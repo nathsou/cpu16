@@ -1,216 +1,283 @@
+use asm::Assembler;
+use isa::Reg;
+use procedures::def_division;
+use sim::Cpu;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Reg {
-    Z = 0,
-    R1,
-    R2,
-    R3,
-    R4,
-    TMP,
-    SP,
-    PC,
+mod asm;
+mod isa;
+mod procedures;
+mod sim;
+
+fn add() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R1, 0x23)
+        .set(R2, 0x17)
+        .add(R1, R1, R2)
+        .halt()
+        .assemble()
 }
 
-impl From<u16> for Reg {
-    fn from(val: u16) -> Self {
-        match val {
-            0 => Reg::Z,
-            1 => Reg::R1,
-            2 => Reg::R2,
-            3 => Reg::R3,
-            4 => Reg::R4,
-            5 => Reg::TMP,
-            6 => Reg::SP,
-            7 => Reg::PC,
-            _ => panic!("Invalid register"),
-        }
-    }
+fn sub() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R1, 0x23)
+        .set(R2, 0x17)
+        .sub(R1, R1, R2)
+        .halt()
+        .assemble()
 }
 
-struct Cpu {
-    regs: [u16; 8],
-    halted: bool,
-    carry: bool,
-    zero: bool,
-    rom: [u16; 0x10000],
-    ram: [u16; 0x10000],
-    next_pc: u16,
+fn muli() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R2, 0x23)
+        .muli(R1, R2, 0x17)
+        .halt()
+        .assemble()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AluOp {
-    Add = 0b000,
-    Adc = 0b001,
-    Sbc = 0b010,
-    And = 0b011,
-    Or = 0b100,
-    Xor = 0b101,
-    Shl = 0b110,
-    Shr = 0b111,
+fn xor() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R2, 0x23)
+        .set(R3, 0x17)
+        .xor(R1, R2, R3)
+        .halt()
+        .assemble()
 }
 
-impl From<u16> for AluOp {
-    fn from(val: u16) -> Self {
-        match val {
-            0b000 => AluOp::Add,
-            0b001 => AluOp::Adc,
-            0b010 => AluOp::Sbc,
-            0b011 => AluOp::And,
-            0b100 => AluOp::Or,
-            0b101 => AluOp::Xor,
-            0b110 => AluOp::Shl,
-            0b111 => AluOp::Shr,
-            _ => panic!("Invalid ALU operation"),
-        }
-    }
+fn dec() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new().set(R1, 0x23).dec(R1).halt().assemble()
 }
 
-enum Cond {
-    Always = 0b00,
-    IfZeroSet = 0b01,
-    IfCarrySet = 0b10,
-    IfCarryNotSet = 0b11,
+fn count() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R1, 0xa)
+        .set(R2, 0)
+        .label("loop")
+        .dec(R1)
+        .jmpnz("loop")
+        .halt()
+        .assemble()
 }
 
-impl From<u16> for Cond {
-    fn from(val: u16) -> Self {
-        match val {
-            0b00 => Cond::Always,
-            0b01 => Cond::IfZeroSet,
-            0b10 => Cond::IfCarrySet,
-            0b11 => Cond::IfCarryNotSet,
-            _ => panic!("Invalid condition"),
-        }
-    }
+fn div() -> Vec<u16> {
+    use Reg::*;
+
+    let mut asm = Assembler::new();
+
+    asm.set(R2, 1621).set(R3, 17).call("div").halt();
+
+    def_division(&mut asm, "div", R1, R2, R3);
+
+    asm.assemble()
 }
 
-// instructions:
-// ctrl flags                  [{00} <halt: 1> <carry: 1> <zero: 1>] 
-// set dst val: reg[dst] = val [{01} <dst: 3> <val: 11>]
-// load/store dst addr offset  [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
-// alu dst src1 src2 op cond   [{11} <dst: 3> <src1: 3> <src2: 3> <op: 3> <cond: 2>]
+fn add32() -> Vec<u16> {
+    use Reg::*;
 
-enum Inst {
-    Ctl{halt: bool, carry: bool, zero: bool},
-    Set{dst: Reg, val: u16},
-    Mem{dst: Reg, addr: Reg, load: bool, offset: u8},
-    Alu{dst: Reg, src1: Reg, src2: Reg, op: AluOp, cond: Cond},
+    Assembler::new()
+        .setw(R1, 0x1234, TMP)
+        .setw(R2, 0xbaba, TMP)
+        .setw(R3, 0x4321, TMP)
+        .setw(R4, 0x5678, TMP)
+        .add32(R1, R2, R3, R4)
+        // .add32(R1, R2, R3, R3)
+        .halt()
+        .assemble()
 }
 
-fn bit(val: u16, i: u8) -> bool {
-    val & (1 << i) != 0
+fn euler1() -> Vec<u16> {
+    use Reg::*;
+
+    // ram addresses
+    let n = 0;
+    let sum_hi = 1;
+    let sum_lo = 2;
+
+    let mut asm = Assembler::new();
+
+    asm.init_sp()
+        .store(Z, Z, sum_lo)
+        .store(Z, Z, sum_hi)
+        .setw(TMP, 1000, R1)
+        .dec(TMP)
+        .store(TMP, Z, n)
+        .label("loop")
+        .load(R1, Z, n)
+        .set(R3, 3)
+        .call("div")
+        .update_flags(R1)
+        .jmpz("is_divisible")
+        .load(R1, Z, n)
+        .set(R3, 5)
+        .call("div")
+        .update_flags(R1)
+        .jmpz("is_divisible")
+        .label("loop_back")
+        .load(R1, Z, n)
+        .dec(R1)
+        .store(R1, Z, n)
+        .jmpnz("loop")
+        .jmp("end")
+        .label("is_divisible")
+        .load(R1, Z, n)
+        .load(R2, Z, sum_hi)
+        .load(R3, Z, sum_lo)
+        .add32(R2, R3, Z, R1)
+        .store(R2, Z, sum_hi)
+        .store(R3, Z, sum_lo)
+        .jmp("loop_back")
+        .label("end")
+        .load(R1, Z, sum_hi)
+        .load(R2, Z, sum_lo)
+        .halt();
+
+    def_division(&mut asm, "div", R2, R1, R3);
+
+    asm.assemble()
 }
 
-impl Cpu {
-    pub fn new(rom: [u16; 0x10000]) -> Self {
-        Self {
-            regs: [0; 8],
-            halted: false,
-            carry: false,
-            zero: false,
-            rom,
-            ram: [0; 0x10000],
-            next_pc: 0,
-        }
-    }
+fn lab() -> Vec<u16> {
+    use Reg::*;
 
-    pub fn set_reg(&mut self, reg: Reg, val: u16) {
-        match reg {
-            Reg::Z => {},
-            Reg::PC => self.next_pc = val,
-            _ => self.regs[reg as usize] = val,
-        }
-    }
+    let mut asm = Assembler::new();
 
-    pub fn step(&mut self) {
-        let pc = self.regs[Reg::PC as usize];
-        let inst = self.rom[pc as usize];
-        let op = inst >> 14;
-        let dst = Reg::from((inst >> 11) & 0b111);
-        self.next_pc = pc.wrapping_add(1);
+    asm.set(R1, 3)
+        .label("loop")
+        .dec(R1)
+        .jmpnz("loop")
+        .halt()
+        .assemble()
+}
 
-        match op {
-            0b00 => {
-                let halt = bit(inst, 13);
-                let carry = bit(inst, 12);
-                let zero = bit(inst, 11);
+fn call() -> Vec<u16> {
+    use Reg::*;
 
-                self.halted = halt;
-                self.carry = carry;
-                self.zero = zero;
-            },
-            0b01 => {
-                let val = inst & 0x7ff;
-                self.set_reg(dst, val);
-            },
-            0b10 => {
-                let addr = (inst >> 8) & 0b111;
-                let load = bit(inst, 7);
-                let offset = inst & 0x7f;
-                let addr = self.regs[addr as usize].wrapping_add(offset);
+    Assembler::new()
+        .jmp("start")
+        .label("yo")
+        .set(R1, 0x23)
+        .ret()
+        .label("start")
+        .set(R1, 7)
+        .call("yo")
+        .inc(R1)
+        .halt()
+        .assemble()
+}
 
-                if load {
-                    self.set_reg(dst, self.ram[addr as usize]);
-                } else {
-                    self.ram[addr as usize] = self.regs[dst as usize];
-                }
-            },
-            0b11 => {
-                let src1 = (inst >> 8) & 0b111;
-                let src2 = (inst >> 5) & 0b111;
-                let op = AluOp::from((inst >> 2) & 0b111);
-                let cond = Cond::from(inst & 0b11);
+#[test]
+fn test_add() {
+    let mut cpu = Cpu::from(&add());
 
-                let a = self.regs[src1 as usize];
-                let b = self.regs[src2 as usize];
-                let res = match op {
-                    AluOp::And => a & b,
-                    AluOp::Or => a | b,
-                    AluOp::Xor => a ^ b,
-                    AluOp::Shl => a << b,
-                    AluOp::Shr => a >> b,
-                    _ => {
-                        let carry_in = match op {
-                            AluOp::Adc => self.carry,
-                            AluOp::Sbc => !self.carry,
-                            _ => false,
-                        } as u16;
+    cpu.run();
 
-                        let b = if op == AluOp::Sbc { !b } else { b };
-                        let (sum1, carry_out1) = a.overflowing_add(b);
-                        let (sum2, carry_out2) = sum1.overflowing_add(carry_in);
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23 + 0x17);
+}
 
-                        self.carry = carry_out1 || carry_out2;
-                        self.zero = sum2 == 0;
+#[test]
+fn test_sub() {
+    let mut cpu = Cpu::from(&sub());
 
-                        sum2
-                    },
-                };
+    cpu.run();
 
-                let cond_met = match cond {
-                    Cond::Always => true,
-                    Cond::IfZeroSet => self.zero,
-                    Cond::IfCarrySet => self.carry,
-                    Cond::IfCarryNotSet => !self.carry,
-                };
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23 - 0x17);
+}
 
-                if cond_met {
-                    self.set_reg(dst, res);
-                }
-            },
-            _ => panic!("Invalid instruction"),
-        }
+#[test]
+fn test_muli() {
+    let mut cpu = Cpu::from(&muli());
 
-        self.regs[Reg::PC as usize] = self.next_pc;
-    }
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23 * 0x17);
+}
+
+#[test]
+fn test_xor() {
+    let mut cpu = Cpu::from(&xor());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23 ^ 0x17);
+}
+
+#[test]
+fn test_dec() {
+    let mut cpu = Cpu::from(&dec());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23 - 1);
+}
+
+#[test]
+fn test_count() {
+    let mut cpu = Cpu::from(&count());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0);
+}
+
+#[test]
+fn test_div() {
+    let mut cpu = Cpu::from(&div());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 1621 / 17);
+}
+
+#[test]
+fn test_add32() {
+    let mut cpu = Cpu::from(&add32());
+
+    cpu.run();
+
+    let sum: u32 = 0x1234_baba + 0x4321_5678;
+    assert_eq!(cpu.regs[Reg::R1 as usize], (sum >> 16) as u16);
+    assert_eq!(cpu.regs[Reg::R2 as usize], (sum & 0xffff) as u16);
+}
+
+#[test]
+fn test_euler1() {
+    let mut cpu = Cpu::from(&euler1());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x0003);
+    assert_eq!(cpu.regs[Reg::R2 as usize], 0x8ed0);
 }
 
 fn main() {
-    let a = 0b10101010u8;
-    let b = 0b11001100u8;
-    let sum = a.wrapping_add(b);
-    let xor = a ^ b;
+    let prog = euler1();
 
-    println!("add: {sum:0>8b}");
-    println!("xor: {xor:0>8b}");
+    let disasm = prog
+        .iter()
+        .map(|&inst| isa::Inst::from(inst))
+        .collect::<Vec<_>>();
+
+    for (i, inst) in disasm.iter().enumerate() {
+        println!("{:04x}: {}", i, inst);
+    }
+
+    println!("");
+
+    let mut cpu = Cpu::from(&prog);
+
+    let steps = cpu.run_with_fuel(1_000_000_000, false);
+
+    println!("{}", cpu);
+    println!("steps: {:?}", steps.expect("fuel exhausted"));
 }
