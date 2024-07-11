@@ -255,7 +255,7 @@ impl std::fmt::Display for ControlOp {
 }
 
 // instructions:
-// ctrl flags                  [{00} <state_n: 1> <flag_sel: 2>] (inverted state so that the inst 0x0000 halts the cpu)
+// ctrl flags                  [{00} <sel: 3>]
 // set dst val: reg[dst] = val [{01} <dst: 3> <val: 11>]
 // load/store dst addr offset  [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
 // alu dst src1 src2 op cond   [{11} <dst: 3> <src1: 3> <src2: 3> <op: 5>]

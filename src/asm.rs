@@ -2,7 +2,7 @@ use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg};
 use std::collections::HashMap;
 
 pub struct Assembler {
-    bytes: Vec<u16>,
+    output: Vec<u16>,
     labels: HashMap<String, usize>,
     unresolved_labels: Vec<(String, usize)>,
 }
@@ -10,7 +10,7 @@ pub struct Assembler {
 impl Assembler {
     pub fn new() -> Self {
         Assembler {
-            bytes: Vec::new(),
+            output: Vec::new(),
             labels: HashMap::new(),
             unresolved_labels: Vec::new(),
         }
@@ -28,7 +28,7 @@ impl Assembler {
     }
 
     fn push_inst(&mut self, inst: Inst) {
-        self.bytes.push(inst.into());
+        self.output.push(inst.into());
     }
 
     pub fn init_sp(&mut self) -> &mut Self {
@@ -36,18 +36,18 @@ impl Assembler {
     }
 
     pub fn assemble(&self) -> Vec<u16> {
-        let mut bytes = self.bytes.clone();
+        let mut out = self.output.clone();
 
         for (label, inst_addr) in &self.unresolved_labels {
             if let Some(&label_addr) = self.labels.get(label) {
                 let relative_offset = Self::get_relative_offset(label_addr, *inst_addr);
-                bytes[*inst_addr] |= (relative_offset as u16) & 0x7f;
+                out[*inst_addr] |= (relative_offset as u16) & 0x7f;
             } else {
                 panic!("unresolved label: {label}");
             }
         }
 
-        bytes
+        out
     }
 
     pub fn nop(&mut self) -> &mut Self {
@@ -301,8 +301,16 @@ impl Assembler {
         self.alu(dst, dst, Reg::Z, AluOp::Inc)
     }
 
+    pub fn inc2(&mut self, dst: Reg, src: Reg) -> &mut Self {
+        self.alu(dst, src, Reg::Z, AluOp::Inc)
+    }
+
     pub fn dec(&mut self, dst: Reg) -> &mut Self {
         self.alu(dst, dst, Reg::Z, AluOp::Dec)
+    }
+
+    pub fn dec2(&mut self, dst: Reg, src: Reg) -> &mut Self {
+        self.alu(dst, src, Reg::Z, AluOp::Dec)
     }
 
     fn jmp_if_rel(&mut self, relative_offset: i8, cond: Cond) -> &mut Self {
@@ -316,7 +324,7 @@ impl Assembler {
     }
 
     pub fn jmp_if(&mut self, label: &str, cond: Cond) -> &mut Self {
-        let inst_addr = self.bytes.len();
+        let inst_addr = self.output.len();
 
         if let Some(&label_addr) = self.labels.get(label) {
             let relative_offset = Self::get_relative_offset(label_addr, inst_addr);
@@ -418,7 +426,7 @@ impl Assembler {
             "label {label} already defined"
         );
 
-        self.labels.insert(label.to_string(), self.bytes.len());
+        self.labels.insert(label.to_string(), self.output.len());
         self
     }
 }

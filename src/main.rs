@@ -91,7 +91,6 @@ fn add32() -> Vec<u16> {
         .setw(R3, 0x4321, TMP)
         .setw(R4, 0x5678, TMP)
         .add32(R1, R2, R3, R4)
-        // .add32(R1, R2, R3, R3)
         .halt()
         .assemble()
 }
