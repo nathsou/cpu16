@@ -73,13 +73,15 @@ impl Cpu {
         self.next_pc = pc.wrapping_add(1);
 
         match inst {
-            Inst::Ctl { op } => match op {
-                ControlOp::Halt => self.halted = true,
-                ControlOp::Setz => self.zero = true,
-                ControlOp::Clrz => self.zero = false,
-                ControlOp::Setc => self.carry = true,
-                ControlOp::Clrc => self.carry = false,
-            },
+            Inst::Ctl { op } => {
+                match op {
+                    ControlOp::Halt => self.halted = true,
+                    ControlOp::Setz => self.zero = true,
+                    ControlOp::Clrz => self.zero = false,
+                    ControlOp::Setc => self.carry = true,
+                    ControlOp::Clrc => self.carry = false,
+                };
+            }
             Inst::Set { dst, val } => {
                 self.set_reg(dst, val);
             }
@@ -115,29 +117,18 @@ impl Cpu {
                     AluOp::Xor => a ^ b,
                     AluOp::Shl => a << (b & 0xf),
                     AluOp::Shr => a >> (b & 0xf),
-                    AluOp::Inc => {
-                        let (out, carry_out) = a.overflowing_add(1);
-                        new_carry = carry_out;
-                        out
-                    }
-                    AluOp::Dec => {
-                        let (out, carry_out) = a.overflowing_sub(1);
-                        new_carry = carry_out;
-                        out
-                    }
                     _ => {
-                        let decomposed = op.decompose_arith().expect("invalid arith op");
-                        let is_add = decomposed.add;
-                        let carry_in = decomposed.force_carry
-                            || if decomposed.incude_carry {
-                                self.carry
-                            } else {
-                                false
-                            };
+                        let op_u16 = op as u16;
+                        let is_add = op_u16 & 1 == 0;
+                        let include_carry = (op_u16 & 0b11) == 0b10 || (op_u16 & 0b11) == 0b11; // all adc and sbc operations
+                        let force_carry = (op_u16 & 0b11) == 1 || op == AluOp::Inc; // all sub operations or inc
+                        let condition = Cond::from((op_u16 & 0b11100) >> 2);
+                        let carry_in = match op {
+                            AluOp::Dec => false,
+                            _ => force_carry || (include_carry && self.carry),
+                        };
 
-                        let cond = decomposed.condition;
-
-                        cond_met = match cond {
+                        cond_met = match condition {
                             Cond::Always => true,
                             Cond::IfZero => self.zero,
                             Cond::IfNotZero => !self.zero,

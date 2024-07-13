@@ -151,12 +151,7 @@ fn lab() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    asm.set(R1, 3)
-        .label("loop")
-        .dec(R1)
-        .jmpnz("loop")
-        .halt()
-        .assemble()
+    asm.set(R1, 0x23).inc(R1).halt().assemble()
 }
 
 fn call() -> Vec<u16> {
@@ -260,7 +255,7 @@ fn test_euler1() {
 }
 
 fn main() {
-    let prog = euler1();
+    let prog = lab();
 
     let disasm = prog
         .iter()
@@ -275,7 +270,7 @@ fn main() {
 
     let mut cpu = Cpu::from(&prog);
 
-    let steps = cpu.run_with_fuel(1_000_000_000, false);
+    let steps = cpu.run_with_fuel(1_000_000_000, true);
 
     println!("{}", cpu);
     println!("steps: {:?}", steps.expect("fuel exhausted"));

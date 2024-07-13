@@ -1,7 +1,7 @@
 
 module RegisterFile #(
-  parameter DataWidth  = 8,
-  parameter NumRegs    = 16,
+  parameter DataWidth  = 16,
+  parameter NumRegs    = 8,
   parameter IndexWidth = $clog2(NumRegs)
 ) (
   input  logic                  clk,

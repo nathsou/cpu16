@@ -55,12 +55,11 @@ pub enum Cond {
 impl From<u16> for Cond {
     fn from(val: u16) -> Self {
         match val {
-            0b000 => Cond::Always,
             0b001 => Cond::IfZero,
             0b010 => Cond::IfNotZero,
             0b011 => Cond::IfCarry,
             0b100 => Cond::IfNotCarry,
-            _ => panic!("Invalid condition: {val:02b}"),
+            _ => Cond::Always,
         }
     }
 }
@@ -106,43 +105,15 @@ pub enum AluOp {
     AdcIfNotCarry = 0b100_10,
     SbcIfNotCarry = 0b100_11,
 
+    Inc = 0b101_00,
+    Dec = 0b101_01,
+
     And,
     Nand,
     Or,
     Xor,
-
     Shl,
     Shr,
-    Inc,
-    Dec,
-}
-
-pub struct ArithOp {
-    pub add: bool,
-    pub incude_carry: bool,
-    pub force_carry: bool,
-    pub condition: Cond,
-}
-
-impl AluOp {
-    pub fn is_arith(self) -> bool {
-        (self as u16) < (AluOp::And as u16)
-    }
-
-    pub fn decompose_arith(self) -> Option<ArithOp> {
-        let op = self as u16;
-
-        if !self.is_arith() {
-            return None;
-        }
-
-        Some(ArithOp {
-            add: op & 1 == 0,
-            incude_carry: (op & 0b11) == 0b10 || (op & 0b11) == 0b11, // all adc and sbc operations
-            force_carry: (op & 0b11) == 1,                            // all sub operations
-            condition: Cond::from((op & 0b11100) >> 2),
-        })
-    }
 }
 
 impl From<u16> for AluOp {
@@ -168,14 +139,14 @@ impl From<u16> for AluOp {
             17 => AluOp::SubIfNotCarry,
             18 => AluOp::AdcIfNotCarry,
             19 => AluOp::SbcIfNotCarry,
-            20 => AluOp::And,
-            21 => AluOp::Nand,
-            22 => AluOp::Or,
-            23 => AluOp::Xor,
-            24 => AluOp::Shl,
-            25 => AluOp::Shr,
-            26 => AluOp::Inc,
-            27 => AluOp::Dec,
+            20 => AluOp::Inc,
+            21 => AluOp::Dec,
+            22 => AluOp::And,
+            23 => AluOp::Nand,
+            24 => AluOp::Or,
+            25 => AluOp::Xor,
+            26 => AluOp::Shl,
+            27 => AluOp::Shr,
             _ => panic!("Invalid ALU operation"),
         }
     }
@@ -204,14 +175,14 @@ impl std::fmt::Display for AluOp {
             AluOp::SubIfNotCarry => "subnc",
             AluOp::AdcIfNotCarry => "adcnc",
             AluOp::SbcIfNotCarry => "sbcnc",
+            AluOp::Inc => "inc",
+            AluOp::Dec => "dec",
             AluOp::And => "and",
             AluOp::Nand => "nand",
             AluOp::Or => "or",
             AluOp::Xor => "xor",
             AluOp::Shl => "shl",
             AluOp::Shr => "shr",
-            AluOp::Inc => "inc",
-            AluOp::Dec => "dec",
         };
 
         write!(f, "{name}")
@@ -255,7 +226,7 @@ impl std::fmt::Display for ControlOp {
 }
 
 // instructions:
-// ctrl flags                  [{00} <sel: 3>]
+// ctrl flags                  [{00} <padding: 11> <sel: 3>]
 // set dst val: reg[dst] = val [{01} <dst: 3> <val: 11>]
 // load/store dst addr offset  [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
 // alu dst src1 src2 op cond   [{11} <dst: 3> <src1: 3> <src2: 3> <op: 5>]
@@ -291,7 +262,7 @@ impl From<u16> for Inst {
     fn from(val: u16) -> Self {
         match val >> 14 {
             0b00 => Inst::Ctl {
-                op: ControlOp::from(val & 0b11),
+                op: ControlOp::from(val & 0b111),
             },
             0b01 => Inst::Set {
                 dst: Reg::from((val >> 11) & 0b111),

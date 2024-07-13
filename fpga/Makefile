@@ -14,7 +14,7 @@ TESTBENCH_PATH = testbenches
 
 SRC_PATH = src
 
-.PHONY: all build clean test
+.PHONY: all build clean test dotfile
 
 all: build test
 
@@ -38,6 +38,10 @@ test:
 		fi; \
 	done
 	@echo "All testbenches passed successfully."
+
+dotfile:
+	mkdir -p $(OUTPUT_PATH)
+	$(OSSCAD_BIN)/yosys -p "read_verilog -sv $(SRC_PATH)/*.sv; hierarchy -check -top $(TOP_MODULE); proc; opt; fsm; opt; memory; opt; show -format dot -prefix $(OUTPUT_PATH)/$(TOP_MODULE)"
 
 clean:
 	rm -rf $(OUTPUT_PATH)
