@@ -1,4 +1,4 @@
-use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg};
+use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg, STACK_POINTER_TOP};
 use std::collections::HashMap;
 
 pub struct Assembler {
@@ -32,7 +32,7 @@ impl Assembler {
     }
 
     pub fn init_sp(&mut self) -> &mut Self {
-        self.setw(Reg::SP, 0xff00, Reg::TMP)
+        self.setw(Reg::SP, STACK_POINTER_TOP, Reg::TMP)
     }
 
     pub fn assemble(&self) -> Vec<u16> {

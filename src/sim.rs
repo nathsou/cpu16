@@ -1,4 +1,4 @@
-use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg};
+use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg, STACK_POINTER_TOP};
 
 pub struct Cpu {
     pub regs: [u16; 8],
@@ -175,8 +175,8 @@ impl std::fmt::Display for Cpu {
 
         let stack_ptr = self.regs[Reg::SP as usize];
 
-        if stack_ptr > 0xff00 {
-            let stack = &self.ram[0xff00..stack_ptr as usize];
+        if stack_ptr > STACK_POINTER_TOP {
+            let stack = &self.ram[(STACK_POINTER_TOP as usize)..stack_ptr as usize];
             let fmt = stack
                 .iter()
                 .map(|&val| format!("{:04x}", val))

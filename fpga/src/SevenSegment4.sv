@@ -6,7 +6,7 @@ module SevenSegment4 (
     output logic [6:0] segs,
     output logic [3:0] sel
 );
-    logic [10:0] counter;
+    logic [12:0] counter;
     logic [3:0] activeChar;
     logic [6:0] segsNeg;
 
@@ -24,7 +24,7 @@ module SevenSegment4 (
     end
 
     always_comb begin
-        unique case (counter[9:8])
+        unique case (counter[12:11])
             2'b00: begin
                 activeChar = value[3:0];
                 sel = 4'b1110;

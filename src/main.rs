@@ -75,18 +75,11 @@ fn div() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    // asm.set(R2, 1621).set(R3, 17).call("div").halt();
+    asm.init_sp().set(R2, 1621).set(R3, 17).call("div").halt();
 
-    // def_division(&mut asm, "div", R1, R2, R3);
+    def_division(&mut asm, "div", R1, R2, R3);
 
-    // asm.assemble()
-    //
-
-    asm.set(R2, 1621)
-        .set(R3, 17)
-        .inline_div(R1, R2, R3, "div")
-        .halt()
-        .assemble()
+    asm.assemble()
 }
 
 fn add32() -> Vec<u16> {
@@ -181,6 +174,18 @@ fn call() -> Vec<u16> {
         .assemble()
 }
 
+fn mem() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .set(R1, 0x23)
+        .store(R1, Z, 3)
+        .set(R1, 0)
+        .load(R1, Z, 3)
+        .halt()
+        .assemble()
+}
+
 #[test]
 fn test_add() {
     let mut cpu = Cpu::from(&add());
@@ -256,6 +261,15 @@ fn test_add32() {
 }
 
 #[test]
+fn test_mem() {
+    let mut cpu = Cpu::from(&mem());
+
+    cpu.run();
+
+    assert_eq!(cpu.ram[3], 0x23);
+}
+
+#[test]
 fn test_euler1() {
     let mut cpu = Cpu::from(&euler1());
 
@@ -284,7 +298,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = div();
+    let prog = euler1();
 
     let disasm = prog
         .iter()
@@ -299,9 +313,9 @@ fn main() {
 
     let mut cpu = Cpu::from(&prog);
 
-    let steps = cpu.run_with_fuel(1_000_000_000, true);
+    let steps = cpu.run_with_fuel(1_000_000_000, false);
 
-    // println!("{}", cpu);
+    println!("{}", cpu);
     println!("steps: {:?}\n", steps.expect("fuel exhausted"));
 
     dump_instructions(&prog);

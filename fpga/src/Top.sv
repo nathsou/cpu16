@@ -35,9 +35,9 @@ module Top (
     logic aluZeroOut;
     logic aluCarryOut;
 
-    logic [19:0] counter;
+    logic [2:0] counter;
     // logic slowClk = debouncedBtn;
-    logic slowClk = counter[19];
+    logic slowClk = counter[2];
 
     ResetConditioner resetConditioner (
         .clk(clk),
@@ -130,7 +130,7 @@ module Top (
                 2'b10: begin // mem: [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
                     regReadAddr1 = romData[10:8];
 
-                    if (romData[8]) begin // load
+                    if (romData[7]) begin // load
                         regWriteEn = 1'b1;
                         regWriteAddr = romData[13:11];
                         regWriteData = ramReadData;

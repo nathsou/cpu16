@@ -46,5 +46,4 @@ module ALU (
     end
 
     assign zeroFlagOut = out[15:0] == 16'h0;
-
 endmodule
