@@ -119,14 +119,12 @@ impl Cpu {
                     AluOp::Shr => a >> (b & 0xf),
                     _ => {
                         let op_u16 = op as u16;
-                        let is_add = op_u16 & 1 == 0;
+                        let is_sub = op_u16 & 1 == 1;
                         let include_carry = (op_u16 & 0b11) == 0b10 || (op_u16 & 0b11) == 0b11; // all adc and sbc operations
                         let force_carry = (op_u16 & 0b11) == 1 || op == AluOp::Inc; // all sub operations or inc
                         let condition = Cond::from((op_u16 & 0b11100) >> 2);
-                        let carry_in = match op {
-                            AluOp::Dec => false,
-                            _ => force_carry || (include_carry && self.carry),
-                        };
+                        let carry_in =
+                            op != AluOp::Dec && (force_carry || (include_carry && self.carry));
 
                         cond_met = match condition {
                             Cond::Always => true,
@@ -136,7 +134,7 @@ impl Cpu {
                             Cond::IfNotCarry => !self.carry,
                         };
 
-                        let b = if !is_add { !b } else { b };
+                        let b = if is_sub { !b } else { b };
                         let (sum1, carry_out1) = a.overflowing_add(b);
                         let (sum2, carry_out2) = sum1.overflowing_add(carry_in as u16);
                         new_carry = carry_out1 || carry_out2;

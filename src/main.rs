@@ -75,11 +75,18 @@ fn div() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    asm.set(R2, 1621).set(R3, 17).call("div").halt();
+    // asm.set(R2, 1621).set(R3, 17).call("div").halt();
 
-    def_division(&mut asm, "div", R1, R2, R3);
+    // def_division(&mut asm, "div", R1, R2, R3);
 
-    asm.assemble()
+    // asm.assemble()
+    //
+
+    asm.set(R2, 1621)
+        .set(R3, 17)
+        .inline_div(R1, R2, R3, "div")
+        .halt()
+        .assemble()
 }
 
 fn add32() -> Vec<u16> {
@@ -151,7 +158,11 @@ fn lab() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    asm.set(R1, 0x23).inc(R1).halt().assemble()
+    asm.set(R1, 1621)
+        .set(R2, 17)
+        .sub(Z, R1, R2)
+        .halt()
+        .assemble()
 }
 
 fn call() -> Vec<u16> {
@@ -254,8 +265,26 @@ fn test_euler1() {
     assert_eq!(cpu.regs[Reg::R2 as usize], 0x8ed0);
 }
 
+fn dump_instructions(prog: &[u16]) {
+    println!("module ROM (");
+    println!("    input logic [15:0] addr,");
+    println!("    output logic [15:0] data");
+    println!(");");
+    println!("    always_comb begin");
+    println!("        case (addr)");
+
+    for (i, &inst) in prog.iter().enumerate() {
+        println!("            16'h{:04X}: data = 16'h{:04X};", i, inst);
+    }
+
+    println!("            default: data = 16'h0000;");
+    println!("        endcase");
+    println!("    end");
+    println!("endmodule");
+}
+
 fn main() {
-    let prog = lab();
+    let prog = div();
 
     let disasm = prog
         .iter()
@@ -272,6 +301,8 @@ fn main() {
 
     let steps = cpu.run_with_fuel(1_000_000_000, true);
 
-    println!("{}", cpu);
-    println!("steps: {:?}", steps.expect("fuel exhausted"));
+    // println!("{}", cpu);
+    println!("steps: {:?}\n", steps.expect("fuel exhausted"));
+
+    dump_instructions(&prog);
 }

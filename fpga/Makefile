@@ -5,7 +5,7 @@ OSSCAD_BIN = $(OSSCAD_PATH)/bin
 # FPGA CHIP
 CHIP = hx8k
 PACKAGE = cb132
-FREQ = 100 # MHz
+FREQ = 40 # MHz
 PCF_PATH = cu.pcf
 
 TOP_MODULE = Top
