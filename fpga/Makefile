@@ -5,7 +5,7 @@ OSSCAD_BIN = $(OSSCAD_PATH)/bin
 # FPGA CHIP
 CHIP = hx8k
 PACKAGE = cb132
-FREQ = 40 # MHz
+FREQ = 50 # MHz
 PCF_PATH = cu.pcf
 
 TOP_MODULE = Top
@@ -20,7 +20,7 @@ all: build test
 
 build:
 	mkdir -p $(OUTPUT_PATH)
-	$(OSSCAD_BIN)/yosys -p "read_verilog -sv $(SRC_PATH)/*.sv; synth_ice40 -top $(TOP_MODULE) -json $(OUTPUT_PATH)/$(TOP_MODULE).json"
+	$(OSSCAD_BIN)/yosys -p "verilog_defines -D ALCHITRY_CU=1; read_verilog -sv $(SRC_PATH)/*.sv; synth_ice40 -top $(TOP_MODULE) -json $(OUTPUT_PATH)/$(TOP_MODULE).json"
 	$(OSSCAD_BIN)/nextpnr-ice40 --$(CHIP) --package $(PACKAGE) --json $(OUTPUT_PATH)/$(TOP_MODULE).json --pcf $(PCF_PATH) --asc $(OUTPUT_PATH)/$(TOP_MODULE).asc --freq $(FREQ)
 	$(OSSCAD_BIN)/icepack $(OUTPUT_PATH)/$(TOP_MODULE).asc  $(OUTPUT_PATH)/$(TOP_MODULE).bin
 

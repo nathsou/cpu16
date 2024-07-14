@@ -1,8 +1,15 @@
 
+`ifdef ALCHITRY_CU
+  `define NUM_RAM_REGS 8192
+`elsif ALCHITRY_AU
+  `define NUM_RAM_REGS 65536
+`else
+  `error "Board not defined. Use ALCHITRY_CU or ALCHITRY_AU."
+`endif
+
 module Top (
     input logic clk,
     input logic rstN,
-    inout logic [4:0] ioButton,
     output logic [7:0] led,
     output logic [6:0] ioSeg,
     output logic [3:0] ioSel,
@@ -32,11 +39,20 @@ module Top (
     logic carryFlag;
     logic aluZeroOut;
     logic aluCarryOut;
-    logic slowClk;
     logic memReadReady;
     // stall for one cycle before reading from memory during a load operation
     logic isReadingMem = ~memReadReady && romData[15:14] == 2'b10 && romData[7];
     logic countEnable = ~haltFlag && ~isReadingMem;
+    logic slowClk;
+
+    `ifdef ALCHITRY_CU
+        // We need to slow down the clock for the ALCHITRY CU for the CPU to run reliably
+        always_ff @(posedge clk) begin
+            slowClk <= ~slowClk;
+        end
+    `else
+        assign slowClk = clk;
+    `endif
 
     ResetConditioner resetConditioner (
         .clk(clk),
@@ -85,7 +101,7 @@ module Top (
         .data(romData)
     );
 
-    RAM #(.DataWidth(16), .NumRegs(8192)) ram (
+    RAM #(.DataWidth(16), .NumRegs(`NUM_RAM_REGS)) ram (
         .clk(slowClk),
         .writeEnable(ramWriteEnable),
         .writeAddr(ramWriteAddr),
@@ -137,14 +153,6 @@ module Top (
                     regWriteEnable = aluConditionMet;
                 end
             endcase
-        end
-    end
-
-    always_ff @(posedge clk or posedge rst) begin
-        if (rst) begin
-            slowClk <= 1'b0;
-        end else begin
-            slowClk <= ~slowClk;
         end
     end
 

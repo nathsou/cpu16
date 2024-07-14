@@ -8,7 +8,7 @@ module ALU (
     output logic zeroFlagOut,
     output logic carryFlagOut,
     output logic conditionMet,
-    output logic [16:0] out,
+    output logic [16:0] out
 );
     logic isSub = (op & 1'b1) == 1'b1;
     logic includeCarry = (op & 2'b11) == 2'b10 || (op & 2'b11) == 2'b11; // all adc/sbc ops

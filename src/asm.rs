@@ -387,14 +387,6 @@ impl Assembler {
     pub fn load(&mut self, dst: Reg, addr: Reg, offset: u8) -> &mut Self {
         assert!(offset < 128, "load: offset is too large (max 127)");
 
-        // prepare read address (RAM reads are clocked)
-        // self.push_inst(Inst::Mem {
-        //     dst: Reg::Z,
-        //     addr,
-        //     load: true,
-        //     offset,
-        // });
-
         // read value
         self.push_inst(Inst::Mem {
             dst,
