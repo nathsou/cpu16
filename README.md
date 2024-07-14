@@ -3,6 +3,8 @@
 Simple load-store 16-bit CPU ISA, along with a Rust simulator and SystemVerilog
 design.
 
+<img src="res/cpu16.png" alt="CPU16 Running on an Alchitry Au" width="400">
+
 ## Instruction Set
 
 | Instruction | Description       | Opcode | Flags       | Arguments                                      | Cycles            |
@@ -59,7 +61,7 @@ these primitive instructions.**
 Currently, both the Alchitry Cu and Alchitry Au development boards are supported
 with the IO Element header.
 
-- Alchitry Cu (iCE40HX8K)
+### Alchitry Cu (iCE40HX8K)
 
 The Alchitry Cu supports a fully open-source toolchain:
 
@@ -69,14 +71,14 @@ The Alchitry Cu supports a fully open-source toolchain:
 3. The bitstream will be in fpga/build/Top.bin
 4. Run iceprog to program the FPGA
 
-- Alchitry Au (Xilinx 7)
+### Alchitry Au (Xilinx 7)
 
 1. Install [Vivado](https://alchitry.com/tutorials/setup/vivado/)
 2. Run build_alchitry_au.bat in the fpga directory
 3. The bitstream will be in fpga/build/vivado/cpu16.runs/impl_1/Top.bin
 4. Run Alchitry Loader or any other compatible tool to program the FPGA
 
-### Board differences
+#### Board differences
 
 | Board       | CPU Freq | RAM (16-bit) |
 | ----------- | -------- | ------------ |
