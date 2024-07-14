@@ -186,6 +186,19 @@ fn mem() -> Vec<u16> {
         .assemble()
 }
 
+fn stack() -> Vec<u16> {
+    use Reg::*;
+
+    Assembler::new()
+        .init_sp()
+        .set(R1, 0x23)
+        .push(R1)
+        .set(R1, 0x11)
+        .pop(R1)
+        .halt()
+        .assemble()
+}
+
 #[test]
 fn test_add() {
     let mut cpu = Cpu::from(&add());
@@ -277,6 +290,15 @@ fn test_euler1() {
 
     assert_eq!(cpu.regs[Reg::R1 as usize], 0x0003);
     assert_eq!(cpu.regs[Reg::R2 as usize], 0x8ed0);
+}
+
+#[test]
+fn test_stack() {
+    let mut cpu = Cpu::from(&stack());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 0x23);
 }
 
 fn dump_instructions(prog: &[u16]) {

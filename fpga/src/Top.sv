@@ -9,9 +9,7 @@ module Top (
     output logic [23:0] ioLed
 );
     logic rst;
-    logic debouncedBtn;
-    logic pulledDownBtn;
-    logic regWriteEn;
+    logic regWriteEnable;
     logic [2:0] regWriteAddr;
     logic [2:0] regReadAddr1;
     logic [2:0] regReadAddr2;
@@ -34,28 +32,12 @@ module Top (
     logic carryFlag;
     logic aluZeroOut;
     logic aluCarryOut;
-
-    logic [2:0] counter;
-    // logic slowClk = debouncedBtn;
-    logic slowClk = counter[2];
+    logic slowClk;
 
     ResetConditioner resetConditioner (
         .clk(clk),
         .in(~rstN),
         .out(rst)
-    );
-
-    FakePullDown #(.SIZE(1)) fakePullDown (
-        .clk(clk),
-        .in(ioButton[0]),
-        .out(pulledDownBtn)
-    );
-    
-    ButtonDebouncer buttonDebouncer (
-        .clk(clk),
-        .rst(rst),
-        .in(pulledDownBtn),
-        .out(debouncedBtn)
     );
 
     SevenSegment4 segments (
@@ -69,7 +51,7 @@ module Top (
     RegisterFile #(.DataWidth(16), .NumRegs(8)) regs (
         .clk(slowClk),
         .rst(rst),
-        .writeEnable(regWriteEn),
+        .writeEnable(regWriteEnable),
         .countEnable(~haltFlag),
         .writeAddr(regWriteAddr),
         .writeData(regWriteData),
@@ -99,7 +81,7 @@ module Top (
         .data(romData)
     );
 
-    RAM #(.DataWidth(16), .NumRegs(16)) ram (
+    RAM #(.DataWidth(16), .NumRegs(8192)) ram (
         .clk(slowClk),
         .writeEnable(ramWriteEnable),
         .writeAddr(ramWriteAddr),
@@ -110,7 +92,7 @@ module Top (
 
     always_comb begin
         aluEnable = 1'b0;
-        regWriteEn = 1'b0;
+        regWriteEnable = 1'b0;
         ramWriteEnable = 1'b0;
         regWriteAddr = 3'bxxx;
         regReadAddr1 = 3'bxxx;
@@ -123,7 +105,7 @@ module Top (
         if (~haltFlag) begin
             case (romData[15:14])
                 2'b01: begin // set: [{01} <dst: 3> <val: 11>]
-                    regWriteEn = 1'b1;
+                    regWriteEnable = 1'b1;
                     regWriteAddr = romData[13:11];
                     regWriteData = romData[10:0];
                 end
@@ -131,7 +113,7 @@ module Top (
                     regReadAddr1 = romData[10:8];
 
                     if (romData[7]) begin // load
-                        regWriteEn = 1'b1;
+                        regWriteEnable = 1'b1;
                         regWriteAddr = romData[13:11];
                         regWriteData = ramReadData;
                         ramReadAddr = regReadData1 + romData[6:0];
@@ -148,7 +130,7 @@ module Top (
                     regReadAddr1 = romData[10:8];
                     regReadAddr2 = romData[7:5];
                     regWriteData = aluOut;
-                    regWriteEn = aluConditionMet;
+                    regWriteEnable = aluConditionMet;
                 end
             endcase
         end
@@ -156,9 +138,9 @@ module Top (
 
     always_ff @(posedge clk or posedge rst) begin
         if (rst) begin
-            counter <= '0;
+            slowClk <= 1'b0;
         end else begin
-            counter <= counter + 1;
+            slowClk <= ~slowClk;
         end
     end
 

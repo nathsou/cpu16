@@ -17,7 +17,7 @@ module RAM #(
         if (writeEnable) begin
             mem[writeAddr] <= writeData;
         end
-    end
 
-    assign readData = mem[readAddr];
+        readData <= mem[readAddr];
+    end
 endmodule

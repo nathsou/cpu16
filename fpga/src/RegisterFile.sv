@@ -38,5 +38,5 @@ module RegisterFile #(
   assign readData1 = regs[readAddr1];
   assign readData2 = regs[readAddr2];
   assign programCounter = regs[NumRegs-1];
-  assign reg1 = regs[1];
+  assign reg1 = regs[2];
 endmodule
