@@ -15,7 +15,7 @@ module RegisterFile #(
   output logic [DataWidth-1:0] readData1,
   output logic [DataWidth-1:0] readData2,
   output logic [DataWidth-1:0] programCounter,
-  output logic [DataWidth-1:0] reg1
+  output logic [DataWidth-1:0] displayReg
 );
   logic [DataWidth-1:0] regs[NumRegs];
 
@@ -38,5 +38,5 @@ module RegisterFile #(
   assign readData1 = regs[readAddr1];
   assign readData2 = regs[readAddr2];
   assign programCounter = regs[NumRegs-1];
-  assign reg1 = regs[2];
+  assign displayReg = regs[2];
 endmodule

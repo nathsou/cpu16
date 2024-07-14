@@ -19,7 +19,7 @@ module Top (
     logic [15:0] programCounter;
     logic [15:0] romData;
     logic [16:0] aluOut;
-    logic [15:0] reg1;
+    logic [15:0] displayReg;
     logic ramWriteEnable;
     logic [15:0] ramWriteAddr;
     logic [15:0] ramWriteData;
@@ -33,6 +33,10 @@ module Top (
     logic aluZeroOut;
     logic aluCarryOut;
     logic slowClk;
+    logic memReadReady;
+    // stall for one cycle before reading from memory during a load operation
+    logic isReadingMem = ~memReadReady && romData[15:14] == 2'b10 && romData[7];
+    logic countEnable = ~haltFlag && ~isReadingMem;
 
     ResetConditioner resetConditioner (
         .clk(clk),
@@ -43,7 +47,7 @@ module Top (
     SevenSegment4 segments (
         .clk(clk),
         .rst(rst),
-        .value(reg1),
+        .value(displayReg),
         .segs(ioSeg),
         .sel(ioSel)
     );
@@ -52,7 +56,7 @@ module Top (
         .clk(slowClk),
         .rst(rst),
         .writeEnable(regWriteEnable),
-        .countEnable(~haltFlag),
+        .countEnable(countEnable),
         .writeAddr(regWriteAddr),
         .writeData(regWriteData),
         .readAddr1(regReadAddr1),
@@ -60,7 +64,7 @@ module Top (
         .readData1(regReadData1),
         .readData2(regReadData2),
         .programCounter(programCounter),
-        .reg1(reg1)
+        .displayReg(displayReg)
     );
 
     ALU alu (
@@ -113,7 +117,7 @@ module Top (
                     regReadAddr1 = romData[10:8];
 
                     if (romData[7]) begin // load
-                        regWriteEnable = 1'b1;
+                        regWriteEnable = memReadReady;
                         regWriteAddr = romData[13:11];
                         regWriteData = ramReadData;
                         ramReadAddr = regReadData1 + romData[6:0];
@@ -149,25 +153,36 @@ module Top (
             haltFlag <= 1'b0;
             zeroFlag <= 1'b0;
             carryFlag <= 1'b0;
+            memReadReady <= 1'b0;
         end else begin
             if (~haltFlag) begin
-                if (romData[15:14] == 2'b00) begin
-                    case (romData[2:0])
-                        3'b000: haltFlag <= 1'b1;
-                        3'b001: zeroFlag <= 1'b1;
-                        3'b010: zeroFlag <= 1'b0;
-                        3'b011: carryFlag <= 1'b1;
-                        3'b100: carryFlag <= 1'b0;
-                    endcase
-                end else if (romData[15:14] == 2'b11 && aluConditionMet) begin
-                    zeroFlag <= aluZeroOut;
-                    carryFlag <= aluCarryOut;
-                end
+                case (romData[15:14])
+                    2'b00: begin
+                        case (romData[2:0])
+                            3'b000: haltFlag <= 1'b1;
+                            3'b001: zeroFlag <= 1'b1;
+                            3'b010: zeroFlag <= 1'b0;
+                            3'b011: carryFlag <= 1'b1;
+                            3'b100: carryFlag <= 1'b0;
+                        endcase
+                    end
+                    2'b10: begin
+                        if (romData[7]) begin
+                            memReadReady <= ~memReadReady;
+                        end
+                    end
+                    2'b11: begin
+                        if (aluConditionMet) begin
+                            zeroFlag <= aluZeroOut;
+                            carryFlag <= aluCarryOut;
+                        end
+                    end
+                endcase
             end
         end
     end
 
     assign led = programCounter;
-    assign ioLed[23:20] = {haltFlag, carryFlag, zeroFlag, romData[15:14] == 2'b11 && aluConditionMet};
+    assign ioLed[23:20] = {haltFlag, carryFlag, zeroFlag, memReadReady};
     assign ioLed[15:0] = romData;
 endmodule

@@ -388,12 +388,12 @@ impl Assembler {
         assert!(offset < 128, "load: offset is too large (max 127)");
 
         // prepare read address (RAM reads are clocked)
-        self.push_inst(Inst::Mem {
-            dst: Reg::Z,
-            addr,
-            load: true,
-            offset,
-        });
+        // self.push_inst(Inst::Mem {
+        //     dst: Reg::Z,
+        //     addr,
+        //     load: true,
+        //     offset,
+        // });
 
         // read value
         self.push_inst(Inst::Mem {
