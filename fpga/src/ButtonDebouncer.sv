@@ -1,3 +1,4 @@
+
 module ButtonDebouncer #(
     parameter CLOCK_CYCLES = 1_000_000  // 10ms at 100MHz clock
 )(

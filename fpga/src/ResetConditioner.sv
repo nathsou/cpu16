@@ -2,8 +2,8 @@
 module ResetConditioner #(
     parameter int STAGES = 4
 ) (
-    input  logic clk,
-    input  logic in,
+    input logic clk,
+    input logic in,
     output logic out
 );
 

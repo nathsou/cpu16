@@ -11,8 +11,21 @@ design.
 | ----------- | ----------------- | ------ | ----------- | ---------------------------------------------- | ----------------- |
 | CTL         | Control flags     | 0b00   | Zero, Carry | <padding: 11> <ctrl_op: 3>                     | 1                 |
 | SET         | Set register      | 0b01   | -           | <dst: 3> <value: 11>                           | 1                 |
-| MEM         | Load/Store memory | 0b10   | -           | <dst: 3> <addr: 3> <load/store: 1> <offset: 7> | load: 2, store: 2 |
+| MEM         | Load/Store memory | 0b10   | -           | <dst: 3> <addr: 3> <load/store: 1> <offset: 7> | load: 2, store: 1 |
 | ALU         | ALU operation     | 0b11   | Zero, Carry | <dst: 3> <src1: 3> <src2: 3> <alu_op: 5>       | 1                 |
+
+### Registers
+
+| Register | Description                                    | Index |
+| -------- | ---------------------------------------------- | ----- |
+| Z        | Zero register (always 0, cannot be written to) | 0     |
+| R1       | General purpose register                       | 1     |
+| R2       | General purpose register                       | 2     |
+| R3       | General purpose register                       | 3     |
+| R4       | General purpose register                       | 4     |
+| TMP      | Temporary value register                       | 5     |
+| SP       | Stack pointer                                  | 6     |
+| PC       | Program counter                                | 7     |
 
 ### CtrlOps:
 

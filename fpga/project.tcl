@@ -13,6 +13,7 @@ set_property verilog_define "ALCHITRY_AU=1" [get_filesets sources_1]
 
 set verilogSources [list \
     "$cwd/src/Top.sv" \
+    "$cwd/src/CPU.sv" \
     "$cwd/src/ALU.sv" \
     "$cwd/src/ButtonDebouncer.sv" \
     "$cwd/src/RAM.sv" \
