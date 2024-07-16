@@ -1,3 +1,5 @@
+# Alchitry Au/Cu Constraints with IO Element board
+
 # Clock
 set_io clk P7
 # Reset

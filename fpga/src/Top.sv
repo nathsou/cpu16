@@ -1,10 +1,8 @@
 
 `ifdef ALCHITRY_CU
   `define NUM_RAM_REGS 8192
-`elsif ALCHITRY_AU
-  `define NUM_RAM_REGS 65536
 `else
-  `error "Board not defined. Use ALCHITRY_CU or ALCHITRY_AU."
+  `define NUM_RAM_REGS 4096
 `endif
 
 module Top (

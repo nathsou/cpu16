@@ -1,0 +1,52 @@
+# Go Board Pin Constraints File
+# Family & Device:    iCE40HX1K
+# Package:            VQ100
+
+# Main FPGA Clock
+set_io clk 15
+
+# LEDs
+set_io led[0] 56
+set_io led[1] 57
+set_io led[2] 59
+set_io led[3] 60
+
+# Push-Button Switches (defined individually for each bit in the vector)
+set_io button[0] 53
+set_io button[1] 51
+set_io button[2] 54
+set_io button[3] 52
+
+# 7 Segment Outputs (defined individually for each bit in the vector)
+set_io segment1A 3
+set_io segment1B 4
+set_io segment1C 93
+set_io segment1D 91
+set_io segment1E 90
+set_io segment1F 1
+set_io segment1G 2
+
+set_io segment2A 100
+set_io segment2B 99
+set_io segment2C 97
+set_io segment2D 95
+set_io segment2E 94
+set_io segment2F 8
+set_io segment2G 96
+
+
+# VGA Outputs (defined individually for each bit in the vectors)
+set_io vgaHSync 26
+set_io vgaVSync 27
+
+set_io vgaRed[0] 36
+set_io vgaRed[1] 37
+set_io vgaRed[2] 40
+
+set_io vgaGrn[0] 29
+set_io vgaGrn[1] 30
+set_io vgaGrn[2] 33
+
+set_io vgaBlu[0] 28
+set_io vgaBlu[1] 41
+set_io vgaBlu[2] 42

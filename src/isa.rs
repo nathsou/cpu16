@@ -10,7 +10,7 @@ pub enum Reg {
     PC,
 }
 
-pub const STACK_POINTER_TOP: u16 = 0x1f00;
+pub const STACK_POINTER_TOP: u16 = 0x00ff;
 
 impl std::fmt::Display for Reg {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
