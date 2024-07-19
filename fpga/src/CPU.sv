@@ -6,7 +6,7 @@ module CPU #(
     input logic rst,
     input logic [15:0] romData,
     output logic [15:0] programCounter,
-    output logic [15:0] displayReg,
+    output logic [31:0] displayReg,
     output logic haltFlag,
     output logic zeroFlag,
     output logic carryFlag,

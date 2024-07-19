@@ -4,7 +4,7 @@ module ROM (
 );
     always_comb begin
         case (addr)
-            16'h0000: data = 16'h70FF;
+            16'h0000: data = 16'h71FF;
             16'h0001: data = 16'h8002;
             16'h0002: data = 16'h8001;
             16'h0003: data = 16'h6BE8;

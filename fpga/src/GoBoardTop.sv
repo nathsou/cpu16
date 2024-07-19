@@ -21,7 +21,7 @@ module GoBoardTop (
     logic rst;
     logic [15:0] programCounter;
     logic [15:0] romData;
-    logic [15:0] displayReg;
+    logic [31:0] displayReg;
     logic haltFlag;
     logic zeroFlag;
     logic carryFlag;

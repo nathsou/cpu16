@@ -1,6 +1,6 @@
 use asm::Assembler;
 use isa::Reg;
-use procedures::def_division;
+use procedures::{def_division, def_is_power_of_two};
 use sim::Cpu;
 
 mod asm;
@@ -199,6 +199,21 @@ fn stack() -> Vec<u16> {
         .assemble()
 }
 
+fn power_of_two() -> Vec<u16> {
+    use Reg::*;
+
+    let mut asm = Assembler::new();
+
+    asm.init_sp()
+        .setw(R1, 0x80, TMP)
+        .call("is_power_of_two")
+        .halt();
+
+    def_is_power_of_two(&mut asm, "is_power_of_two", R1);
+
+    asm.assemble()
+}
+
 #[test]
 fn test_add() {
     let mut cpu = Cpu::from(&add());
@@ -301,6 +316,15 @@ fn test_stack() {
     assert_eq!(cpu.regs[Reg::R1 as usize], 0x23);
 }
 
+#[test]
+fn test_power_of_two() {
+    let mut cpu = Cpu::from(&power_of_two());
+
+    cpu.run();
+
+    assert_eq!(cpu.regs[Reg::R1 as usize], 1);
+}
+
 fn dump_instructions(prog: &[u16]) {
     println!("module ROM (");
     println!("    input logic [15:0] addr,");
@@ -320,7 +344,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = euler1();
+    let prog = power_of_two();
 
     let disasm = prog
         .iter()
@@ -335,9 +359,9 @@ fn main() {
 
     let mut cpu = Cpu::from(&prog);
 
-    let steps = cpu.run_with_fuel(1_000_000_000, false);
+    let steps = cpu.run_with_fuel(1_000_000_000, true);
 
-    println!("{}", cpu);
+    // println!("{}", cpu);
     println!("steps: {:?}\n", steps.expect("fuel exhausted"));
 
     dump_instructions(&prog);

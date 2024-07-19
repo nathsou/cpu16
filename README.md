@@ -71,8 +71,16 @@ these primitive instructions.**
 
 ## Generating bin files
 
-Currently, both the Alchitry Cu and Alchitry Au development boards are supported
-with the IO Element header.
+The Digilent Nexys A7, Alchitry Cu, Alchitry Au (both with the IO Element board)
+and the Nandland Go development boards are supported.
+
+### Nexys A7 / Alchitry Au (Xilinx Artix 7 XC7A100T / XC7A35T)
+
+1. Install [Vivado](https://alchitry.com/tutorials/setup/vivado/)
+2. Run build_nexys_a7.bat / build_alchitry_au.bat in the fpga directory
+3. The bitstream will be in fpga/build/vivado/cpu16.runs/impl_1/Top.bin
+4. Run openFPGALoader / Alchitry Loader or any other compatible tool to program
+   the FPGA
 
 ### Alchitry Cu (iCE40HX8K)
 
@@ -83,13 +91,6 @@ The Alchitry Cu supports a fully open-source toolchain:
 2. Run `make build` in the fpga directory
 3. The bitstream will be in fpga/build/Top.bin
 4. Run iceprog to program the FPGA
-
-### Alchitry Au (Xilinx 7)
-
-1. Install [Vivado](https://alchitry.com/tutorials/setup/vivado/)
-2. Run build_alchitry_au.bat in the fpga directory
-3. The bitstream will be in fpga/build/vivado/cpu16.runs/impl_1/Top.bin
-4. Run Alchitry Loader or any other compatible tool to program the FPGA
 
 ### Nandland Go (iCE40HX1K)
 
@@ -108,3 +109,4 @@ The Nandland Go supports a fully open-source toolchain:
 | Nandland Go | 25 MHz   | 4k           |
 | Alchitry Cu | 50 MHz   | 8k           |
 | Alchitry Au | 100 MHz  | 64k          |
+| Nexys A7    | 100 MHz  | 64k          |

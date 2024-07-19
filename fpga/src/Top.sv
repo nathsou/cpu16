@@ -17,7 +17,7 @@ module Top (
     logic rst;
     logic [15:0] programCounter;
     logic [15:0] romData;
-    logic [15:0] displayReg;
+    logic [31:0] displayReg;
     logic haltFlag;
     logic zeroFlag;
     logic carryFlag;
@@ -47,7 +47,7 @@ module Top (
         .rst(rst),
         .romData(romData),
         .programCounter(programCounter),
-        .displayReg(displayReg),
+        .displayReg(displayReg[15:0]),
         .haltFlag(haltFlag),
         .zeroFlag(zeroFlag),
         .carryFlag(carryFlag),
