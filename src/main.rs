@@ -1,6 +1,6 @@
 use asm::Assembler;
 use isa::Reg;
-use procedures::{def_division, def_is_power_of_two};
+use procedures::{def_division, def_is_power_of_two, def_itoa, def_print};
 use sim::Cpu;
 
 mod asm;
@@ -151,11 +151,19 @@ fn lab() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    asm.set(R1, 1621)
-        .set(R2, 17)
-        .sub(Z, R1, R2)
-        .halt()
-        .assemble()
+    asm.init_sp()
+        .setw(R1, 0xbaba, TMP)
+        .set(R2, 0x20)
+        .call("itoa")
+        .set(R1, 0x20)
+        .set(R2, 0)
+        .call("print")
+        .halt();
+
+    def_itoa(&mut asm);
+    def_print(&mut asm);
+
+    asm.assemble()
 }
 
 fn call() -> Vec<u16> {
@@ -210,6 +218,40 @@ fn power_of_two() -> Vec<u16> {
         .halt();
 
     def_is_power_of_two(&mut asm, "is_power_of_two", R1);
+
+    asm.assemble()
+}
+
+fn yo_fpga() -> Vec<u16> {
+    use Reg::*;
+
+    let mut asm = Assembler::new();
+
+    let message = "Hello, FPGA!";
+
+    asm.init_sp().setw(R2, 0xffff, TMP).setw(R3, 1 << 15, TMP);
+
+    for byte in message.bytes() {
+        asm.store(R3, R2, 0);
+        asm.set(R1, byte as u16).store(R1, R2, 0);
+        asm.inc(R3);
+    }
+
+    asm.halt().assemble()
+}
+
+fn itoa() -> Vec<u16> {
+    use Reg::*;
+
+    let mut asm = Assembler::new();
+
+    asm.init_sp()
+        .setw(R1, 0xbaba, TMP) // num
+        .set(R2, 0x20) // str_ptr
+        .call("itoa")
+        .halt();
+
+    def_itoa(&mut asm);
 
     asm.assemble()
 }
@@ -325,6 +367,21 @@ fn test_power_of_two() {
     assert_eq!(cpu.regs[Reg::R1 as usize], 1);
 }
 
+#[test]
+fn test_itoa() {
+    let mut cpu = Cpu::from(&itoa());
+
+    cpu.run();
+
+    let mut str = String::new();
+
+    for i in 0x20..0x26 {
+        str.push(char::from(cpu.ram[i] as u8));
+    }
+
+    assert_eq!(str, "47802\0");
+}
+
 fn dump_instructions(prog: &[u16]) {
     println!("module ROM (");
     println!("    input logic [15:0] addr,");
@@ -344,7 +401,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = power_of_two();
+    let prog = lab();
 
     let disasm = prog
         .iter()
@@ -359,10 +416,14 @@ fn main() {
 
     let mut cpu = Cpu::from(&prog);
 
-    let steps = cpu.run_with_fuel(1_000_000_000, true);
+    let steps = cpu.run_with_fuel(1_000, true);
 
     // println!("{}", cpu);
     println!("steps: {:?}\n", steps.expect("fuel exhausted"));
+
+    for i in 0x20..0x26 {
+        println!("{:04x}: {:04x}", i, cpu.ram[i]);
+    }
 
     dump_instructions(&prog);
 }

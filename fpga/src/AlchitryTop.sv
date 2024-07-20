@@ -5,7 +5,7 @@
   `define NUM_RAM_REGS 4096
 `endif
 
-module Top (
+module AlchitryTop (
     input logic clk,
     input logic rstN,
     output logic [7:0] led,
@@ -22,6 +22,11 @@ module Top (
     logic zeroFlag;
     logic carryFlag;
     logic memReadReady;
+    logic ramWriteEnable;
+    logic [15:0] ramWriteAddr;
+    logic [15:0] ramWriteData;
+    logic [15:0] ramReadAddr;
+    logic [15:0] ramReadData;
 
     ResetConditioner resetConditioner (
         .clk(clk),
@@ -32,7 +37,7 @@ module Top (
     SevenSegment4 segments (
         .clk(clk),
         .rst(rst),
-        .value(displayReg),
+        .value(displayReg[15:0]),
         .segs(ioSeg),
         .sel(ioSel)
     );
@@ -42,16 +47,30 @@ module Top (
         .data(romData)
     );
 
-    CPU #(.NUM_RAM_REGS(`NUM_RAM_REGS)) cpu (
+    RAM #(.DataWidth(16), .NumRegs(`NUM_RAM_REGS)) ram (
+        .clk(slowClk),
+        .writeEnable(ramWriteEnable),
+        .writeAddr(ramWriteAddr),
+        .writeData(ramWriteData),
+        .readAddr(ramReadAddr),
+        .readData(ramReadData)
+    );
+
+    CPU cpu (
         .clk(slowClk),
         .rst(rst),
         .romData(romData),
+        .ramReadData(ramReadData),
         .programCounter(programCounter),
         .displayReg(displayReg[15:0]),
         .haltFlag(haltFlag),
         .zeroFlag(zeroFlag),
         .carryFlag(carryFlag),
-        .memReadReady(memReadReady)
+        .memReadReady(memReadReady),
+        .ramWriteEnable(ramWriteEnable),
+        .ramWriteAddr(ramWriteAddr),
+        .ramWriteData(ramWriteData),
+        .ramReadAddr(ramReadAddr)
     );
 
     `ifdef ALCHITRY_CU
@@ -65,5 +84,6 @@ module Top (
 
     assign led = programCounter;
     assign ioLed[23:20] = {haltFlag, carryFlag, zeroFlag, memReadReady};
+    assign ioLed[19:16] = 4'b0;
     assign ioLed[15:0] = romData;
 endmodule

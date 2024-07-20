@@ -4,8 +4,8 @@
 module FakePullDown #(
     parameter SIZE = 1
 ) (
-    input  logic clk,
-    inout  wire  [SIZE-1:0] in,
+    input logic clk,
+    inout logic  [SIZE-1:0] in,
     output logic [SIZE-1:0] out
 );
     logic [3:0] flip;

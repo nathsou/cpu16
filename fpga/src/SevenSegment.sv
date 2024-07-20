@@ -21,6 +21,7 @@ module SevenSegment (
             4'd13: segs = 7'b1011110;
             4'd14: segs = 7'b1111001;
             4'd15: segs = 7'b1110001;
+            default: segs = 7'b1111111;
         endcase
     end
 endmodule

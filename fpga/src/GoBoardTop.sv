@@ -26,6 +26,11 @@ module GoBoardTop (
     logic zeroFlag;
     logic carryFlag;
     logic memReadReady;
+    logic ramWriteEnable;
+    logic [15:0] ramWriteAddr;
+    logic [15:0] ramWriteData;
+    logic [15:0] ramReadAddr;
+    logic [15:0] ramReadData;
 
     ResetConditioner resetConditioner (
         .clk(clk),
@@ -62,16 +67,30 @@ module GoBoardTop (
         .data(romData)
     );
 
-    CPU #(.NUM_RAM_REGS(4096)) cpu (
+    RAM #(.DataWidth(16), .NumRegs(4096)) ram (
+        .clk(clk),
+        .writeEnable(ramWriteEnable),
+        .writeAddr(ramWriteAddr),
+        .writeData(ramWriteData),
+        .readAddr(ramReadAddr),
+        .readData(ramReadData)
+    );
+
+    CPU cpu (
         .clk(clk),
         .rst(rst),
         .romData(romData),
+        .ramReadData(ramReadData),
         .programCounter(programCounter),
-        .displayReg(displayReg),
+        .displayReg(displayReg[15:0]),
         .haltFlag(haltFlag),
         .zeroFlag(zeroFlag),
         .carryFlag(carryFlag),
-        .memReadReady(memReadReady)
+        .memReadReady(memReadReady),
+        .ramWriteEnable(ramWriteEnable),
+        .ramWriteAddr(ramWriteAddr),
+        .ramWriteData(ramWriteData),
+        .ramReadAddr(ramReadAddr)
     );
 
     assign led = {memReadReady, zeroFlag, carryFlag, haltFlag};

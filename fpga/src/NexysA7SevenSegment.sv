@@ -1,12 +1,11 @@
 
-module NexyA7SevenSegment (
+module NexysA7SevenSegment (
     input  logic [31:0] x,
     input  logic        clk,
     output logic [6:0]  seg,
     output logic [7:0]  an,
     output logic        dp
 );
-
     logic [2:0]  s;
     logic [3:0]  digit;
     logic [7:0]  aen;

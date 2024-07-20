@@ -23,7 +23,7 @@ module GoBoardSevenSegment  (
 );
 
   reg [6:0] r_Hex_Encoding;
-  
+
   // Purpose: Creates a case statement for all possible input binary numbers.
   // Drives r_Hex_Encoding appropriately for each input combination.
   always @(posedge clk) begin
@@ -32,7 +32,7 @@ module GoBoardSevenSegment  (
         4'b0001 : r_Hex_Encoding <= 7'h30;
         4'b0010 : r_Hex_Encoding <= 7'h6D;
         4'b0011 : r_Hex_Encoding <= 7'h79;
-        4'b0100 : r_Hex_Encoding <= 7'h33;          
+        4'b0100 : r_Hex_Encoding <= 7'h33;
         4'b0101 : r_Hex_Encoding <= 7'h5B;
         4'b0110 : r_Hex_Encoding <= 7'h5F;
         4'b0111 : r_Hex_Encoding <= 7'h70;
@@ -54,6 +54,5 @@ module GoBoardSevenSegment  (
   assign segmentD = ~r_Hex_Encoding[3];
   assign segmentE = ~r_Hex_Encoding[2];
   assign segmentF = ~r_Hex_Encoding[1];
-  assign segmentG = ~r_Hex_Encoding[0];
-
+  assign segmentG = ~r_Hex_Encoding[0];\
 endmodule

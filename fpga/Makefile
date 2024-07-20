@@ -8,7 +8,7 @@ CU_CHIP = hx8k
 CU_PACKAGE = cb132
 CU_FREQ = 50 # MHz // 100 MHz but timing is not met
 CU_PCF_PATH = cu.pcf
-CU_TOP_MODULE = Top
+CU_TOP_MODULE = AlchitryTop
 
 # Nandland Go
 GO_CHIP = hx1k

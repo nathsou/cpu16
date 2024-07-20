@@ -13,17 +13,24 @@ set_property design_mode RTL [get_filesets sources_1]
 set verilogSources [list \
     "$cwd/src/NexysA7Top.sv" \
     "$cwd/src/CPU.sv" \
+    "$cwd/src/PPU.sv" \
     "$cwd/src/RegisterFile.sv" \
     "$cwd/src/ALU.sv" \
     "$cwd/src/RAM.sv" \
     "$cwd/src/ROM.sv" \
     "$cwd/src/ResetConditioner.sv" \
+    "$cwd/src/ButtonDebouncer.sv" \
     "$cwd/src/NexysA7SevenSegment.sv" \
 ]
 
 import_files -fileset [get_filesets sources_1] -force -norecurse $verilogSources
 set xdcSources [list "$cwd/nexys_a7.xdc"]
 read_xdc $xdcSources
+
+# Add patternTable.hex to the project
+set patternTableFile "$cwd/src/patternTable.hex"
+import_files -fileset [get_filesets sources_1] -force $patternTableFile
+
 set_property STEPS.WRITE_BITSTREAM.ARGS.BIN_FILE true [get_runs impl_1]
 update_compile_order -fileset sources_1
 launch_runs -runs synth_1 -jobs 16

@@ -6,7 +6,7 @@ module RegisterFile #(
 ) (
   input logic clk,
   input logic rst,
-  input logic countEnable, 
+  input logic countEnable,
   input logic writeEnable,
   input logic [IndexWidth-1:0] writeAddr,
   input logic [DataWidth-1:0] writeData,
@@ -28,7 +28,7 @@ module RegisterFile #(
       if (writeEnable && writeAddr != '0) begin // Z is not writable
         regs[writeAddr] <= writeData;
       end
-      
+
       if (countEnable && !(writeAddr == (NumRegs-1) && writeEnable)) begin
         regs[NumRegs-1] <= regs[NumRegs-1] + 1'b1;
       end

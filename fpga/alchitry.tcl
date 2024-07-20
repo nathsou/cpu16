@@ -1,7 +1,7 @@
 set cwd [pwd]
 set projDir "$cwd/build/vivado"
 set projName "cpu16"
-set topName Top
+set topName AlchitryTop
 set device xc7a35tftg256-1
 
 if {[file exists "$projDir"]} { file delete -force "$projDir" }
@@ -12,7 +12,7 @@ set_property design_mode RTL [get_filesets sources_1]
 set_property verilog_define "ALCHITRY_AU=1" [get_filesets sources_1]
 
 set verilogSources [list \
-    "$cwd/src/Top.sv" \
+    "$cwd/src/AlchitryTop.sv" \
     "$cwd/src/CPU.sv" \
     "$cwd/src/ALU.sv" \
     "$cwd/src/ButtonDebouncer.sv" \

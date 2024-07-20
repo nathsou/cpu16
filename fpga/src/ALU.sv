@@ -32,11 +32,11 @@ module ALU (
                 5'd27: out = a >> (b & 4'hf);
                 default: begin
                     case (condition)
-                        3'b000: conditionMet = 1'b1; // always
                         3'b001: conditionMet = zeroFlagIn; // if zero
                         3'b010: conditionMet = ~zeroFlagIn; // if not zero
                         3'b011: conditionMet = carryFlagIn; // if carry
                         3'b100: conditionMet = ~carryFlagIn; // if not carry
+                        default: conditionMet = 1'b1; // always
                     endcase
 
                     out = a + ((isSub ? ~b : b) & 16'hffff) + carryIn;

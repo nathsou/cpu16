@@ -1,16 +1,18 @@
-
-module CPU #(
-    parameter NUM_RAM_REGS = 65536
-) (
+module CPU (
     input logic clk,
     input logic rst,
     input logic [15:0] romData,
+    input logic [15:0] ramReadData,
     output logic [15:0] programCounter,
     output logic [31:0] displayReg,
     output logic haltFlag,
     output logic zeroFlag,
     output logic carryFlag,
-    output logic memReadReady
+    output logic memReadReady,
+    output logic ramWriteEnable,
+    output logic [15:0] ramWriteAddr,
+    output logic [15:0] ramWriteData,
+    output logic [15:0] ramReadAddr
 );
     logic regWriteEnable;
     logic [2:0] regWriteAddr;
@@ -20,19 +22,10 @@ module CPU #(
     logic [15:0] regReadData1;
     logic [15:0] regReadData2;
     logic [16:0] aluOut;
-    logic ramWriteEnable;
-    logic [15:0] ramWriteAddr;
-    logic [15:0] ramWriteData;
-    logic [15:0] ramReadAddr;
-    logic [15:0] ramReadData;
     logic aluEnable;
     logic aluConditionMet;
-    logic haltFlag;
-    logic zeroFlag;
-    logic carryFlag;
     logic aluZeroOut;
     logic aluCarryOut;
-    // stall for one cycle before reading from memory during a load operation
     logic isReadingMem = ~memReadReady && romData[15:14] == 2'b10 && romData[7];
     logic countEnable = ~haltFlag && ~isReadingMem;
 
@@ -62,15 +55,6 @@ module CPU #(
         .carryFlagOut(aluCarryOut),
         .conditionMet(aluConditionMet),
         .out(aluOut)
-    );
-
-    RAM #(.DataWidth(16), .NumRegs(NUM_RAM_REGS)) ram (
-        .clk(clk),
-        .writeEnable(ramWriteEnable),
-        .writeAddr(ramWriteAddr),
-        .writeData(ramWriteData),
-        .readAddr(ramReadAddr),
-        .readData(ramReadData)
     );
 
     always_comb begin
