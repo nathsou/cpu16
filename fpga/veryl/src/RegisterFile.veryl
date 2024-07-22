@@ -1,0 +1,36 @@
+module RegisterFile (
+  i_clk: input clock,
+  i_count_enable: input logic,
+  i_write_enable: input logic,
+  i_write_address: input logic<3>,
+  i_write_data: input logic<16>,
+  i_read_addr1: input logic<3>,
+  i_read_addr2: input logic<3>,
+  o_read_data1: output logic<16>,
+  o_read_data2: output logic<16>,
+  o_program_counter: output logic<16>,
+) {
+  var r_regs: logic<16>[8];
+
+  always_ff (i_clk) {
+    case i_write_address {
+      0: {}
+      1, 2, 3, 4, 5, 6: {
+        if i_write_enable {
+          r_regs[i_write_address] = i_write_data;
+        }
+      }
+      7: {
+        if i_write_enable {
+          r_regs[7] = i_write_data;
+        } else if i_count_enable {
+          r_regs[7] = r_regs[7] + 1;
+        }
+      }
+    }
+  }
+
+  assign o_read_data1 = r_regs[i_read_addr1];
+  assign o_read_data2 = r_regs[i_read_addr2];
+  assign o_program_counter = r_regs[7];
+}

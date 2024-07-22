@@ -1,0 +1,6 @@
+[project]
+name = "veryl"
+version = "0.1.0"
+
+[build]
+target = {type = "directory", path = "build"}

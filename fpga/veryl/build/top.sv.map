@@ -1,0 +1,1 @@
+{"version":3,"file":"Top.sv.map","sources":["../src/Top.veryl"],"names":["","module","Top",";","initial","begin","$display","(","\"Hello, world!\"",")","end","endmodule"],"mappings":"AAAAA,AAAAC,aAAOC,GAAIC;IACPC,QAAQC;QACJC,QAAQC,CAACC,eAAeC,CAACN;IAC7BO;AACJC"}
