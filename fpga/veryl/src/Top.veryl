@@ -1,5 +1,0 @@
-module Top {
-    initial {
-        $display("Hello, world!");
-    }
-}

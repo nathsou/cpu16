@@ -1,0 +1,12 @@
+module Top (
+    clk: input clock,
+    led: output logic<16>,
+) {
+    var r_counter: logic<30>;
+
+    always_ff (clk) {
+        r_counter = r_counter + 1;
+    }
+
+    assign led = r_counter[29:14];
+}

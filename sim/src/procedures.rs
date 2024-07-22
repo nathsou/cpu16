@@ -80,9 +80,9 @@ pub fn def_itoa(asm: &mut Assembler) {
     asm.label("itoa");
 
     // variable addresses in RAM
-    let num = 0;
-    let str_ptr = 1;
-    let powers_of_10 = 2;
+    let num = 100;
+    let str_ptr = 101;
+    let powers_of_10 = 102;
 
     // store the arguments to RAM
     asm.store(R1, Z, num);

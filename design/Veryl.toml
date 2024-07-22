@@ -1,5 +1,5 @@
 [project]
-name = "veryl"
+name = "cpu16"
 version = "0.1.0"
 
 [build]
