@@ -3,6 +3,7 @@ TOP := cpu16_Top
 TARGET := nexysa7
 current_dir := ${CURDIR}
 SOURCES := ${current_dir}/build/Top.sv
+SOURCES += ${current_dir}/build/ResetConditioner.sv
 
 BUILDDIR := ${current_dir}/build
 BOARD_BUILDDIR := ${BUILDDIR}/${TARGET}

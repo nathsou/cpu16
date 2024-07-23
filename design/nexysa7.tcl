@@ -12,6 +12,7 @@ set_property design_mode RTL [get_filesets sources_1]
 
 set verilogSources [list \
     "$cwd/build/Top.sv" \
+    "$cwd/build/ResetConditioner.sv" \
 ]
 
 import_files -fileset [get_filesets sources_1] -force -norecurse $verilogSources

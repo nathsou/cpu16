@@ -4,3 +4,4 @@ version = "0.1.0"
 
 [build]
 target = {type = "directory", path = "build"}
+reset_type = "async_high"

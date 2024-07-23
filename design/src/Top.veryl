@@ -1,11 +1,25 @@
 module Top (
     clk: input clock,
+    btn_r: input logic,
     led: output logic<16>,
 ) {
     var r_counter: logic<30>;
+    var rst: logic;
+
+    inst reset_conditioner: ResetConditioner #(
+        Stages: 4,
+    ) (
+        i_clk: clk,
+        i_in: btn_r,
+        o_out: rst,
+    );
 
     always_ff (clk) {
-        r_counter = r_counter + 1;
+        if rst {
+            r_counter = '0;
+        } else {
+            r_counter = r_counter + 1;
+        }
     }
 
     assign led = r_counter[29:14];
