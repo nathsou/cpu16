@@ -2,12 +2,15 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 import random
+import os
+from pathlib import Path
+from cocotb.runner import get_runner
 
 @cocotb.test()
 async def test_register_file(dut):
     """ Test RegisterFile """
 
-    clock = Clock(signal=dut.i_clk, period=10, units="ns")
+    clock = Clock(signal=dut.i_clk, period=10, units="us")
     cocotb.start_soon(clock.start())
 
     dut.i_rst.value = 1
@@ -49,3 +52,23 @@ async def test_register_file(dut):
 
 
     dut._log.info("Test complete")
+
+def test_register_file_runner():
+    sim = os.getenv("SIM", "icarus")
+
+    proj_path = Path(__file__).resolve().parent.parent / 'build'
+    sources = [proj_path / "RegisterFile.sv"]
+
+    runner = get_runner(sim)
+    runner.build(
+        sources=sources,
+        hdl_toplevel="cpu16_RegisterFile",
+        always=True,
+        timescale=("1us", "1us"),
+    )
+
+    runner.test(hdl_toplevel="cpu16_RegisterFile", test_module="test_register_file")
+
+
+if __name__ == "__main__":
+    test_register_file_runner()

@@ -1,7 +1,11 @@
+use std::io::Write;
+
 use asm::Assembler;
 use isa::Reg;
 use procedures::{def_division, def_is_power_of_two, def_itoa, def_print};
-use sim::Cpu;
+use serde::Serialize;
+use serde_json::json;
+use sim::CPU;
 
 mod asm;
 mod isa;
@@ -258,7 +262,7 @@ fn itoa() -> Vec<u16> {
 
 #[test]
 fn test_add() {
-    let mut cpu = Cpu::from(&add());
+    let mut cpu = CPU::from(&add());
 
     cpu.run();
 
@@ -267,7 +271,7 @@ fn test_add() {
 
 #[test]
 fn test_sub() {
-    let mut cpu = Cpu::from(&sub());
+    let mut cpu = CPU::from(&sub());
 
     cpu.run();
 
@@ -276,7 +280,7 @@ fn test_sub() {
 
 #[test]
 fn test_muli() {
-    let mut cpu = Cpu::from(&muli());
+    let mut cpu = CPU::from(&muli());
 
     cpu.run();
 
@@ -285,7 +289,7 @@ fn test_muli() {
 
 #[test]
 fn test_xor() {
-    let mut cpu = Cpu::from(&xor());
+    let mut cpu = CPU::from(&xor());
 
     cpu.run();
 
@@ -294,7 +298,7 @@ fn test_xor() {
 
 #[test]
 fn test_dec() {
-    let mut cpu = Cpu::from(&dec());
+    let mut cpu = CPU::from(&dec());
 
     cpu.run();
 
@@ -303,7 +307,7 @@ fn test_dec() {
 
 #[test]
 fn test_count() {
-    let mut cpu = Cpu::from(&count());
+    let mut cpu = CPU::from(&count());
 
     cpu.run();
 
@@ -312,7 +316,7 @@ fn test_count() {
 
 #[test]
 fn test_div() {
-    let mut cpu = Cpu::from(&div());
+    let mut cpu = CPU::from(&div());
 
     cpu.run();
 
@@ -321,7 +325,7 @@ fn test_div() {
 
 #[test]
 fn test_add32() {
-    let mut cpu = Cpu::from(&add32());
+    let mut cpu = CPU::from(&add32());
 
     cpu.run();
 
@@ -332,7 +336,7 @@ fn test_add32() {
 
 #[test]
 fn test_mem() {
-    let mut cpu = Cpu::from(&mem());
+    let mut cpu = CPU::from(&mem());
 
     cpu.run();
 
@@ -341,7 +345,7 @@ fn test_mem() {
 
 #[test]
 fn test_euler1() {
-    let mut cpu = Cpu::from(&euler1());
+    let mut cpu = CPU::from(&euler1());
 
     cpu.run();
 
@@ -351,7 +355,7 @@ fn test_euler1() {
 
 #[test]
 fn test_stack() {
-    let mut cpu = Cpu::from(&stack());
+    let mut cpu = CPU::from(&stack());
 
     cpu.run();
 
@@ -360,7 +364,7 @@ fn test_stack() {
 
 #[test]
 fn test_power_of_two() {
-    let mut cpu = Cpu::from(&power_of_two());
+    let mut cpu = CPU::from(&power_of_two());
 
     cpu.run();
 
@@ -369,7 +373,7 @@ fn test_power_of_two() {
 
 #[test]
 fn test_itoa() {
-    let mut cpu = Cpu::from(&itoa());
+    let mut cpu = CPU::from(&itoa());
 
     cpu.run();
 
@@ -384,24 +388,24 @@ fn test_itoa() {
 
 fn dump_instructions(prog: &[u16]) {
     println!("module ROM (");
-    println!("    input logic [15:0] addr,");
-    println!("    output logic [15:0] data");
-    println!(");");
-    println!("    always_comb begin");
-    println!("        case (addr)");
+    println!("    i_addr: input logic<16>,");
+    println!("    o_data: output logic<16>,");
+    println!(") {{");
+    println!("    always_comb {{");
+    println!("        case i_addr {{");
 
     for (i, &inst) in prog.iter().enumerate() {
-        println!("            16'h{:04X}: data = 16'h{:04X};", i, inst);
+        println!("            {i}: o_data = 16'h{inst:04X};");
     }
 
-    println!("            default: data = 16'h0000;");
-    println!("        endcase");
-    println!("    end");
-    println!("endmodule");
+    println!("            default: o_data = 16'h0000;");
+    println!("        }}");
+    println!("    }}");
+    println!("}}");
 }
 
 fn main() {
-    let prog = lab();
+    let prog = add();
 
     let disasm = prog
         .iter()
@@ -412,18 +416,27 @@ fn main() {
         println!("{:04x}: {}", i, inst);
     }
 
-    println!("");
+    let cpu = CPU::from(&prog);
 
-    let mut cpu = Cpu::from(&prog);
+    let mut output_file =
+        std::fs::File::create("trace.jsonl").expect("failed to create output file");
 
-    let steps = cpu.run_with_fuel(1_000, true);
+    for state in cpu {
+        let state_json = serde_json::to_string(&state).expect("failed to serialize state");
+        output_file
+            .write_all(state_json.as_bytes())
+            .expect("failed to write to output file");
+
+        output_file
+            .write_all(b"\n")
+            .expect("failed to write to output file");
+    }
 
     // println!("{}", cpu);
-    println!("steps: {:?}\n", steps.expect("fuel exhausted"));
 
-    for i in 0x20..0x26 {
-        println!("{:04x}: {:04x}", i, cpu.ram[i]);
-    }
+    // for i in 0x20..0x26 {
+    //     println!("{:04x}: {:04x}", i, cpu.ram[i]);
+    // }
 
     dump_instructions(&prog);
 }

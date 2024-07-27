@@ -4,6 +4,12 @@ TARGET := nexysa7
 current_dir := ${CURDIR}
 SOURCES := ${current_dir}/build/Top.sv
 SOURCES += ${current_dir}/build/ResetConditioner.sv
+SOURCES += ${current_dir}/build/ALU.sv
+SOURCES += ${current_dir}/build/RegisterFile.sv
+SOURCES += ${current_dir}/build/CPU.sv
+SOURCES += ${current_dir}/build/ROM.sv
+SOURCES += ${current_dir}/build/RAM.sv
+SOURCES += ${current_dir}/build/SevenSegment.sv
 
 BUILDDIR := ${current_dir}/build
 BOARD_BUILDDIR := ${BUILDDIR}/${TARGET}

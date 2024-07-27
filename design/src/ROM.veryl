@@ -1,0 +1,14 @@
+module ROM (
+    i_addr: input logic<16>,
+    o_data: output logic<16>,
+) {
+    always_comb {
+        case i_addr {
+            0: o_data = 16'h4823;
+            1: o_data = 16'h5017;
+            2: o_data = 16'hC940;
+            3: o_data = 16'h0000;
+            default: o_data = 16'h0000;
+        }
+    }
+}

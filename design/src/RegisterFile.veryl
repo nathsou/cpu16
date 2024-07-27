@@ -1,3 +1,4 @@
+
 pub module RegisterFile (
     i_clk: input clock,
     i_rst: input reset,
@@ -10,23 +11,33 @@ pub module RegisterFile (
     o_read_data1: output logic<16>,
     o_read_data2: output logic<16>,
     o_program_counter: output logic<16>,
+    o_display_reg: output logic<32>,
 ) {
     var r_regs: logic<16>[8];
 
     always_ff (i_clk, i_rst) {
         if_reset {
             r_regs[0] = '0;
+            r_regs[1] = '0;
+            r_regs[2] = '0;
+            r_regs[3] = '0;
+            r_regs[4] = '0;
+            r_regs[5] = '0;
+            r_regs[6] = '0;
             r_regs[7] = '0;
-        } else if i_write_enable && i_write_dest != 3'd0 {
-            r_regs[i_write_dest] = i_write_data;
-        }
-        
-        if i_count_enable && !(i_write_enable && i_write_dest == 3'd7) {
-            r_regs[7] = r_regs[7] + 1;
+        } else {
+            if i_count_enable {
+                r_regs[7] = r_regs[7] + 1;
+            }
+            
+            if i_write_enable && i_write_dest != 3'b000 {
+                r_regs[i_write_dest] = i_write_data;
+            }    
         }
     }
 
     assign o_read_data1 = r_regs[i_read_src1];
     assign o_read_data2 = r_regs[i_read_src2];
     assign o_program_counter = r_regs[7];
+    assign o_display_reg = {r_regs[1], r_regs[2]};
 }

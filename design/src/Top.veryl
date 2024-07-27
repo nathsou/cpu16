@@ -2,9 +2,11 @@ module Top (
     clk: input clock,
     btn_r: input logic,
     led: output logic<16>,
+    seg: output logic<7>,
+    an: output logic<8>,
+    dp: output logic,
 ) {
-    var r_counter: logic<30>;
-    var rst: logic;
+    var rst: bit;
 
     inst reset_conditioner: ResetConditioner #(
         Stages: 4,
@@ -14,13 +16,58 @@ module Top (
         o_out: rst,
     );
 
-    always_ff (clk) {
-        if rst {
-            r_counter = '0;
-        } else {
-            r_counter = r_counter + 1;
-        }
-    }
+    var program_counter: logic<16>;
+    var rom_data: logic<16>;
+    var display_reg: logic<32>;
+    var halt_flag: bit;
+    var zero_flag: bit;
+    var carry_flag: bit;
+    var mem_ready: bit;
 
-    assign led = r_counter[29:14];
+    var ram_write_enable: logic;
+    var ram_write_address: logic<16>;
+    var ram_write_data: logic<16>;
+    var ram_read_address: logic<16>;
+    var ram_read_data: logic<16>;
+
+    inst ram: RAM (
+        i_clk: clk,
+        i_write_enable: ram_write_enable,
+        i_write_address: ram_write_address,
+        i_write_data: ram_write_data,
+        i_read_address: ram_read_address,
+        o_read_data: ram_read_data,
+    );
+
+    inst rom: ROM (
+        i_addr: program_counter,
+        o_data: rom_data,
+    );
+
+    inst cpu: CPU (
+        i_clk: clk,
+        i_rst: rst,
+        i_rom_data: rom_data,
+        i_ram_read_data: ram_read_data,
+        o_program_counter: program_counter,
+        o_display_reg: display_reg,
+        o_halt_flag: halt_flag,
+        o_zero_flag: zero_flag,
+        o_carry_flag: carry_flag,
+        o_mem_ready: mem_ready,
+        o_ram_write_enable: ram_write_enable,
+        o_ram_write_address: ram_write_address,
+        o_ram_write_data: ram_write_data,
+        o_ram_read_address: ram_read_address,
+    );
+
+    inst display: SevenSegment (
+        i_clk: clk,
+        i_value: display_reg,
+        o_seg: seg,
+        o_an: an,
+        o_dp: dp,
+    );
+
+    assign led = program_counter;
 }

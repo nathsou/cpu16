@@ -1,0 +1,81 @@
+
+module ALU (
+    i_a: input logic<16>,
+    i_b: input logic<16>,
+    i_op: input logic<5>,
+    i_enable: input logic,
+    i_flags: input logic<2>,
+    o_flags: output logic<2>,
+    o_condition_met: output logic,
+    o_out: output logic<17>,
+) {
+    enum ALUOp: logic<5> {
+        add = 5'b000_00,
+        sub = 5'b000_01,
+        adc = 5'b000_10,
+        sbc = 5'b000_11,
+        add_if_zero = 5'b001_00,
+        sub_if_zero = 5'b001_01,
+        adc_if_zero = 5'b001_10,
+        sbc_if_zero = 5'b001_11,
+        add_if_not_zero = 5'b010_00,
+        sub_if_not_zero = 5'b010_01,
+        adc_if_not_zero = 5'b010_10,
+        sbc_if_not_zero = 5'b010_11,
+        add_if_carry = 5'b011_00,
+        sub_if_carry = 5'b011_01,
+        adc_if_carry = 5'b011_10,
+        sbc_if_carry = 5'b011_11,
+        add_if_not_carry = 5'b100_00,
+        sub_if_not_carry = 5'b100_01,
+        adc_if_not_carry = 5'b100_10,
+        sbc_if_not_carry = 5'b100_11,
+        and = 5'b101_00,
+        nand = 5'b101_01,
+        or = 5'b101_10,
+        xor = 5'b101_11,
+        shl = 5'b110_00,
+        shr = 5'b110_01,
+        inc = 5'b110_10,
+        dec = 5'b110_11,
+    }
+
+    let is_sub: logic = (i_op & 5'b1) == 5'b1;
+    let include_carry: logic = (i_op & 5'b11) == 5'b10 || (i_op & 5'b11) == 5'b11; // all adc/sbc ops
+    let force_carry: logic = (i_op & 5'b11) == 5'b01 || (i_op == ALUOp::inc);
+    let condition: logic<3> = i_op[4:2];
+    let carry_in: logic = i_op != ALUOp::dec && (force_carry || (include_carry && i_flags[1]));
+
+    always_comb {
+        o_condition_met = 1'b0;
+        o_out = 17'h00000;
+        o_flags = i_flags;
+
+        if i_enable {
+            case i_op {
+                ALUOp::and: o_out[15:0] = i_a & i_b;
+                ALUOp::nand: o_out[15:0] = ~(i_a & i_b);
+                ALUOp::or: o_out[15:0] = i_a | i_b;
+                ALUOp::xor: o_out[15:0] = i_a ^ i_b;
+                ALUOp::shl: o_out[15:0] = i_a << (i_b & 16'hf);
+                ALUOp::shr: o_out[15:0] = i_a >> (i_b & 16'hf);
+                default: {
+                    case condition {
+                        3'b001: o_condition_met = i_flags[1]; // if zero
+                        3'b010: o_condition_met = !i_flags[1]; // if not zero
+                        3'b011: o_condition_met = i_flags[0]; // if carry
+                        3'b100: o_condition_met = !i_flags[0]; // if not carry
+                        default: o_condition_met = 1'b1; // always
+                    }
+
+                    o_out = {1'b0, i_a} + {1'b0, ((if is_sub { ~i_b } else { i_b }) & 16'hffff)} + {15'b0, carry_in};
+                }
+            }
+
+            // if o_condition_met {
+            o_flags[0] = o_out[16];
+            o_flags[1] = o_out[15:0] == 16'h0;
+            // }
+        }
+    }
+}

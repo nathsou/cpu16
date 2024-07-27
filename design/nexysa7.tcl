@@ -11,8 +11,14 @@ create_project $projName "$projDir" -part $device
 set_property design_mode RTL [get_filesets sources_1]
 
 set verilogSources [list \
-    "$cwd/build/Top.sv" \
+    "$cwd/build/ALU.sv" \
+    "$cwd/build/CPU.sv" \
+    "$cwd/build/RAM.sv" \
+    "$cwd/build/RegisterFile.sv" \
     "$cwd/build/ResetConditioner.sv" \
+    "$cwd/build/ROM.sv" \
+    "$cwd/build/SevenSegment.sv" \
+    "$cwd/build/Top.sv" \
 ]
 
 import_files -fileset [get_filesets sources_1] -force -norecurse $verilogSources

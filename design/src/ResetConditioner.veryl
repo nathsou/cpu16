@@ -5,7 +5,7 @@ module ResetConditioner #(
     i_in : input  logic,
     o_out: output logic,
 ) {
-    var r_stage: logic<Stages>;
+    var r_stage : logic<Stages>;
     var r_initialized: bit;
 
     always_ff (i_clk) {

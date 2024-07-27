@@ -1,0 +1,18 @@
+module RAM (
+    i_clk          : input  clock    ,
+    i_write_enable : input  logic    ,
+    i_write_address: input  logic<16>,
+    i_write_data   : input  logic<16>,
+    i_read_address : input  logic<16>,
+    o_read_data    : output logic<16>,
+) {
+    var r_data: logic<16> [65536];
+
+    always_ff (i_clk) {
+        if i_write_enable {
+            r_data[i_write_address] = i_write_data;
+        }
+
+        o_read_data = r_data[i_read_address];
+    }
+}

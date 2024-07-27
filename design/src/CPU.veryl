@@ -1,0 +1,164 @@
+module CPU (
+    i_clk: input clock,
+    i_rst: input reset,
+    i_rom_data: input logic<16>,
+    i_ram_read_data: input logic<16>,
+    o_program_counter: output logic<16>,
+    o_display_reg: output logic<32>,
+    o_halt_flag: output logic,
+    o_zero_flag: output logic,
+    o_carry_flag: output logic,
+    o_mem_ready: output logic,
+    o_ram_write_enable: output logic,
+    o_ram_write_address: output logic<16>,
+    o_ram_write_data: output logic<16>,
+    o_ram_read_address: output logic<16>,
+) {
+    enum OpCode: logic<2> {
+        ctl = 2'b00,
+        set = 2'b01,
+        mem = 2'b10,
+        alu = 2'b11,
+    }
+
+    var reg_write_enable: logic;
+    var reg_write_dest: logic<3>;
+    var reg_write_data: logic<16>;
+    var reg_read_src1: logic<3>;
+    var reg_read_src2: logic<3>;
+    var reg_read_data1: logic<16>;
+    var reg_read_data2: logic<16>;
+
+    var alu_out: logic<17>;
+    var alu_enable: logic;
+    var alu_condition_met: logic;
+    var alu_zero_flag: logic;
+    var alu_carry_flag: logic;
+
+    var r_halt_flag: logic;
+    var r_zero_flag: logic;
+    var r_carry_flag: logic;
+
+    let op_code: logic<2> = i_rom_data[15:14];
+
+    let is_reading_memory: logic = ~o_mem_ready && op_code == 2'b10 && i_rom_data[7];
+    let count_enable: logic = ~o_halt_flag && ~is_reading_memory;
+
+    inst register_file: RegisterFile (
+        i_clk: i_clk,
+        i_rst: i_rst,
+        i_count_enable: count_enable,
+        i_write_enable: reg_write_enable,
+        i_write_dest: reg_write_dest,
+        i_write_data: reg_write_data,
+        i_read_src1: reg_read_src1,
+        i_read_src2: reg_read_src2,
+        o_read_data1: reg_read_data1,
+        o_read_data2: reg_read_data2,
+        o_program_counter: o_program_counter,
+        o_display_reg: o_display_reg,
+    );
+
+    inst alu: ALU (
+        i_a: reg_read_data1,
+        i_b: reg_read_data2,
+        i_op: i_rom_data[4:0],
+        i_enable: alu_enable,
+        i_flags: {r_zero_flag, r_carry_flag},
+        o_flags: {alu_zero_flag, alu_carry_flag},
+        o_condition_met: alu_condition_met,
+        o_out: alu_out,
+    );
+
+    always_comb {
+        alu_enable = 1'b0;
+        reg_write_enable = 1'b0;
+        o_ram_write_enable = 1'b0;
+        reg_write_dest = 3'bxxx;
+        reg_write_data = 16'hxxxx;
+        reg_read_src1 = 3'bxxx;
+        reg_read_src2 = 3'bxxx;
+        o_ram_write_address = 16'hxxxx;
+        o_ram_write_data = 16'hxxxx;
+        o_ram_read_address = 16'hxxxx;
+
+        let dest_reg: logic<3> = i_rom_data[13:11];
+        let src1_reg: logic<3> = i_rom_data[10:8];
+        let src2_reg: logic<3> = i_rom_data[7:5];
+
+        if !o_halt_flag {
+            case op_code {
+                OpCode:: ctl: {}
+                OpCode::set: {
+                    // set: [{01} <dst: 3> <val: 11>]
+                    reg_write_enable = 1'b1;
+                    reg_write_dest = dest_reg;
+                    reg_write_data = {5'd0, i_rom_data[10:0]};
+                }
+                OpCode::mem: {
+                    // mem: [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
+                    reg_read_src1 = src1_reg;
+ 
+                    if i_rom_data[7] {
+                        reg_write_enable = o_mem_ready;
+                        reg_write_dest = dest_reg;
+                        reg_write_data = i_ram_read_data;
+                        o_ram_read_address = reg_read_data1 + {9'd0, i_rom_data[6:0]};
+                    } else {
+                        o_ram_write_enable = 1'b1;
+                        o_ram_write_address = reg_read_data1 + {9'd0, i_rom_data[6:0]};
+                        reg_read_src2 = dest_reg;
+                        o_ram_write_data = reg_read_data2;
+                    }
+                }
+                OpCode::alu: {
+                    // alu: [{11} <dst: 3> <src1: 3> <src2: 3> <op: 5>]
+                    alu_enable = 1'b1;
+                    reg_write_dest = dest_reg;
+                    reg_read_src1 = src1_reg;
+                    reg_read_src2 = src2_reg;
+                    reg_write_data = alu_out[15:0];
+                    reg_write_enable = alu_condition_met;
+                }
+            }
+        }
+    }
+
+    always_ff (i_clk, i_rst) {
+        if_reset {
+            r_halt_flag = 1'b0;
+            r_zero_flag = 1'b0;
+            r_carry_flag = 1'b0;
+            o_mem_ready = 1'b0;
+        } else {
+            if !r_halt_flag {
+                case op_code {
+                    OpCode::ctl: {
+                        case i_rom_data[2:0] {
+                            3'b000: r_halt_flag = 1'b1;
+                            3'b001: r_zero_flag = 1'b1;
+                            3'b010: r_zero_flag = 1'b0;
+                            3'b011: r_carry_flag = 1'b1;
+                            3'b100: r_carry_flag = 1'b0;
+                            default: {}
+                        }
+                    }
+                    OpCode::set: {}
+                    OpCode::mem: {
+                        if i_rom_data[7] {
+                            o_mem_ready = !o_mem_ready;
+                        }
+                    }
+                    OpCode::alu: {
+                        r_zero_flag = alu_zero_flag;
+                        r_carry_flag = alu_carry_flag;
+                    }
+                }
+            }
+        }
+    }
+
+    assign o_halt_flag = r_halt_flag;
+    assign o_zero_flag = r_zero_flag;
+    assign o_carry_flag = r_carry_flag;
+}

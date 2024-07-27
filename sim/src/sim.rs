@@ -1,6 +1,7 @@
 use crate::isa::{AluOp, Cond, ControlOp, Inst, Reg, STACK_POINTER_TOP};
+use serde::Serialize;
 
-pub struct Cpu {
+pub struct CPU {
     pub regs: [u16; 8],
     pub halted: bool,
     pub carry: bool,
@@ -10,7 +11,21 @@ pub struct Cpu {
     next_pc: u16,
 }
 
-impl Cpu {
+#[derive(Serialize, Debug)]
+pub struct CPUState {
+    r1: u16,
+    r2: u16,
+    r3: u16,
+    r4: u16,
+    tmp: u16,
+    sp: u16,
+    pc: u16,
+    zero: bool,
+    carry: bool,
+    halt: bool,
+}
+
+impl CPU {
     pub fn new(rom: [u16; 0x10000]) -> Self {
         Self {
             regs: [0; 8],
@@ -153,9 +168,37 @@ impl Cpu {
 
         self.regs[Reg::PC as usize] = self.next_pc;
     }
+
+    pub fn get_state(&self) -> CPUState {
+        CPUState {
+            r1: self.regs[Reg::R1 as usize],
+            r2: self.regs[Reg::R2 as usize],
+            r3: self.regs[Reg::R3 as usize],
+            r4: self.regs[Reg::R4 as usize],
+            tmp: self.regs[Reg::TMP as usize],
+            sp: self.regs[Reg::SP as usize],
+            pc: self.regs[Reg::PC as usize],
+            zero: self.zero,
+            carry: self.carry,
+            halt: self.halted,
+        }
+    }
 }
 
-impl std::fmt::Display for Cpu {
+impl Iterator for CPU {
+    type Item = CPUState;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.halted {
+            None
+        } else {
+            self.step();
+            Some(self.get_state())
+        }
+    }
+}
+
+impl std::fmt::Display for CPU {
     // r1: 0003, r2: 0000, r3: 0000, r4: 0000, tmp: 0000, sp: 0000, pc: 0001, flags: (c: 0, z: 0), set r1 3
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         for (i, reg) in self.regs.iter().skip(1).enumerate() {

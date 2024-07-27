@@ -1,6 +1,0 @@
-<testsuites name="results">
-  <testsuite name="all" package="all">
-    <property name="random_seed" value="1721729128" />
-    <testcase name="test_register_file" classname="test_register_file" file="/home/nathan/code/fpga/cpu16/design/tests/test_register_file.py" lineno="6" time="0.00235748291015625" sim_time_ns="190.0" ratio_time="80594.43365695793" />
-  </testsuite>
-</testsuites>
