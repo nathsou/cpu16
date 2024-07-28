@@ -38,7 +38,7 @@ async def test_top(dut):
     clock = Clock(signal=dut.clk, period=10, units='us')
     cocotb.start_soon(clock.start())
 
-    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'add.jsonl')
+    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'div.jsonl')
 
     dut.btn_r.value = 0
 
@@ -46,7 +46,10 @@ async def test_top(dut):
         pc = dut.program_counter.value
         a = dut.cpu.alu.i_a.value
         b = dut.cpu.alu.i_b.value
-        print(f"PC: {pc}, rst: {dut.rst} inst: {dut.rom.o_data.value}, a: {a}, b: {b}, alu_en: {dut.cpu.alu.i_enable.value}, alu_out: {dut.cpu.alu_out.value}, display: {dut.display_reg.value}")
+        alu_op = dut.cpu.alu.i_op.value
+        flags = dut.cpu.alu.i_flags.value
+        carry_in = dut.cpu.alu.carry_in.value
+        print(f"PC: {pc}, rst: {dut.rst} inst: {dut.rom.o_data.value}, a: {a}, b: {b}, alu_en: {dut.cpu.alu.i_enable.value}, alu_out: {dut.cpu.alu_out.value}, alu_op: {alu_op}, flags: {flags}, carry_in: {carry_in}")
         reg_file = dut.cpu.register_file
         regs = {i: int(reg_file.r_regs[i].value) for i in range(8)}
         print("regs:", regs)
@@ -60,30 +63,37 @@ async def test_top(dut):
         is_ready = dut.cpu.register_file.r_regs[0].value == 0 and dut.program_counter.value != 0
 
         if is_ready:
+            is_reading_mem = dut.cpu.is_reading_memory.value
+            
             regs = [int(dut.cpu.register_file.r_regs[i].value) for i in range(8)]
-            print(regs)
+            print_state()
+            regs = [int(dut.cpu.register_file.r_regs[i].value) for i in range(8)]
+            print([hex(n) for n in regs])
             print(f"inst: {dut.rom_data.value}")
             zero_flag = dut.zero_flag.value
             carry_flag = dut.carry_flag.value
             halt_flag = dut.halt_flag.value
 
+                
+            print(f"is_reading_mem: {is_reading_mem}")
+
             expected = trace[trace_index]
             print('expected', expected)
-            print_state()
 
             assert regs[0] == 0
             assert regs[7] == expected['pc']
             assert regs[1] == expected['r1']
-            # assert regs[2] == expected['r2']
-            # assert regs[3] == expected['r3']
-            # assert regs[4] == expected['r4']
-            # assert regs[5] == expected['tmp']
-            # assert regs[6] == expected['sp']
-            # assert zero_flag == expected['zero']
-            # assert carry_flag == expected['carry']
-            # assert halt_flag == expected['halt']
+            assert regs[2] == expected['r2']
+            assert regs[3] == expected['r3']
+            assert regs[4] == expected['r4']
+            assert regs[5] == expected['tmp']
+            assert regs[6] == expected['sp']
+            assert zero_flag == expected['zero']
+            assert carry_flag == expected['carry']
+            assert halt_flag == expected['halt']
 
-            trace_index += 1
+            if is_reading_mem == 0:
+                trace_index += 1
 
         # print_state()
         await RisingEdge(dut.clk)

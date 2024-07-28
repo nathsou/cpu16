@@ -30,7 +30,6 @@ module CPU (
     var reg_read_data2: logic<16>;
 
     var alu_out: logic<17>;
-    var alu_enable: logic;
     var alu_condition_met: logic;
     var alu_zero_flag: logic;
     var alu_carry_flag: logic;
@@ -41,7 +40,7 @@ module CPU (
 
     let op_code: logic<2> = i_rom_data[15:14];
 
-    let is_reading_memory: logic = ~o_mem_ready && op_code == 2'b10 && i_rom_data[7];
+    let is_reading_memory: logic = ~o_mem_ready && op_code == OpCode::mem && i_rom_data[7];
     let count_enable: logic = ~o_halt_flag && ~is_reading_memory;
 
     inst register_file: RegisterFile (
@@ -63,7 +62,7 @@ module CPU (
         i_a: reg_read_data1,
         i_b: reg_read_data2,
         i_op: i_rom_data[4:0],
-        i_enable: alu_enable,
+        i_enable: op_code == OpCode::alu,
         i_flags: {r_zero_flag, r_carry_flag},
         o_flags: {alu_zero_flag, alu_carry_flag},
         o_condition_met: alu_condition_met,
@@ -71,7 +70,6 @@ module CPU (
     );
 
     always_comb {
-        alu_enable = 1'b0;
         reg_write_enable = 1'b0;
         o_ram_write_enable = 1'b0;
         reg_write_dest = 3'bxxx;
@@ -113,7 +111,6 @@ module CPU (
                 }
                 OpCode::alu: {
                     // alu: [{11} <dst: 3> <src1: 3> <src2: 3> <op: 5>]
-                    alu_enable = 1'b1;
                     reg_write_dest = dest_reg;
                     reg_read_src1 = src1_reg;
                     reg_read_src2 = src2_reg;
@@ -150,8 +147,10 @@ module CPU (
                         }
                     }
                     OpCode::alu: {
-                        r_zero_flag = alu_zero_flag;
-                        r_carry_flag = alu_carry_flag;
+                        if alu_condition_met {
+                            r_zero_flag = alu_zero_flag;
+                            r_carry_flag = alu_carry_flag;
+                        }
                     }
                 }
             }

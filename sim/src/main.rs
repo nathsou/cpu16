@@ -405,7 +405,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = add();
+    let prog = euler1();
 
     let disasm = prog
         .iter()
@@ -417,6 +417,8 @@ fn main() {
     }
 
     let cpu = CPU::from(&prog);
+
+    // cpu.run_with_fuel(100, true);
 
     let mut output_file =
         std::fs::File::create("trace.jsonl").expect("failed to create output file");
