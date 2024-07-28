@@ -38,7 +38,7 @@ async def test_top(dut):
     clock = Clock(signal=dut.clk, period=10, units='us')
     cocotb.start_soon(clock.start())
 
-    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'div.jsonl')
+    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'add.jsonl')
 
     dut.btn_r.value = 0
 

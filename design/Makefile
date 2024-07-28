@@ -9,6 +9,7 @@ SOURCES += ${current_dir}/build/RegisterFile.sv
 SOURCES += ${current_dir}/build/CPU.sv
 SOURCES += ${current_dir}/build/ROM.sv
 SOURCES += ${current_dir}/build/RAM.sv
+SOURCES += ${current_dir}/build/PPU.sv
 SOURCES += ${current_dir}/build/SevenSegment.sv
 
 BUILDDIR := ${current_dir}/build

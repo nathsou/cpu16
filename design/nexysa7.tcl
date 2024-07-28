@@ -18,12 +18,21 @@ set verilogSources [list \
     "$cwd/build/ResetConditioner.sv" \
     "$cwd/build/ROM.sv" \
     "$cwd/build/SevenSegment.sv" \
+    "$cwd/build/PPU.sv" \
     "$cwd/build/Top.sv" \
 ]
 
-import_files -fileset [get_filesets sources_1] -force -norecurse $verilogSources
+import_files -fileset [get_filesets sources_1] -force -norecurse -flat $verilogSources
 set xdcSources [list "$cwd/nexysa7.xdc"]
 read_xdc $xdcSources
+
+# Add hex files to the project
+set hexFiles [list \
+    "$cwd/src/patternTable.hex" \
+    "$cwd/src/prog.hex" \
+]
+
+import_files -fileset [get_filesets sources_1] -force -norecurse -flat $hexFiles
 
 set_property STEPS.WRITE_BITSTREAM.ARGS.BIN_FILE true [get_runs impl_1]
 update_compile_order -fileset sources_1

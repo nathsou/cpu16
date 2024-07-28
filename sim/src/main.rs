@@ -405,7 +405,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = euler1();
+    let prog = yo_fpga();
 
     let disasm = prog
         .iter()
@@ -416,23 +416,23 @@ fn main() {
         println!("{:04x}: {}", i, inst);
     }
 
-    let cpu = CPU::from(&prog);
+    let mut cpu = CPU::from(&prog);
 
-    // cpu.run_with_fuel(100, true);
+    cpu.run_with_fuel(100, true);
 
-    let mut output_file =
-        std::fs::File::create("trace.jsonl").expect("failed to create output file");
+    // let mut output_file =
+    //     std::fs::File::create("trace.jsonl").expect("failed to create output file");
 
-    for state in cpu {
-        let state_json = serde_json::to_string(&state).expect("failed to serialize state");
-        output_file
-            .write_all(state_json.as_bytes())
-            .expect("failed to write to output file");
+    // for state in cpu {
+    //     let state_json = serde_json::to_string(&state).expect("failed to serialize state");
+    //     output_file
+    //         .write_all(state_json.as_bytes())
+    //         .expect("failed to write to output file");
 
-        output_file
-            .write_all(b"\n")
-            .expect("failed to write to output file");
-    }
+    //     output_file
+    //         .write_all(b"\n")
+    //         .expect("failed to write to output file");
+    // }
 
     // println!("{}", cpu);
 
@@ -440,5 +440,10 @@ fn main() {
     //     println!("{:04x}: {:04x}", i, cpu.ram[i]);
     // }
 
-    dump_instructions(&prog);
+    // hexdump
+    // for (i, &inst) in prog.iter().enumerate() {
+    //     println!("{inst:04x}");
+    // }
+
+    // dump_instructions(&prog);
 }

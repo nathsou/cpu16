@@ -1,0 +1,130 @@
+
+module PPU (
+    i_clk_100mhz: input clock,
+    i_rst: input reset,
+    i_name_table_write_enable: input logic,
+    i_name_table_write_data: input logic<8>,
+    i_name_table_write_addr: input logic<13>,
+    o_hsync: output logic,
+    o_vsync: output logic,
+    o_vga_red: output logic<4>,
+    o_vga_green: output logic<4>,
+    o_vga_blue: output logic<4>,
+) {
+    local H_ACTIVE: logic<10> = 640;
+    local H_FRONT_PORCH: logic<5> = 16;
+    local H_SYNC: logic<7> = 96;
+    local H_BACK_PORCH: logic<6> = 48;
+    local H_TOTAL: logic<10> = H_ACTIVE + H_FRONT_PORCH + H_SYNC + H_BACK_PORCH;
+
+    local V_ACTIVE: logic<9> = 480;
+    local V_FRONT_PORCH: logic<5> = 10;
+    local V_SYNC: logic<2> = 2;
+    local V_BACK_PORCH: logic<6> = 33;
+    local V_TOTAL: logic<10> = V_ACTIVE + V_FRONT_PORCH + V_SYNC + V_BACK_PORCH;
+
+    local TILE_SIZE: logic<3> = 8;
+    local TILES_X: logic<7> = 80; // H_ACTIVE / TILE_SIZE;
+    local TILES_Y: logic<7> = 60; // V_ACTIVE / TILE_SIZE;
+
+    local STAGE_FETCH_NAME_TABLE: logic<2> = 0;
+    local STAGE_FETCH_PATTERN_TABLE: logic<2> = 1;
+    local STAGE_IDLE: logic<2> = 2;
+    local STAGE_RENDER: logic<2> = 3;
+
+    // Counter for horizontal and vertical sync
+    var col: logic<10>;
+    var row: logic<10>;
+    let is_rendering: logic = (col <: H_ACTIVE) & (row <: V_ACTIVE);
+    var pattern_table: bit<64>[128];
+    var name_table: bit<8>[TILES_X * TILES_Y];
+    var stage: logic<2>;
+    let tile_x: logic<7> = col >> 3;
+    let tile_y: logic<6> = row >> 3;
+    let sub_x: logic<3> = 7 - (col & 7);
+    let sub_y: logic<3> = 7 - (row & 7);
+    let name_table_index: logic<13> = tile_y * TILES_X + tile_x;
+    var pattern_table_index: logic<8>;
+    var pixel: logic;
+
+    initial {
+        $readmemh("patternTable.hex", pattern_table);
+    }
+
+    var clock_div: bit<2>;
+    let clk_25mhz: clock = clock_div[1];
+
+    // Horizontal and vertical counters
+    always_ff (clk_25mhz) {
+        if col == H_TOTAL - 1 {
+            col = 0;
+            if row == V_TOTAL - 1 {
+                row = 0;
+            } else {
+                row = row + 1;
+            }
+        } else {
+            col = col + 1;
+        }
+
+        o_hsync = if (col >= (H_ACTIVE + H_FRONT_PORCH)) && (col <: (H_ACTIVE + H_FRONT_PORCH + H_SYNC)) { '0 } else { '1 };
+        o_vsync = if (row >= (V_ACTIVE + V_FRONT_PORCH)) && (row <: (V_ACTIVE + V_FRONT_PORCH + V_SYNC)) { '0 } else { '1 };
+    }
+
+    always_ff (i_clk_100mhz, i_rst) {
+        if_reset {
+            clock_div = '0;
+            stage = '0;
+            pattern_table_index = '0;
+            pattern_table[0] = '0;
+
+            for i: u32 in 0..(TILES_X * TILES_Y) {
+                name_table[i] = 8'h0;
+            }
+
+            o_vga_red = '0;
+            o_vga_green = '0;
+            o_vga_blue = '0;
+            pixel = 1'b0;
+        } else {
+            clock_div = clock_div + 1;
+
+            if i_name_table_write_enable {
+                name_table[i_name_table_write_addr] = i_name_table_write_data;
+            }
+
+            if is_rendering {
+                case stage {
+                    STAGE_FETCH_NAME_TABLE: {
+                        pattern_table_index = name_table[name_table_index];
+                        stage = STAGE_FETCH_PATTERN_TABLE;
+                    }
+                    STAGE_FETCH_PATTERN_TABLE: {
+                        pixel = pattern_table[if pattern_table_index >: 8'h20 { pattern_table_index - 8'h20 } else { 0 }][sub_y * 8 + sub_x];
+                        stage = STAGE_IDLE;
+                    }
+                    STAGE_IDLE: {
+                        stage = STAGE_RENDER;
+                    }
+                    STAGE_RENDER: {
+                        if pixel {
+                            o_vga_red = 4'hf;
+                            o_vga_green = 4'hf;
+                            o_vga_blue = 4'hf;
+                        } else {
+                            o_vga_red = '0;
+                            o_vga_green = '0;
+                            o_vga_blue = '0;
+                        }
+
+                        stage = STAGE_FETCH_NAME_TABLE;
+                    }
+                }
+            } else {
+                o_vga_red = '0;
+                o_vga_green = '0;
+                o_vga_blue = '0;
+            }
+        }
+    }
+}

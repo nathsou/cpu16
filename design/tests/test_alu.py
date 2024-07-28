@@ -1,7 +1,5 @@
 import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
-from typing import List
+from cocotb.triggers import Timer
 import os
 from pathlib import Path
 from cocotb.runner import get_runner
@@ -29,14 +27,14 @@ class Op(IntEnum):
     SUB_IF_NOT_CARRY = 17
     ADC_IF_NOT_CARRY = 18
     SBC_IF_NOT_CARRY = 19
-    AND = 20
-    NAND = 21
-    OR = 22
-    XOR = 23
-    SHL = 24
-    SHR = 25
-    INC = 26
-    DEC = 27
+    INC = 20
+    DEC = 21
+    AND = 22
+    NAND = 23
+    OR = 24
+    XOR = 25
+    SHL = 26
+    SHR = 27
     
 @dataclass
 class ALUInput:
@@ -61,19 +59,14 @@ ALU_INPUTS = [
 async def test_alu(dut):
     """ Test ALU """
 
-    clock = Clock(signal=dut.i_clk, period=10, units="us")
-    cocotb.start_soon(clock.start())
-
-    dut.i_rst.value = 1
-    await RisingEdge(dut.i_clk)
-
     for input in ALU_INPUTS:
         dut.i_enable.value = 1
-        dut.i_rst.value = 0
+        dut.i_flags.value = 0
         dut.i_op.value = input.op.value
         dut.i_a.value = input.a
         dut.i_b.value = input.b
-        await RisingEdge(dut.i_clk)
+
+        await Timer(1, units='us')
 
         assert dut.o_out.value == input.out, f"ALU output is {dut.o_out.value}, expected {input.out} for op {input.op.name}"
 
