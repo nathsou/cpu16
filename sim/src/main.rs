@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{fmt::format, io::Write};
 
 use asm::Assembler;
 use isa::Reg;
@@ -405,7 +405,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = yo_fpga();
+    let prog = add();
 
     let disasm = prog
         .iter()
@@ -441,9 +441,8 @@ fn main() {
     // }
 
     // hexdump
-    // for (i, &inst) in prog.iter().enumerate() {
-    //     println!("{inst:04x}");
-    // }
-
+    for &inst in prog.iter() {
+        print!("0x{:04x}, ", inst);
+    }
     // dump_instructions(&prog);
 }

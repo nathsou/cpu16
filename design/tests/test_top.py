@@ -107,6 +107,7 @@ def test_top_runner():
 
     sources = [
         proj_path / "Top.sv",
+        proj_path / "PPU.sv",
         proj_path / "CPU.sv",
         proj_path / "ALU.sv",
         proj_path / "RAM.sv",

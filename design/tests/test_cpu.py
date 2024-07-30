@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 from cocotb.runner import get_runner
 from cocotb.types import LogicArray
+from typing import List
 
 def replace_text_in_files(directory, old_text, new_text):
     for root, _, files in os.walk(directory):
@@ -33,51 +34,91 @@ def parse_prog(file: str):
         lines = f.readlines()
         return [int(line, 16) for line in lines]
 
-@cocotb.test()
-async def test_cpu(dut):
-    """ Test CPU """
+class CPU:
+    def __init__(self, dut, prog_rom: List[int]):
+        self.dut = dut
+        self.prog_rom = prog_rom
+        self.ram = [0] * (1 << 16)
+        self.clock = Clock(signal=dut.i_clk, period=10, units='us')
+        cocotb.start_soon(self.clock.start())
+        self.name_table = [0] * ((640 >> 3) * (480 >> 3))
+        self.name_table_index = 0
 
-    prog_rom = parse_prog(root_path / 'src' / 'prog.hex')
-    ram = [0] * (1 << 16)
-    name_table = [0] * ((640 >> 3) * (480 >> 3))
-    name_table_index = 0
-    clock = Clock(signal=dut.i_clk, period=10, units='us')
-    cocotb.start_soon(clock.start())
+    async def reset_conditioner(self):
+        self.dut.i_rst.value = 1
+        await RisingEdge(self.dut.i_clk)
+        self.dut.i_rst.value = 0
+        await RisingEdge(self.dut.i_clk)
 
-    dut.i_rst.value = 1
-    await RisingEdge(dut.i_clk)
-    dut.i_rst.value = 0
-    await RisingEdge(dut.i_clk)
+    def is_halted(self) -> bool:
+        return self.dut.r_halt_flag.value == 1
+    
+    def get_reg(self, reg_idx: int) -> LogicArray:
+        return self.dut.register_file.r_regs[reg_idx].value
 
-    while dut.r_halt_flag.value != 1:
-        pc = int(dut.o_program_counter.value)
-        print(f"pc: {pc}")
-        inst = prog_rom[pc] if pc < len(prog_rom) else 0
-        dut.i_rom_data.value = inst
-        print(f"inst: {bin(inst)}")
+    async def step(self):
+        pc = int(self.dut.o_program_counter.value)
+        inst = self.prog_rom[pc] if pc < len(self.prog_rom) else 0
+        self.dut.i_rom_data.value = inst
 
-        if dut.o_ram_write_enable.value == 1:
-            addr = int(dut.o_ram_write_address.value)
-            val = int(dut.o_ram_write_data.value)
-            print(f"store ram[{addr}] = {val}")
+        if self.dut.o_ram_write_enable.value == 1:
+            addr = int(self.dut.o_ram_write_address.value)
+            val = int(self.dut.o_ram_write_data.value)
 
             if addr == 0xffff:
                 if val & 0x8000 != 0:
-                    name_table_index = val & 0x1fff
+                    self.name_table_index = val & 0x1fff
                 else:
-                    name_table[name_table_index] = val
+                    self.name_table[self.name_table_index] = val
             else:
-                ram[addr] = val
+                self.ram[addr] = val
 
-        ram_read_addr = dut.o_ram_read_address.value
+        ram_read_addr = self.dut.o_ram_read_address.value
 
         if is_binary(ram_read_addr):
-            print(f"load {ram[int(ram_read_addr)]}")
-            dut.i_ram_read_data.value = ram[int(ram_read_addr)]
+            self.dut.i_ram_read_data.value = self.ram[int(ram_read_addr)]
         
-        await RisingEdge(dut.i_clk)
+        await RisingEdge(self.dut.i_clk)
 
-    print(''.join([chr(c) for c in name_table[:32]]))
+# @cocotb.test()
+# async def test_add(dut):
+#     prog_rom = [0x4823, 0x5017, 0xc940, 0x0000]
+
+#     cpu = CPU(dut, prog_rom)
+
+#     await cpu.reset_conditioner()
+
+#     while not cpu.is_halted():
+#         await cpu.step()
+
+#     assert cpu.get_reg(1) == 0x3a
+
+
+@cocotb.test()
+async def test_nametable(dut):
+    """ Test NameTable """
+
+    # a program that writes "Hello, FPGA!" to the name table
+    prog_rom: List[int] = [
+        0x71ff, 0x50ff, 0x6808, 0xd2ba, 0x68ff, 0xd2b8, 0x5880, 0x6808, 0xdbba, 0xdb18, 0x9a00,
+        0x4848, 0x8a00, 0xdb14, 0x9a00, 0x4865, 0x8a00, 0xdb14, 0x9a00, 0x486c, 0x8a00, 0xdb14,
+        0x9a00, 0x486c, 0x8a00, 0xdb14, 0x9a00, 0x486f, 0x8a00, 0xdb14, 0x9a00, 0x482c, 0x8a00,
+        0xdb14, 0x9a00, 0x4820, 0x8a00, 0xdb14, 0x9a00, 0x4846, 0x8a00, 0xdb14, 0x9a00, 0x4850,
+        0x8a00, 0xdb14, 0x9a00, 0x4847, 0x8a00, 0xdb14, 0x9a00, 0x4841, 0x8a00, 0xdb14, 0x9a00,
+        0x4821, 0x8a00, 0xdb14, 0x0000,
+    ]
+
+    cpu = CPU(dut, prog_rom)
+
+    await cpu.reset_conditioner()
+
+    while not cpu.is_halted():
+        await cpu.step()
+
+    message = ''.join([chr(c) for c in cpu.name_table[:12]])
+
+    assert message == "Hello, FPGA!"
+    assert all(cpu.name_table[i] == 0 for i in range(12, len(cpu.name_table)))
 
 
 def test_cpu_runner():
@@ -96,7 +137,6 @@ def test_cpu_runner():
         always=True,
         timescale=("1us", "1us"),
         verbose=True,
-        build_args=['-pfileline=1']
     )
 
     runner.test(hdl_toplevel="cpu16_CPU", test_module="test_cpu")
