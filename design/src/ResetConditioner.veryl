@@ -1,0 +1,21 @@
+module ResetConditioner #(
+    param Stages: u32 = 4,
+) (
+    i_clk: input  clock,
+    i_in : input  logic,
+    o_out: output logic,
+) {
+    var r_stage : logic<Stages>;
+    var r_initialized: bit;
+
+    always_ff (i_clk) {
+        if i_in || !r_initialized {
+            r_stage = '1;
+            r_initialized = 1'b1;
+        } else {
+            r_stage = {r_stage[Stages - 2:0], 1'b0};
+        }
+    }
+
+    assign o_out = r_stage[Stages - 1];
+}

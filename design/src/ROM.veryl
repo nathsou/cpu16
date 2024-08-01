@@ -1,0 +1,20 @@
+module ROM (
+    i_clk: input clock,
+    i_rst: input reset,
+    i_addr: input logic<16>,
+    o_data: output logic<16>,
+) {
+    var mem: logic<16> [128];
+
+    initial {
+        $readmemh("prog.hex", mem);
+    }
+
+    always_ff (i_clk, i_rst) {
+        if_reset {
+            mem[127] = '0;
+        }
+    }
+
+    assign o_data = mem[i_addr];
+}

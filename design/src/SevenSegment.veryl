@@ -1,0 +1,67 @@
+module SevenSegment (
+    i_clk  : input  clock    ,
+    i_value: input  logic<32>,
+    o_seg  : output logic<7> ,
+    o_an   : output logic<8> ,
+    o_dp   : output logic    ,
+) {
+    var r_s     : logic<3> ;
+    var r_digit : logic<4> ;
+    var r_aen   : logic<8> ;
+    var r_clkdiv: logic<20>;
+
+    assign o_dp  = 1'b1;
+    assign r_s   = r_clkdiv[19:17];
+    assign r_aen = 8'b11111111;
+
+    // Quad 4-to-1 MUX
+    always_ff (i_clk) {
+        case (r_s) {
+            3'd0   : r_digit = i_value[3:0];
+            3'd1   : r_digit = i_value[7:4];
+            3'd2   : r_digit = i_value[11:8];
+            3'd3   : r_digit = i_value[15:12];
+            3'd4   : r_digit = i_value[19:16];
+            3'd5   : r_digit = i_value[23:20];
+            3'd6   : r_digit = i_value[27:24];
+            3'd7   : r_digit = i_value[31:28];
+            default: r_digit = i_value[3:0];
+        }
+    }
+
+    // Decoder for 7-segment display values
+    always_comb {
+        case (r_digit) {
+            4'h0   : o_seg = 7'b1000000;
+            4'h1   : o_seg = 7'b1111001;
+            4'h2   : o_seg = 7'b0100100;
+            4'h3   : o_seg = 7'b0110000;
+            4'h4   : o_seg = 7'b0011001;
+            4'h5   : o_seg = 7'b0010010;
+            4'h6   : o_seg = 7'b0000010;
+            4'h7   : o_seg = 7'b1111000;
+            4'h8   : o_seg = 7'b0000000;
+            4'h9   : o_seg = 7'b0010000;
+            4'hA   : o_seg = 7'b0001000;
+            4'hB   : o_seg = 7'b0000011;
+            4'hC   : o_seg = 7'b1000110;
+            4'hD   : o_seg = 7'b0100001;
+            4'hE   : o_seg = 7'b0000110;
+            4'hF   : o_seg = 7'b0001110;
+            default: o_seg = 7'b0000000; // 'U'
+                 }
+    }
+
+    // Anode control
+    always_comb {
+        o_an = 8'b11111111;
+        if (r_aen[r_s]) {
+            o_an[r_s] = 1'b0;
+        }
+    }
+
+    // Clock divider
+    always_ff (i_clk) {
+        r_clkdiv = r_clkdiv + 1'b1;
+    }
+}

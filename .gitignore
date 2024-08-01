@@ -1,2 +1,9 @@
-/target
-/fpga/build
+/sim/target
+/design/build/
+/design/dependencies/
+/design/.f4cache
+/design/cpu16.f
+/design/tests/sim_build/
+/design/tests/traces/
+/design/tests/__pycache__/
+/design/tests/.pytest_cache
