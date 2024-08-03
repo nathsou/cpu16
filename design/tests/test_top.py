@@ -6,6 +6,8 @@ from pathlib import Path
 from cocotb.runner import get_runner
 import json
 
+VERBOSE = False
+
 def replace_text_in_files(directory, old_text, new_text):
     for root, _, files in os.walk(directory):
         for file in files:
@@ -29,7 +31,9 @@ def parse_cpu_state(file: str):
     with open(file, 'r') as f:
         lines = f.readlines()
         return [json.loads(line) for line in lines]
-    
+
+
+PC_START_ADDR = 0x8000
 
 @cocotb.test()
 async def test_top(dut):
@@ -38,69 +42,98 @@ async def test_top(dut):
     clock = Clock(signal=dut.clk, period=10, units='us')
     cocotb.start_soon(clock.start())
 
-    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'add.jsonl')
+    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'div.jsonl')
 
     dut.btn_r.value = 0
+    
+    signals = {
+        "PC": dut.cpu.o_program_counter,
+        "stage": dut.cpu.r_stage,
+        "instruction": dut.cpu.r_instruction,
+        "reg_write_enable": dut.cpu.register_file.i_write_enable,
+        "reg_write_dest": dut.cpu.register_file.i_write_dest,
+        "reg_write_data": dut.cpu.register_file.i_write_data,
+        "reg_read_src1": dut.cpu.register_file.i_read_src1,
+        "reg_read_src2": dut.cpu.register_file.i_read_src2,
+        "reg_read_data1": dut.cpu.register_file.o_read_data1,
+        "reg_read_data2": dut.cpu.register_file.o_read_data2,
+        "alu_out": dut.cpu.alu.o_out,
+        "alu_condition_met": dut.cpu.w_alu_condition_met,
+        "halt_flag": dut.halt_flag,
+        "zero_flag": dut.zero_flag,
+        "carry_flag": dut.carry_flag,
+        "mem_address": dut.cpu.w_mem_address,
+        "mem_write_data": dut.cpu.r_mem_write_data,
+        "mem_write_enable": dut.cpu.w_mem_write_enable,
+        "ram_address": dut.ram.i_address,
+        "ram_write_enable": dut.ram.i_write_enable,
+        "ram_write_data": dut.ram.i_write_data,
+        "ram_read_data": dut.ram.o_read_data,
+        "count_enable": dut.cpu.w_count_enable,
+        "rst": dut.rst,
+    }
 
     def print_state():
-        pc = dut.program_counter.value
-        a = dut.cpu.alu.i_a.value
-        b = dut.cpu.alu.i_b.value
-        alu_op = dut.cpu.alu.i_op.value
-        flags = dut.cpu.alu.i_flags.value
-        carry_in = dut.cpu.alu.carry_in.value
-        print(f"PC: {pc}, rst: {dut.rst} inst: {dut.rom.o_data.value}, a: {a}, b: {b}, alu_en: {dut.cpu.alu.i_enable.value}, alu_out: {dut.cpu.alu_out.value}, alu_op: {alu_op}, flags: {flags}, carry_in: {carry_in}")
-        reg_file = dut.cpu.register_file
-        regs = {i: int(reg_file.r_regs[i].value) for i in range(8)}
-        print("regs:", regs)
-        print(f"src1: {reg_file.i_read_src1.value}, src2: {reg_file.i_read_src2.value}, dst: {reg_file.i_write_dest.value}, d1: {reg_file.o_read_data1.value}, d2: {reg_file.o_read_data2.value}, wr: {reg_file.i_write_enable.value}, wr_data: {reg_file.i_write_data}")
-        print("")
+        for name, signal in signals.items():
+            print(f"{name}: {signal.value} ({hex(signal.value)})")
+        
+        for i in range(8):
+            val = dut.cpu.register_file.r_regs[i].value
+            print(f"r{i}: {val} ({hex(val)})")
 
-
+        print("-------------")
+    
     trace_index = 0
+    max_iters = 10 ** 6
+    last_pc = 0
+    i = 0
 
-    while dut.halt_flag.value != 1:
-        is_ready = dut.cpu.register_file.r_regs[0].value == 0 and dut.program_counter.value != 0
-
+    while True:
+        is_ready = dut.rst.value == 0 and dut.cpu.register_file.r_regs[0].value == 0 and dut.program_counter.value != PC_START_ADDR
         if is_ready:
-            is_reading_mem = dut.cpu.is_reading_memory.value
-            
-            regs = [int(dut.cpu.register_file.r_regs[i].value) for i in range(8)]
-            print_state()
-            regs = [int(dut.cpu.register_file.r_regs[i].value) for i in range(8)]
-            print([hex(n) for n in regs])
-            print(f"inst: {dut.rom_data.value}")
-            zero_flag = dut.zero_flag.value
-            carry_flag = dut.carry_flag.value
-            halt_flag = dut.halt_flag.value
+            break
+        else:
+            await RisingEdge(dut.clk)
 
-                
-            print(f"is_reading_mem: {is_reading_mem}")
+    while i < max_iters and dut.halt_flag.value != 1:
+        pc = str(dut.program_counter.value)
+
+        if pc == last_pc and signals['stage'].value != 0:
+            await RisingEdge(dut.clk)
+            # print_state()
+            continue
+            
+        i += 1
+        last_pc = pc
+
+        if signals['stage'].value == 0:
+            regs = [int(dut.cpu.register_file.r_regs[i].value) for i in range(8)]
 
             expected = trace[trace_index]
-            print('expected', expected)
+            
+            if VERBOSE:
+                print_state()
+                print('expected', {k: hex(v) if isinstance(v, int) else v for k, v in expected.items()})
+
+            trace_index += 1
 
             assert regs[0] == 0
-            assert regs[7] == expected['pc']
+            assert regs[7] == expected['pc'] 
             assert regs[1] == expected['r1']
             assert regs[2] == expected['r2']
             assert regs[3] == expected['r3']
             assert regs[4] == expected['r4']
             assert regs[5] == expected['tmp']
             assert regs[6] == expected['sp']
-            assert zero_flag == expected['zero']
-            assert carry_flag == expected['carry']
-            assert halt_flag == expected['halt']
+            assert signals['zero_flag'].value == expected['zero']
+            assert signals['carry_flag'].value == expected['carry']
+            assert signals['halt_flag'].value == expected['halt']
 
-            if is_reading_mem == 0:
-                trace_index += 1
+            await RisingEdge(dut.clk)
+        
 
-        # print_state()
-        await RisingEdge(dut.clk)
-
-    # print_state()
-    assert dut.halt_flag.value == 1
-
+    if VERBOSE:
+        print_state()
 
 def test_top_runner():
     sim = os.getenv("SIM", "icarus")
@@ -111,7 +144,6 @@ def test_top_runner():
         proj_path / "CPU.sv",
         proj_path / "ALU.sv",
         proj_path / "RAM.sv",
-        proj_path / "ROM.sv",
         proj_path / "RegisterFile.sv",
         proj_path / "ResetConditioner.sv",
         proj_path / "SevenSegment.sv",

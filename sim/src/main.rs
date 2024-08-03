@@ -12,6 +12,8 @@ mod isa;
 mod procedures;
 mod sim;
 
+const START_PC: u16 = 0x8000;
+
 fn add() -> Vec<u16> {
     use Reg::*;
 
@@ -262,7 +264,7 @@ fn itoa() -> Vec<u16> {
 
 #[test]
 fn test_add() {
-    let mut cpu = CPU::from(&add());
+    let mut cpu = CPU::from(&add(), START_PC);
 
     cpu.run();
 
@@ -271,7 +273,7 @@ fn test_add() {
 
 #[test]
 fn test_sub() {
-    let mut cpu = CPU::from(&sub());
+    let mut cpu = CPU::from(&sub(), START_PC);
 
     cpu.run();
 
@@ -280,7 +282,7 @@ fn test_sub() {
 
 #[test]
 fn test_muli() {
-    let mut cpu = CPU::from(&muli());
+    let mut cpu = CPU::from(&muli(), START_PC);
 
     cpu.run();
 
@@ -289,7 +291,7 @@ fn test_muli() {
 
 #[test]
 fn test_xor() {
-    let mut cpu = CPU::from(&xor());
+    let mut cpu = CPU::from(&xor(), START_PC);
 
     cpu.run();
 
@@ -298,7 +300,7 @@ fn test_xor() {
 
 #[test]
 fn test_dec() {
-    let mut cpu = CPU::from(&dec());
+    let mut cpu = CPU::from(&dec(), START_PC);
 
     cpu.run();
 
@@ -307,7 +309,7 @@ fn test_dec() {
 
 #[test]
 fn test_count() {
-    let mut cpu = CPU::from(&count());
+    let mut cpu = CPU::from(&count(), START_PC);
 
     cpu.run();
 
@@ -316,7 +318,7 @@ fn test_count() {
 
 #[test]
 fn test_div() {
-    let mut cpu = CPU::from(&div());
+    let mut cpu = CPU::from(&div(), START_PC);
 
     cpu.run();
 
@@ -325,7 +327,7 @@ fn test_div() {
 
 #[test]
 fn test_add32() {
-    let mut cpu = CPU::from(&add32());
+    let mut cpu = CPU::from(&add32(), START_PC);
 
     cpu.run();
 
@@ -336,7 +338,7 @@ fn test_add32() {
 
 #[test]
 fn test_mem() {
-    let mut cpu = CPU::from(&mem());
+    let mut cpu = CPU::from(&mem(), START_PC);
 
     cpu.run();
 
@@ -345,7 +347,7 @@ fn test_mem() {
 
 #[test]
 fn test_euler1() {
-    let mut cpu = CPU::from(&euler1());
+    let mut cpu = CPU::from(&euler1(), START_PC);
 
     cpu.run();
 
@@ -355,7 +357,7 @@ fn test_euler1() {
 
 #[test]
 fn test_stack() {
-    let mut cpu = CPU::from(&stack());
+    let mut cpu = CPU::from(&stack(), START_PC);
 
     cpu.run();
 
@@ -364,7 +366,7 @@ fn test_stack() {
 
 #[test]
 fn test_power_of_two() {
-    let mut cpu = CPU::from(&power_of_two());
+    let mut cpu = CPU::from(&power_of_two(), START_PC);
 
     cpu.run();
 
@@ -373,7 +375,7 @@ fn test_power_of_two() {
 
 #[test]
 fn test_itoa() {
-    let mut cpu = CPU::from(&itoa());
+    let mut cpu = CPU::from(&itoa(), START_PC);
 
     cpu.run();
 
@@ -405,7 +407,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = add();
+    let prog = stack();
 
     let disasm = prog
         .iter()
@@ -416,23 +418,23 @@ fn main() {
         println!("{:04x}: {}", i, inst);
     }
 
-    let mut cpu = CPU::from(&prog);
+    let cpu = CPU::from(&prog, START_PC);
 
-    cpu.run_with_fuel(100, true);
+    // cpu.run_with_fuel(100_000_000, true);
 
-    // let mut output_file =
-    //     std::fs::File::create("trace.jsonl").expect("failed to create output file");
+    let mut output_file =
+        std::fs::File::create("trace.jsonl").expect("failed to create output file");
 
-    // for state in cpu {
-    //     let state_json = serde_json::to_string(&state).expect("failed to serialize state");
-    //     output_file
-    //         .write_all(state_json.as_bytes())
-    //         .expect("failed to write to output file");
+    for state in cpu {
+        let state_json = serde_json::to_string(&state).expect("failed to serialize state");
+        output_file
+            .write_all(state_json.as_bytes())
+            .expect("failed to write to output file");
 
-    //     output_file
-    //         .write_all(b"\n")
-    //         .expect("failed to write to output file");
-    // }
+        output_file
+            .write_all(b"\n")
+            .expect("failed to write to output file");
+    }
 
     // println!("{}", cpu);
 
@@ -442,7 +444,7 @@ fn main() {
 
     // hexdump
     for &inst in prog.iter() {
-        print!("0x{:04x}, ", inst);
+        println!("{:04x}", inst);
     }
     // dump_instructions(&prog);
 }

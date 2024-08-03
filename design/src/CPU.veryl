@@ -1,19 +1,18 @@
 module CPU (
     i_clk: input clock,
     i_rst: input reset,
-    i_rom_data: input logic<16>,
     i_ram_read_data: input logic<16>,
     o_program_counter: output logic<16>,
     o_display_reg: output logic<32>,
     o_halt_flag: output logic,
     o_zero_flag: output logic,
     o_carry_flag: output logic,
-    o_mem_ready: output logic,
     o_ram_write_enable: output logic,
-    o_ram_write_address: output logic<16>,
+    o_ram_address: output logic<16>,
     o_ram_write_data: output logic<16>,
-    o_ram_read_address: output logic<16>,
 ) {
+    local RESET_PC: logic<16> = 16'h8000;
+
     enum OpCode: logic<2> {
         ctl = 2'b00,
         set = 2'b01,
@@ -21,136 +20,191 @@ module CPU (
         alu = 2'b11,
     }
 
-    var reg_write_enable: logic;
-    var reg_write_dest: logic<3>;
-    var reg_write_data: logic<16>;
-    var reg_read_src1: logic<3>;
-    var reg_read_src2: logic<3>;
-    var reg_read_data1: logic<16>;
-    var reg_read_data2: logic<16>;
+    enum Stage: logic<3> {
+        fetch = 3'b000,
+        decode = 3'b001,
+        execute = 3'b010,
+        memory_access = 3'b011,
+        writeback = 3'b100,
+    }
 
-    var alu_out: logic<17>;
-    var alu_condition_met: logic;
-    var alu_zero_flag: logic;
-    var alu_carry_flag: logic;
-
+    var r_stage: Stage;
+    var r_instruction: logic<16>;
+    var w_reg_write_enable: logic;
+    var r_reg_write_dest: logic<3>;
+    var r_reg_write_data: logic<16>;
+    var r_reg_read_src1: logic<3>;
+    var r_reg_read_src2: logic<3>;
+    var r_reg_read_data1: logic<16>;
+    var r_reg_read_data2: logic<16>;
+    var r_alu_out: logic<17>;
+    var w_alu_condition_met: logic;
+    var r_alu_condition_met: logic;
+    var r_alu_zero_flag: logic;
+    var r_alu_carry_flag: logic;
     var r_halt_flag: logic;
     var r_zero_flag: logic;
     var r_carry_flag: logic;
-
-    let op_code: logic<2> = i_rom_data[15:14];
-
-    let is_reading_memory: logic = ~o_mem_ready && op_code == OpCode::mem && i_rom_data[7];
-    let count_enable: logic = ~o_halt_flag && ~is_reading_memory;
+    var w_mem_address: logic<16>;
+    var r_mem_write_data: logic<16>;
+    var w_mem_write_enable: logic;
+    var w_count_enable: logic;
+    let op_code: logic<2> = r_instruction[15:14];
+    let is_load: logic = r_instruction[7];
 
     inst register_file: RegisterFile (
         i_clk: i_clk,
         i_rst: i_rst,
-        i_count_enable: count_enable,
-        i_write_enable: reg_write_enable,
-        i_write_dest: reg_write_dest,
-        i_write_data: reg_write_data,
-        i_read_src1: reg_read_src1,
-        i_read_src2: reg_read_src2,
-        o_read_data1: reg_read_data1,
-        o_read_data2: reg_read_data2,
+        i_count_enable: w_count_enable,
+        i_write_enable: w_reg_write_enable,
+        i_write_dest: r_reg_write_dest,
+        i_write_data: r_reg_write_data,
+        i_read_src1: r_reg_read_src1,
+        i_read_src2: r_reg_read_src2,
+        o_read_data1: r_reg_read_data1,
+        o_read_data2: r_reg_read_data2,
         o_program_counter: o_program_counter,
         o_display_reg: o_display_reg,
     );
 
     inst alu: ALU (
-        i_a: reg_read_data1,
-        i_b: reg_read_data2,
-        i_op: i_rom_data[4:0],
-        i_enable: op_code == OpCode::alu,
+        i_a: r_reg_read_data1,
+        i_b: r_reg_read_data2,
+        i_op: r_instruction[4:0],
+        i_enable: r_stage == Stage::execute && r_instruction[15:14] == OpCode::alu,
         i_flags: {r_zero_flag, r_carry_flag},
-        o_flags: {alu_zero_flag, alu_carry_flag},
-        o_condition_met: alu_condition_met,
-        o_out: alu_out,
+        o_flags: {r_alu_zero_flag, r_alu_carry_flag},
+        o_condition_met: w_alu_condition_met,
+        o_out: r_alu_out,
     );
 
-    always_comb {
-        reg_write_enable = 1'b0;
-        o_ram_write_enable = 1'b0;
-        reg_write_dest = 3'bxxx;
-        reg_write_data = 16'hxxxx;
-        reg_read_src1 = 3'bxxx;
-        reg_read_src2 = 3'bxxx;
-        o_ram_write_address = 16'hxxxx;
-        o_ram_write_data = 16'hxxxx;
-        o_ram_read_address = 16'hxxxx;
-
-        let dest_reg: logic<3> = i_rom_data[13:11];
-        let src1_reg: logic<3> = i_rom_data[10:8];
-        let src2_reg: logic<3> = i_rom_data[7:5];
-
-        if !o_halt_flag {
-            case op_code {
-                OpCode:: ctl: {}
-                OpCode::set: {
-                    // set: [{01} <dst: 3> <val: 11>]
-                    reg_write_enable = 1'b1;
-                    reg_write_dest = dest_reg;
-                    reg_write_data = {5'd0, i_rom_data[10:0]};
+    always_ff (i_clk, i_rst) {
+        if_reset {
+            r_stage = Stage::fetch;
+            r_halt_flag = 1'b0;
+            r_zero_flag = 1'b0;
+            r_carry_flag = 1'b0;
+            r_alu_condition_met = 1'b0;
+            r_reg_read_src1 = 3'b000;
+            r_reg_read_src2 = 3'b000;
+            r_reg_write_dest = 3'b000;
+            r_reg_write_data = 16'h0000;
+            r_instruction = 16'h0000;
+            r_mem_write_data = 16'h0000;
+        } else {
+            case r_stage {
+                Stage::fetch: {
+                    r_stage = Stage::decode;
                 }
-                OpCode::mem: {
-                    // mem: [{10} <dst: 3> <addr: 3> <load/store: 1> <offset: 7>]
-                    reg_read_src1 = src1_reg;
- 
-                    if i_rom_data[7] {
-                        reg_write_enable = o_mem_ready;
-                        reg_write_dest = dest_reg;
-                        reg_write_data = i_ram_read_data;
-                        o_ram_read_address = reg_read_data1 + {9'd0, i_rom_data[6:0]};
-                    } else {
-                        o_ram_write_enable = 1'b1;
-                        o_ram_write_address = reg_read_data1 + {9'd0, i_rom_data[6:0]};
-                        reg_read_src2 = dest_reg;
-                        o_ram_write_data = reg_read_data2;
+                Stage::decode: {
+                    r_instruction = i_ram_read_data;
+                    r_reg_write_dest = i_ram_read_data[13:11];
+                    r_reg_read_src1 = i_ram_read_data[10:8];
+                    r_reg_read_src2 = i_ram_read_data[7:5];
+
+                    case i_ram_read_data[15:14] {
+                        OpCode::set: {
+                            r_reg_write_data = {5'd0, i_ram_read_data[10:0]};
+                            r_stage = Stage::writeback;
+                        }
+                        OpCode::mem: {
+                            if ~i_ram_read_data[7] { // Store
+                                r_reg_read_src2 = i_ram_read_data[13:11];
+                            }
+
+                            r_stage = Stage::execute;
+                        }
+                        default: {
+                            r_stage = Stage::execute;
+                        }
                     }
                 }
-                OpCode::alu: {
-                    // alu: [{11} <dst: 3> <src1: 3> <src2: 3> <op: 5>]
-                    reg_write_dest = dest_reg;
-                    reg_read_src1 = src1_reg;
-                    reg_read_src2 = src2_reg;
-                    reg_write_data = alu_out[15:0];
-                    reg_write_enable = alu_condition_met;
+                Stage::execute: {
+                    case op_code {
+                        OpCode::ctl: {
+                            case r_instruction[2:0] {
+                                3'b000: r_halt_flag = 1'b1;
+                                3'b001: r_zero_flag = 1'b1;
+                                3'b010: r_zero_flag = 1'b0;
+                                3'b011: r_carry_flag = 1'b1;
+                                3'b100: r_carry_flag = 1'b0;
+                                default: {}
+                            }
+
+                            r_stage = Stage::writeback;
+                        }
+                        OpCode::mem: {
+                            // [{10} <dst: 3> <addr: 3> <store/load: 1> <offset: 7>]
+                            r_stage = Stage::memory_access;
+
+                            if ~is_load { // Store
+                                r_mem_write_data = r_reg_read_data2;
+                            }
+                        }
+                        OpCode::alu: {
+                            r_alu_condition_met = w_alu_condition_met;
+
+                            if w_alu_condition_met {
+                                r_zero_flag = r_alu_zero_flag;
+                                r_carry_flag = r_alu_carry_flag;
+                                r_reg_write_data = r_alu_out[15:0];
+                            }
+
+                            r_stage = Stage::writeback;
+                        }
+                        default: {
+                            r_stage = Stage::writeback;
+                        }
+                    }
+                }
+                Stage::memory_access: {
+                    r_stage = Stage::writeback;
+
+                    if is_load {
+                        r_reg_write_data = i_ram_read_data;
+                    }
+                }
+                Stage::writeback: {
+                    r_stage = Stage::fetch;
                 }
             }
         }
     }
 
-    always_ff (i_clk, i_rst) {
-        if_reset {
-            r_halt_flag = 1'b0;
-            r_zero_flag = 1'b0;
-            r_carry_flag = 1'b0;
-            o_mem_ready = 1'b0;
-        } else {
-            if !r_halt_flag {
+    always_comb {
+        w_reg_write_enable = 1'b0;
+        w_count_enable = 1'b0;
+        w_mem_address = o_program_counter;
+        w_mem_write_enable = 1'b0;
+
+        case r_stage {
+            Stage::execute: {
+                if op_code == OpCode::mem {
+                    w_mem_address = r_reg_read_data1 + {9'd0, r_instruction[6:0]};
+                    w_mem_write_enable = ~is_load;
+                }
+            }
+            Stage::memory_access: {
+                w_mem_address = r_reg_read_data1 + {9'd0, r_instruction[6:0]};
+                w_reg_write_enable = is_load;
+                w_mem_write_enable = ~is_load;
+            }
+            Stage::writeback: {
                 case op_code {
-                    OpCode::ctl: {
-                        case i_rom_data[2:0] {
-                            3'b000: r_halt_flag = 1'b1;
-                            3'b001: r_zero_flag = 1'b1;
-                            3'b010: r_zero_flag = 1'b0;
-                            3'b011: r_carry_flag = 1'b1;
-                            3'b100: r_carry_flag = 1'b0;
-                            default: {}
-                        }
+                    OpCode::set: {
+                        w_reg_write_enable = 1'b1;
+                        w_count_enable = 1'b1;
                     }
-                    OpCode::set: {}
                     OpCode::mem: {
-                        if i_rom_data[7] {
-                            o_mem_ready = !o_mem_ready;
+                        if r_instruction[7] {  // Load
+                            w_reg_write_enable = 1'b1;
                         }
+
+                        w_count_enable = 1'b1;
                     }
                     OpCode::alu: {
-                        if alu_condition_met {
-                            r_zero_flag = alu_zero_flag;
-                            r_carry_flag = alu_carry_flag;
-                        }
+                        w_reg_write_enable = r_alu_condition_met;
+                        w_count_enable = 1'b1;
                     }
                 }
             }
@@ -160,4 +214,7 @@ module CPU (
     assign o_halt_flag = r_halt_flag;
     assign o_zero_flag = r_zero_flag;
     assign o_carry_flag = r_carry_flag;
+    assign o_ram_write_enable = w_mem_write_enable;
+    assign o_ram_address = w_mem_address;
+    assign o_ram_write_data = r_mem_write_data;
 }

@@ -14,6 +14,7 @@ pub module RegisterFile (
     o_display_reg: output logic<32>,
 ) {
     var r_regs: logic<16>[8];
+    local RESET_PC: logic<16> = 16'h8000;
 
     always_ff (i_clk, i_rst) {
         if_reset {
@@ -24,15 +25,15 @@ pub module RegisterFile (
             r_regs[4] = '0;
             r_regs[5] = '0;
             r_regs[6] = '0;
-            r_regs[7] = '0;
+            r_regs[7] = RESET_PC;
         } else {
-            if i_count_enable {
+            if i_count_enable && !(i_write_enable && i_write_dest == 3'd7) {
                 r_regs[7] = r_regs[7] + 1;
             }
             
             if i_write_enable && i_write_dest != 3'b000 {
                 r_regs[i_write_dest] = i_write_data;
-            }    
+            }
         }
     }
 

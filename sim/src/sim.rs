@@ -26,23 +26,23 @@ pub struct CPUState {
 }
 
 impl CPU {
-    pub fn new(rom: [u16; 0x10000]) -> Self {
+    pub fn new(rom: [u16; 0x10000], start_address: u16) -> Self {
         Self {
-            regs: [0; 8],
+            regs: [0, 0, 0, 0, 0, 0, 0, start_address],
             halted: false,
             carry: false,
             zero: false,
             rom,
             ram: [0; 0x10000],
-            next_pc: 0,
+            next_pc: start_address,
         }
     }
 
-    pub fn from(prog: &[u16]) -> Self {
+    pub fn from(prog: &[u16], start_address: u16) -> Self {
         let mut rom = [0; 0x10000];
-        rom[..prog.len()].copy_from_slice(prog);
+        rom[(start_address as usize)..(start_address as usize + prog.len())].copy_from_slice(prog);
 
-        Self::new(rom)
+        Self::new(rom, start_address)
     }
 
     pub fn set_reg(&mut self, reg: Reg, val: u16) {

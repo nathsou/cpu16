@@ -48,7 +48,7 @@ module PPU (
     var pixel: logic;
 
     initial {
-        $readmemh("patternTable.hex", pattern_table);
+        $readmemh("/Users/nathan/Documents/code/Rust/cpu16/design/src/patternTable.hex", pattern_table);
     }
 
     var clock_div: bit<2>;

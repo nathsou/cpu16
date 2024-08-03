@@ -22,61 +22,47 @@ module Top (
     );
 
     var program_counter: logic<16>;
-    var rom_data: logic<16>;
     var display_reg: logic<32>;
     var halt_flag: bit;
     var zero_flag: bit;
     var carry_flag: bit;
-    var mem_ready: bit;
 
     var ram_write_enable: logic;
-    var ram_write_address: logic<16>;
+    var ram_address: logic<16>;
     var ram_write_data: logic<16>;
-    var ram_read_address: logic<16>;
     var ram_read_data: logic<16>;
 
     inst ram: RAM (
         i_clk: clk,
         i_write_enable: ram_write_enable,
-        i_write_address: ram_write_address,
+        i_address: ram_address,
         i_write_data: ram_write_data,
-        i_read_address: ram_read_address,
         o_read_data: ram_read_data,
-    );
-
-    inst rom: ROM (
-        i_clk: clk,
-        i_rst: rst,
-        i_addr: program_counter,
-        o_data: rom_data,
     );
 
     inst cpu: CPU (
         i_clk: clk,
         i_rst: rst,
-        i_rom_data: rom_data,
         i_ram_read_data: ram_read_data,
-        o_program_counter: program_counter,
         o_display_reg: display_reg,
+        o_program_counter: program_counter,
         o_halt_flag: halt_flag,
         o_zero_flag: zero_flag,
         o_carry_flag: carry_flag,
-        o_mem_ready: mem_ready,
         o_ram_write_enable: ram_write_enable,
-        o_ram_write_address: ram_write_address,
         o_ram_write_data: ram_write_data,
-        o_ram_read_address: ram_read_address,
+        o_ram_address: ram_address,
     );
 
     let name_table_write_data: logic<8> = ram_write_data[7:0];
     var name_table_write_addr: logic<13>;
-    let name_table_write_enable: bit = ram_write_enable && ram_write_address == 16'hffff && ~ram_write_data[15];
+    let name_table_write_enable: bit = ram_write_enable && ram_address == 16'hffff && ~ram_write_data[15];
 
     always_ff (clk, rst) {
         if_reset {
             name_table_write_addr = 13'h0;
         } else if ram_write_enable {
-            case ram_write_address {
+            case ram_address {
                 16'hffff: {
                     if ram_write_data[15] {
                         name_table_write_addr = ram_write_data[12:0];
