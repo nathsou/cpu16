@@ -36,8 +36,8 @@ module PPU (
     var col: logic<10>;
     var row: logic<10>;
     let is_rendering: logic = (col <: H_ACTIVE) & (row <: V_ACTIVE);
-    var pattern_table: bit<64>[128];
-    var name_table: bit<8>[TILES_X * TILES_Y];
+    var pattern_table: logic<64>[128];
+    var name_table: logic<8>[TILES_X * TILES_Y];
     var stage: logic<2>;
     let tile_x: logic<7> = col >> 3;
     let tile_y: logic<6> = row >> 3;
@@ -48,7 +48,7 @@ module PPU (
     var pixel: logic;
 
     initial {
-        $readmemh("/Users/nathan/Documents/code/Rust/cpu16/design/src/patternTable.hex", pattern_table);
+        $readmemh("patternTable.hex", pattern_table, 0);
     }
 
     var clock_div: bit<2>;
@@ -71,17 +71,12 @@ module PPU (
         o_vsync = if (row >= (V_ACTIVE + V_FRONT_PORCH)) && (row <: (V_ACTIVE + V_FRONT_PORCH + V_SYNC)) { '0 } else { '1 };
     }
 
-    always_ff (i_clk_100mhz, i_rst) {
-        if_reset {
+    always_ff (i_clk_100mhz) {
+        if i_rst {
             clock_div = '0;
             stage = '0;
-            pattern_table_index = '0;
+            pattern_table_index = '0; // to remove veryl warning
             pattern_table[0] = '0;
-
-            for i: u32 in 0..(TILES_X * TILES_Y) {
-                name_table[i] = 8'h0;
-            }
-
             o_vga_red = '0;
             o_vga_green = '0;
             o_vga_blue = '0;
@@ -92,7 +87,7 @@ module PPU (
             if i_name_table_write_enable {
                 name_table[i_name_table_write_addr] = i_name_table_write_data;
             }
-
+            
             if is_rendering {
                 case stage {
                     STAGE_FETCH_NAME_TABLE: {

@@ -16,7 +16,6 @@ set verilogSources [list \
     "$cwd/build/RAM.sv" \
     "$cwd/build/RegisterFile.sv" \
     "$cwd/build/ResetConditioner.sv" \
-    "$cwd/build/ROM.sv" \
     "$cwd/build/SevenSegment.sv" \
     "$cwd/build/PPU.sv" \
     "$cwd/build/Top.sv" \
@@ -29,7 +28,7 @@ read_xdc $xdcSources
 # Add hex files to the project
 set hexFiles [list \
     "$cwd/src/patternTable.hex" \
-    "$cwd/src/prog.hex" \
+    "$cwd/src/progs/text.hex" \
 ]
 
 import_files -fileset [get_filesets sources_1] -force -norecurse -flat $hexFiles

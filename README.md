@@ -1,7 +1,6 @@
 # CPU 16
 
-Simple load-store 16-bit CPU ISA, along with a Rust simulator and SystemVerilog
-design.
+Simple load-store 16-bit CPU ISA, along with a Rust simulator and Veryl design.
 
 <img src="res/cpu16.png" alt="CPU16 Running on an Alchitry Au" width="400">
 
@@ -39,25 +38,23 @@ design.
 
 ### AluOps
 
-| Opcode   | Operation           |
-| -------- | ------------------- |
-| 0b000_00 | Add                 |
-| 0b000_01 | Sub                 |
-| 0b000_10 | Adc (Add with carry)|
-| 0b000_11 | Sbc (Subtract with carry)|
-| 0b001_00 | AddIfZero           |
-| 0b001_01 | SubIfZero           |
-| 0b001_10 | AdcIfZero           |
-| 0b001_11 | SbcIfZero           |
-| 0b010_00 | AddIfNotZero        |
-| 0b010_01 | SubIfNotZero        |
-| 0b010_10 | AdcIfNotZero        |
-| 0b010_11 | SbcIfNotZero        |
-| 0b011_00 | AddIfCarry          |
+| Opcode   | Operation                 |
+| -------- | ------------------------- |
+| 0b000_00 | Add                       |
+| 0b000_01 | Sub                       |
+| 0b000_10 | Adc (Add with carry)      |
+| 0b000_11 | Sbc (Subtract with carry) |
+| 0b001_00 | AddIfZero                 |
+| 0b001_01 | SubIfZero                 |
+| 0b001_10 | AdcIfZero                 |
+| 0b001_11 | SbcIfZero                 |
+| 0b010_00 | AddIfNotZero              |
+| 0b010_01 | SubIfNotZero              |
+| 0b010_10 | AdcIfNotZero              |
+| 0b010_11 | SbcIfNotZero              |
+| 0b011_00 | AddIfCarry                |
 
-
-**The assembler defines common operations using
-these primitive instructions.**
+**The assembler defines common operations using these primitive instructions.**
 
 ## Generating bin files
 

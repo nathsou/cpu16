@@ -8,7 +8,7 @@ module RAM (
     var mem: logic<16> [65536];
 
     initial {
-        $readmemh("/Users/nathan/Documents/code/Rust/cpu16/design/src/progs/div.hex", mem, 32768);
+        $readmemh("text.hex", mem, 32768);
     }
 
     always_ff (i_clk) {

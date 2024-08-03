@@ -407,7 +407,7 @@ fn dump_instructions(prog: &[u16]) {
 }
 
 fn main() {
-    let prog = stack();
+    let prog = yo_fpga();
 
     let disasm = prog
         .iter()

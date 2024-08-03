@@ -6,7 +6,7 @@ from pathlib import Path
 from cocotb.runner import get_runner
 import json
 
-VERBOSE = False
+VERBOSE = True
 
 def replace_text_in_files(directory, old_text, new_text):
     for root, _, files in os.walk(directory):
@@ -42,7 +42,7 @@ async def test_top(dut):
     clock = Clock(signal=dut.clk, period=10, units='us')
     cocotb.start_soon(clock.start())
 
-    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'div.jsonl')
+    trace = parse_cpu_state(Path(__file__).resolve().parent / 'traces' / 'text.jsonl')
 
     dut.btn_r.value = 0
     
@@ -75,11 +75,11 @@ async def test_top(dut):
 
     def print_state():
         for name, signal in signals.items():
-            print(f"{name}: {signal.value} ({hex(signal.value)})")
+            print(f"{name}: {signal.value}")
         
         for i in range(8):
             val = dut.cpu.register_file.r_regs[i].value
-            print(f"r{i}: {val} ({hex(val)})")
+            print(f"r{i}: {val}")
 
         print("-------------")
     
