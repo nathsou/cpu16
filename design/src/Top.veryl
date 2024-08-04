@@ -54,23 +54,23 @@ module Top (
         o_ram_address: ram_address,
     );
 
-    let name_table_write_data: logic<8> = ram_write_data[7:0];
+    let name_table_write_data: logic<16> = ram_write_data;
     var name_table_write_addr: logic<13>;
-    let name_table_write_enable: bit = ram_write_enable && ram_address == 16'hffff && ~ram_write_data[15];
+    let name_table_write_enable: bit = ram_write_enable && ram_address == 16'hffff;
 
-    always_ff (clk, rst) {
-        if_reset {
+    // Memory-mapped I/O
+    always_ff (clk) {
+        if rst {
             name_table_write_addr = 13'h0;
         } else if ram_write_enable {
             case ram_address {
+                16'hfffe: {
+                    name_table_write_addr = ram_write_data[12:0];
+                }
                 16'hffff: {
-                    if ram_write_data[15] {
-                        name_table_write_addr = ram_write_data[12:0];
-                    }
+                    name_table_write_addr = name_table_write_addr + 1;
                 }
-                default: {
-                    // do nothing
-                }
+                default: {}
             }
         }
     }

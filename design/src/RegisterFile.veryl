@@ -16,8 +16,8 @@ pub module RegisterFile (
     var r_regs: logic<16>[8];
     local RESET_PC: logic<16> = 16'h8000;
 
-    always_ff (i_clk, i_rst) {
-        if_reset {
+    always_ff (i_clk) {
+        if i_rst {
             r_regs[0] = '0;
             r_regs[1] = '0;
             r_regs[2] = '0;

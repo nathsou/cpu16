@@ -78,8 +78,8 @@ module CPU (
         o_out: r_alu_out,
     );
 
-    always_ff (i_clk, i_rst) {
-        if_reset {
+    always_ff (i_clk) {
+        if i_rst {
             r_stage = Stage::fetch;
             r_halt_flag = 1'b0;
             r_zero_flag = 1'b0;
@@ -185,7 +185,6 @@ module CPU (
                 }
             }
             Stage::memory_access: {
-                w_mem_address = r_reg_read_data1 + {9'd0, r_instruction[6:0]};
                 w_reg_write_enable = is_load;
                 w_mem_write_enable = ~is_load;
             }

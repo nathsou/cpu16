@@ -233,14 +233,16 @@ fn yo_fpga() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    let message = "Hello, FPGA!";
+    let message = "In computing, the reset vector is the default location a central processing unit will go to find the first instruction it will execute after a reset. The reset vector is a pointer or address, where the CPU should always begin as soon as it is able to execute instructions. The address is in a section of non-volatile memory initialized to contain instructions to start the operation of the CPU, as the first step in the process of booting the system containing the CPU.";
 
-    asm.init_sp().setw(R2, 0xffff, TMP).setw(R3, 1 << 15, TMP);
+    asm.init_sp()
+        .setw(R2, 0xfffe, TMP)
+        .store(Z, R2, 0)
+        .setw(R2, 0xffff, TMP)
+        .setw(R3, 1 << 15, TMP);
 
     for byte in message.bytes() {
-        asm.store(R3, R2, 0);
         asm.set(R1, byte as u16).store(R1, R2, 0);
-        asm.inc(R3);
     }
 
     asm.halt().assemble()
