@@ -79,6 +79,10 @@ impl Assembler {
         self.ctrl(ControlOp::Clrz)
     }
 
+    pub fn restore(&mut self) -> &mut Self {
+        self.ctrl(ControlOp::Restore)
+    }
+
     pub fn set(&mut self, dst: Reg, val: u16) -> &mut Self {
         assert!(
             val <= 0x7ff,

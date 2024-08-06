@@ -1,6 +1,7 @@
 module CPU (
     i_clk: input clock,
     i_rst: input reset,
+    i_nmi: input logic,
     i_ram_read_data: input logic<16>,
     o_program_counter: output logic<16>,
     o_display_reg: output logic<32>,
@@ -11,7 +12,7 @@ module CPU (
     o_ram_address: output logic<16>,
     o_ram_write_data: output logic<16>,
 ) {
-    local RESET_PC: logic<16> = 16'h8000;
+    local INTERRUPT_ADDR: logic<16> = 16'hfff0;
 
     enum OpCode: logic<2> {
         ctl = 2'b00,
@@ -26,6 +27,15 @@ module CPU (
         execute = 3'b010,
         memory_access = 3'b011,
         writeback = 3'b100,
+    }
+
+    enum CtlOp: logic<3> {
+        halt = 3'b000,
+        set_zero = 3'b001,
+        clear_zero = 3'b010,
+        set_carry = 3'b011,
+        clear_carry = 3'b100,
+        restore = 3'b101,
     }
 
     var r_stage: Stage;
@@ -51,12 +61,19 @@ module CPU (
     var w_count_enable: logic;
     let op_code: logic<2> = r_instruction[15:14];
     let is_load: logic = r_instruction[7];
+    var r_interrupted: logic;
+    // save registers and flags for interrupts (7 registers + 2 flags)
+    var r_regs_backup: logic<114>;
+    var w_regs_flat: logic<128>;
+    var w_regs_restore_enable: logic;
 
     inst register_file: RegisterFile (
         i_clk: i_clk,
         i_rst: i_rst,
+        i_restore_enable: w_regs_restore_enable,
         i_count_enable: w_count_enable,
         i_write_enable: w_reg_write_enable,
+        i_restore: r_regs_backup,
         i_write_dest: r_reg_write_dest,
         i_write_data: r_reg_write_data,
         i_read_src1: r_reg_read_src1,
@@ -65,6 +82,7 @@ module CPU (
         o_read_data2: r_reg_read_data2,
         o_program_counter: o_program_counter,
         o_display_reg: o_display_reg,
+        o_flat: w_regs_flat,
     );
 
     inst alu: ALU (
@@ -77,6 +95,15 @@ module CPU (
         o_condition_met: w_alu_condition_met,
         o_out: r_alu_out,
     );
+
+    // Synchronize interrupt request with the clock
+    always_ff (i_clk) {
+        if i_rst {
+            r_interrupted = 1'b0;
+        } else if i_nmi {
+            r_interrupted = 1'b1;
+        }
+    }
 
     always_ff (i_clk) {
         if i_rst {
@@ -91,10 +118,19 @@ module CPU (
             r_reg_write_data = 16'h0000;
             r_instruction = 16'h0000;
             r_mem_write_data = 16'h0000;
-        } else {
+        } else if !r_halt_flag {
             case r_stage {
                 Stage::fetch: {
-                    r_stage = Stage::decode;
+                    if r_interrupted {
+                        // Save registers and flags
+                        r_regs_backup = {w_regs_flat, r_carry_flag, r_zero_flag};
+                        r_interrupted = 1'b0;
+                        // jump to interrupt handler
+                        r_reg_write_dest = 3'd7;
+                        r_reg_write_data = INTERRUPT_ADDR;
+                    } else {
+                        r_stage = Stage::decode;
+                    }
                 }
                 Stage::decode: {
                     r_instruction = i_ram_read_data;
@@ -123,11 +159,16 @@ module CPU (
                     case op_code {
                         OpCode::ctl: {
                             case r_instruction[2:0] {
-                                3'b000: r_halt_flag = 1'b1;
-                                3'b001: r_zero_flag = 1'b1;
-                                3'b010: r_zero_flag = 1'b0;
-                                3'b011: r_carry_flag = 1'b1;
-                                3'b100: r_carry_flag = 1'b0;
+                                CtlOp::halt: r_halt_flag = 1'b1;
+                                CtlOp::set_zero: r_zero_flag = 1'b1;
+                                CtlOp::clear_zero: r_zero_flag = 1'b0;
+                                CtlOp::set_carry: r_carry_flag = 1'b1;
+                                CtlOp::clear_carry: r_carry_flag = 1'b0;
+                                CtlOp::restore: {
+                                    // Restore flags
+                                    r_carry_flag = r_regs_backup[128];
+                                    r_zero_flag = r_regs_backup[129];
+                                }
                                 default: {}
                             }
 
@@ -176,6 +217,7 @@ module CPU (
         w_count_enable = 1'b0;
         w_mem_address = o_program_counter;
         w_mem_write_enable = 1'b0;
+        w_regs_restore_enable = 1'b0;
 
         case r_stage {
             Stage::execute: {
@@ -190,12 +232,18 @@ module CPU (
             }
             Stage::writeback: {
                 case op_code {
+                    OpCode::ctl: {
+                        if r_instruction[2:0] == CtlOp::restore {
+                            // Restore registers
+                            w_regs_restore_enable = 1'b1;
+                        }
+                    }
                     OpCode::set: {
                         w_reg_write_enable = 1'b1;
                         w_count_enable = 1'b1;
                     }
                     OpCode::mem: {
-                        if r_instruction[7] {  // Load
+                        if r_instruction[7] { // Load
                             w_reg_write_enable = 1'b1;
                         }
 

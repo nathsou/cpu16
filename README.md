@@ -28,13 +28,14 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and Veryl design.
 
 ### CtrlOps
 
-| Opcode | Operation  |
-| ------ | ---------- |
-| 0b000  | Halt       |
-| 0b001  | SetZero    |
-| 0b010  | ClearZero  |
-| 0b011  | SetCarry   |
-| 0b100  | ClearCarry |
+| Opcode | Operation           |
+| ------ | ------------------- |
+| 0b000  | Halt                |
+| 0b001  | SetZero             |
+| 0b010  | ClearZero           |
+| 0b011  | SetCarry            |
+| 0b100  | ClearCarry          |
+| 0b101  | RestoreRegsAndFlags |
 
 ### AluOps
 

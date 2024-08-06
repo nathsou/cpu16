@@ -43,6 +43,7 @@ module Top (
     inst cpu: CPU (
         i_clk: clk,
         i_rst: rst,
+        i_nmi: 1'b0,
         i_ram_read_data: ram_read_data,
         o_display_reg: display_reg,
         o_program_counter: program_counter,

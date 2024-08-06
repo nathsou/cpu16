@@ -198,6 +198,7 @@ pub enum ControlOp {
     Clrz,
     Setc,
     Clrc,
+    Restore,
 }
 
 impl From<u16> for ControlOp {
@@ -221,6 +222,7 @@ impl std::fmt::Display for ControlOp {
             ControlOp::Clrz => "clrz",
             ControlOp::Setc => "setc",
             ControlOp::Clrc => "clrc",
+            ControlOp::Restore => "restore",
         };
 
         write!(f, "{}", name)
@@ -298,6 +300,7 @@ impl Into<u16> for Inst {
                     ControlOp::Clrz => 2,
                     ControlOp::Setc => 3,
                     ControlOp::Clrc => 4,
+                    ControlOp::Restore => 5,
                 };
 
                 inst

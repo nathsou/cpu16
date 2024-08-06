@@ -2,8 +2,10 @@
 pub module RegisterFile (
     i_clk: input clock,
     i_rst: input reset,
+    i_restore_enable: input logic,
     i_count_enable: input logic,
     i_write_enable: input logic,
+    i_restore: input logic<112>,
     i_write_dest: input logic<3>,
     i_write_data: input logic<16>,
     i_read_src1: input logic<3>,
@@ -12,6 +14,7 @@ pub module RegisterFile (
     o_read_data2: output logic<16>,
     o_program_counter: output logic<16>,
     o_display_reg: output logic<32>,
+    o_flat: output logic<112>,
 ) {
     var r_regs: logic<16>[8];
     local RESET_PC: logic<16> = 16'h8000;
@@ -27,12 +30,22 @@ pub module RegisterFile (
             r_regs[6] = '0;
             r_regs[7] = RESET_PC;
         } else {
-            if i_count_enable && !(i_write_enable && i_write_dest == 3'd7) {
-                r_regs[7] = r_regs[7] + 1;
-            }
-            
-            if i_write_enable && i_write_dest != 3'b000 {
-                r_regs[i_write_dest] = i_write_data;
+            if i_restore_enable {
+                r_regs[1] = i_restore[15:0];
+                r_regs[2] = i_restore[31:16];
+                r_regs[3] = i_restore[47:32];
+                r_regs[4] = i_restore[63:48];
+                r_regs[5] = i_restore[79:64];
+                r_regs[6] = i_restore[95:80];
+                r_regs[7] = i_restore[111:96];
+            } else {
+                if i_count_enable && !(i_write_enable && i_write_dest == 3'd7) {
+                    r_regs[7] = r_regs[7] + 1;
+                }
+                
+                if i_write_enable && i_write_dest != 3'b000 {
+                    r_regs[i_write_dest] = i_write_data;
+                }
             }
         }
     }
@@ -41,4 +54,5 @@ pub module RegisterFile (
     assign o_read_data2 = r_regs[i_read_src2];
     assign o_program_counter = r_regs[7];
     assign o_display_reg = {r_regs[1], r_regs[2]};
+    assign o_flat = {r_regs[1], r_regs[2], r_regs[3], r_regs[4], r_regs[5], r_regs[6], r_regs[7]};
 }
