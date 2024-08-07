@@ -19,7 +19,7 @@ set verilogSources [list \
     "$cwd/build/SevenSegment.sv" \
     "$cwd/build/PPU.sv" \
     "$cwd/build/UART.sv" \
-    "$cwd/build/ButtonDebouncer.sv" \
+    "$cwd/build/PosEdgeDetector.sv" \
     "$cwd/build/Top.sv" \
 ]
 

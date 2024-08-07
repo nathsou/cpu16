@@ -17,7 +17,7 @@ def program_ram(file_path: str):
             file.seek(0)  # Move back to the beginning of the file
 
             with tqdm(total=file_size, unit='B', unit_scale=True, desc='Transferring') as pbar:
-                while chunk := file.read(16):
+                while chunk := file.read(256):
                     ser.write(chunk)
                     pbar.update(len(chunk))
 

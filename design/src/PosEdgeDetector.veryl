@@ -1,0 +1,19 @@
+
+module PosEdgeDetector (
+    i_clk: input clock,
+    i_rst: input reset,
+    i_in: input logic,
+    o_edge: output logic,
+) {
+    var r_prev: logic;
+
+    always_ff (i_clk) {
+        if i_rst {
+            r_prev = 1'b0;
+        } else {
+            r_prev = i_in;
+        }
+    }
+
+    assign o_edge = !r_prev && i_in;
+}

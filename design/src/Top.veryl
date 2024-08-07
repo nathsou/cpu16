@@ -53,15 +53,31 @@ module Top (
     var r_prog_byte_select: logic;
     var w_display_data: logic<32>;
     var w_status: logic<3>; // bgr led
-    var r_prev_uart_ready: logic;
     var r_read_mode_enable: logic;
-    var w_debounced_btn_l: logic;
     var w_leds: logic<16>;
+    var w_btn_l_edge: logic;
+    var w_uart_ready_edge: logic;
+
+    // Edge detectors
+
+    inst btn_l_edge_detector: PosEdgeDetector (
+        i_clk: clk,
+        i_rst: rst,
+        i_in: btn_l,
+        o_edge: w_btn_l_edge,
+    );
+
+    inst uart_ready_edge_detector: PosEdgeDetector (
+        i_clk: clk,
+        i_rst: rst,
+        i_in: w_uart_ready,
+        o_edge: w_uart_ready_edge,
+    );
 
     always_ff (clk) {
         if rst {
             r_read_mode_enable = 1'b0;
-        } else if w_debounced_btn_l == 1'b1 {
+        } else if w_btn_l_edge {
             r_read_mode_enable = ~r_read_mode_enable;
         }
     }
@@ -70,21 +86,16 @@ module Top (
         if rst {
             r_prog_addr = '0;
             r_prog_inst = '0;
-            r_prev_uart_ready = 1'b0;
             r_prog_byte_select = 1'b0;
-        } else {
-            if w_uart_ready == 1'b1 && r_prev_uart_ready == 1'b0 && mode == Mode::program && r_prog_addr <: 16'hffff {
-                if r_prog_byte_select == 1'b0 {
-                    r_prog_inst[15:8] = r_uart_data;
-                } else {
-                    r_prog_inst[7:0] = r_uart_data;
-                    r_prog_addr += 1;
-                }
-
-                r_prog_byte_select = ~r_prog_byte_select;
+        } else if w_uart_ready_edge && mode == Mode::program && r_prog_addr <: 16'hffff {
+            if r_prog_byte_select == 1'b0 {
+                r_prog_inst[15:8] = r_uart_data;
+            } else {
+                r_prog_inst[7:0] = r_uart_data;
+                r_prog_addr += 1;
             }
-            
-            r_prev_uart_ready = w_uart_ready;
+
+            r_prog_byte_select = ~r_prog_byte_select;
         }
     }
 
@@ -129,13 +140,6 @@ module Top (
             }
         }
     }
-
-    inst btn_l_debouncer: ButtonDebouncer (
-        clk: clk,
-        rst: rst,
-        inp: btn_l,
-        debounced: w_debounced_btn_l,
-    );
 
     inst ram: RAM (
         i_clk: clk,
