@@ -1,6 +1,7 @@
 module Top (
     clk: input clock,
     btn_r: input logic,
+    btn_l: input logic,
     led: output logic<16>,
     seg: output logic<7>,
     an: output logic<8>,
@@ -16,14 +17,13 @@ module Top (
     led16_b: output logic,
     led16_g: output logic,
     led16_r: output logic,
-    pmod_jd1: output logic,
-    pmod_jd2: output logic,
 ) {
     var rst: reset;
 
-    enum Mode: logic {
+    enum Mode: logic<2> {
         execute,
         program,
+        inspect,
     }
 
     inst reset_conditioner: ResetConditioner #(
@@ -40,24 +40,121 @@ module Top (
     var zero_flag: bit;
     var carry_flag: bit;
 
-    var ram_write_enable: logic;
-    var ram_address: logic<16>;
-    var ram_write_data: logic<16>;
-    var ram_read_data: logic<16>;
+    var w_cpu_clk: logic;
+    var w_cpu_ram_write_enable: logic;
+    var w_cpu_ram_address: logic<16>;
+    var w_cpu_ram_write_data: logic<16>;
+    var w_ram_write_enable: logic;
+    var w_ram_address: logic<16>;
+    var w_ram_write_data: logic<16>;
+    var w_ram_read_data: logic<16>;
+    var r_prog_addr: logic<16>;
+    var r_prog_inst: logic<16>;
+    var r_prog_byte_select: logic;
+    var w_display_data: logic<16>;
+    var w_status: logic<3>; // bgr led
+    var r_prev_uart_ready: logic;
+    var r_read_mode_enable: logic;
+    var w_debounced_btn_l: logic;
+
+    always_ff (clk) {
+        if rst {
+            r_read_mode_enable = 1'b0;
+        } else if w_debounced_btn_l == 1'b1 {
+            r_read_mode_enable = ~r_read_mode_enable;
+        }
+    }
+
+    always_ff (clk) {
+        if rst {
+            r_prog_addr = '0;
+            r_prog_inst = '0;
+            r_prev_uart_ready = 1'b0;
+            r_prog_byte_select = 1'b0;
+        } else {
+            if w_uart_ready == 1'b1 && r_prev_uart_ready == 1'b0 && mode == Mode::program && r_prog_addr <: 16'hffff {
+                if r_prog_byte_select == 1'b0 {
+                    r_prog_inst[15:8] = r_uart_data;
+                } else {
+                    r_prog_inst[7:0] = r_uart_data;
+                    r_prog_addr += 1;
+                }
+
+                r_prog_byte_select = ~r_prog_byte_select;
+            }
+            
+            r_prev_uart_ready = w_uart_ready;
+        }
+    }
+
+    // select RAM write data and address based on mode
+    always_comb {
+        w_ram_write_enable = 1'b0;
+        w_ram_address = 16'h0;
+        w_ram_write_data = 16'h0;
+        w_display_data = 16'h0;
+        w_status = 3'b000;
+        w_cpu_clk = 1'b0;
+
+        case mode {
+            Mode::program: {
+                w_ram_write_enable = r_prog_byte_select == 1'b1;
+                w_ram_address = r_prog_addr - 1;
+                w_ram_write_data = r_prog_inst;
+                w_display_data = r_prog_addr;
+
+                if r_prog_addr == 16'hffff {
+                    w_status = 3'b010; // green
+                } else {
+                    w_status = 3'b100; // blue
+                }
+            }
+            Mode::execute: {
+                w_cpu_clk = clk;
+                w_ram_write_enable = w_cpu_ram_write_enable;
+                w_ram_address = w_cpu_ram_address;
+                w_ram_write_data = w_cpu_ram_write_data;
+                w_display_data = display_reg;
+            }
+            Mode::inspect: {
+                w_status = 3'b001; // white
+                w_ram_write_enable = 1'b0;
+                w_ram_address = sw;
+                w_display_data = w_ram_read_data;
+            }
+        }
+    }
+
+    inst btn_l_debouncer: ButtonDebouncer (
+        clk: clk,
+        rst: rst,
+        inp: btn_l,
+        debounced: w_debounced_btn_l,
+    );
 
     inst ram: RAM (
         i_clk: clk,
-        i_write_enable: ram_write_enable,
-        i_address: ram_address,
-        i_write_data: ram_write_data,
-        o_read_data: ram_read_data,
+        i_write_enable: w_ram_write_enable,
+        i_address: w_ram_address,
+        i_write_data: w_ram_write_data,
+        o_read_data: w_ram_read_data,
     );
 
     var w_uart_ready: logic;
     var w_uart_data: logic<8>;
     var r_uart_data: logic<8>;
-    let mode: logic = if sw[0] { Mode::program } else { Mode::execute };
     var w_uart_state: logic<2>;
+    var mode: logic<2>;
+
+    always_comb {
+        mode = Mode::execute;
+
+        if r_read_mode_enable {
+            mode = Mode::inspect;
+        } else if sw[0] {
+            mode = Mode::program;
+        }
+    }
 
     always_ff (clk) {
         if rst {
@@ -76,32 +173,32 @@ module Top (
     );
 
     inst cpu: CPU (
-        i_clk: clk,
+        i_clk: w_cpu_clk,
         i_rst: rst,
         i_nmi: 1'b0,
-        i_ram_read_data: ram_read_data,
+        i_ram_read_data: w_ram_read_data,
         o_display_reg: display_reg,
         o_program_counter: program_counter,
         o_halt_flag: halt_flag,
         o_zero_flag: zero_flag,
         o_carry_flag: carry_flag,
-        o_ram_write_enable: ram_write_enable,
-        o_ram_write_data: ram_write_data,
-        o_ram_address: ram_address,
+        o_ram_write_enable: w_cpu_ram_write_enable,
+        o_ram_write_data: w_cpu_ram_write_data,
+        o_ram_address: w_cpu_ram_address,
     );
 
-    let name_table_write_data: logic<16> = ram_write_data;
+    let name_table_write_data: logic<16> = w_cpu_ram_write_data;
     var name_table_write_addr: logic<13>;
-    let name_table_write_enable: bit = ram_write_enable && ram_address == 16'hffff;
+    let name_table_write_enable: bit = w_cpu_ram_write_enable && w_cpu_ram_address == 16'hffff;
 
     // Memory-mapped I/O
     always_ff (clk) {
         if rst {
             name_table_write_addr = 13'h0;
-        } else if ram_write_enable {
-            case ram_address {
+        } else if w_cpu_ram_write_enable {
+            case w_cpu_ram_address {
                 16'hfffe: {
-                    name_table_write_addr = ram_write_data[12:0];
+                    name_table_write_addr = w_cpu_ram_write_data[12:0];
                 }
                 16'hffff: {
                     name_table_write_addr = name_table_write_addr + 1;
@@ -126,17 +223,15 @@ module Top (
 
     inst display: SevenSegment (
         i_clk: clk,
-        i_value: if mode == Mode::execute { display_reg } else { r_uart_data },
+        i_value: w_display_data,
         o_seg: seg,
         o_an: an,
         o_dp: dp,
     );
 
-    assign led = if mode == Mode::execute { program_counter } else { {uart_tx, w_uart_ready, 13'd0, w_uart_state} };
-    assign led16_b = sw[0];
-    assign led16_g = sw[1];
-    assign led16_r = sw[2];
+    assign led = if mode == Mode::execute { program_counter } else { r_uart_data };
 
-    assign pmod_jd1 = clk;
-    assign pmod_jd2 = uart_tx;
+    assign led16_b = w_status[2];
+    assign led16_g = w_status[1];
+    assign led16_r = w_status[0];
 }

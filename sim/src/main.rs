@@ -408,24 +408,22 @@ fn dump_instructions(prog: &[u16]) {
     println!("}}");
 }
 
-fn main() {
-    let prog = yo_fpga();
+fn dump_bin(prog: &[u16], bin_paht: &str) {
+    let mut bin = [0u16; 65536];
+    bin[START_PC as usize..(START_PC as usize + prog.len())].copy_from_slice(prog);
 
-    let disasm = prog
-        .iter()
-        .map(|&inst| isa::Inst::from(inst))
-        .collect::<Vec<_>>();
+    // save the raw binary to a file
+    let mut rom_file = std::fs::File::create(bin_paht).expect("failed to create bin file");
+    rom_file
+        .write_all(&bin.iter().flat_map(|&inst| inst.to_le_bytes()).collect::<Vec<_>>())
+        .expect("failed to write to bin file");
+}
 
-    for (i, inst) in disasm.iter().enumerate() {
-        println!("{:04x}: {}", i, inst);
-    }
-
+fn trace(prog: &[u16], trace_path: &str) {
     let cpu = CPU::from(&prog, START_PC);
 
-    // cpu.run_with_fuel(100_000_000, true);
-
     let mut output_file =
-        std::fs::File::create("trace.jsonl").expect("failed to create output file");
+        std::fs::File::create(trace_path).expect("failed to create output file");
 
     for state in cpu {
         let state_json = serde_json::to_string(&state).expect("failed to serialize state");
@@ -437,16 +435,30 @@ fn main() {
             .write_all(b"\n")
             .expect("failed to write to output file");
     }
+}
 
-    // println!("{}", cpu);
+fn disassemble(prog: &[u16], disasm_path: &str) {
+    let disasm = prog
+        .iter()
+        .map(|&inst| isa::Inst::from(inst))
+        .collect::<Vec<_>>();
 
-    // for i in 0x20..0x26 {
-    //     println!("{:04x}: {:04x}", i, cpu.ram[i]);
-    // }
+    let mut output_file =
+        std::fs::File::create(disasm_path).expect("failed to create output file");
 
-    // hexdump
-    for &inst in prog.iter() {
-        println!("{:04x}", inst);
+    for (i, inst) in disasm.iter().enumerate() {
+        let inst_str = format!("{:04x}: {}", i, inst);
+        output_file
+            .write_all(inst_str.as_bytes())
+            .expect("failed to write to output file");
+
+        output_file
+            .write_all(b"\n")
+            .expect("failed to write to output file");
     }
-    // dump_instructions(&prog);
+}
+
+fn main() {
+    let prog = div();
+    dump_bin(&prog, "div.bin");
 }

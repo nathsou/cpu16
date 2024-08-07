@@ -82,7 +82,7 @@ module CPU (
         o_read_data2: r_reg_read_data2,
         o_program_counter: o_program_counter,
         o_display_reg: o_display_reg,
-        o_flat: w_regs_flat,
+        o_flat: w_regs_flat[msb:2],
     );
 
     inst alu: ALU (

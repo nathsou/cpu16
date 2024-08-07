@@ -1,0 +1,32 @@
+
+module ButtonDebouncer #(
+    param CLOCK_CYCLES: u32 = 500_000  // 5ms at 100MHz clock
+) (
+    clk: input clock,
+    rst: input reset,
+    inp: input logic,
+    debounced: output logic,
+) {
+    var counter: logic<$clog2(CLOCK_CYCLES)>;
+    var button_state: logic;
+
+    always_ff (clk) {
+        if rst {
+            counter = '0;
+            button_state = 1'b0;
+            debounced = 1'b0;
+        } else {
+            if inp != button_state {
+                // Button state changed, reset counter
+                counter = '0;
+                button_state = inp;
+            } else if counter <: CLOCK_CYCLES {
+                // Increment counter
+                counter += 1'b1;
+            } else {
+                // Counter reached DEBOUNCE_TIME, update output
+                debounced = button_state;
+            }
+        }
+    }
+}
