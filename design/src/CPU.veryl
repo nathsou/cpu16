@@ -218,15 +218,16 @@ module CPU (
         w_mem_address = o_program_counter;
         w_mem_write_enable = 1'b0;
         w_regs_restore_enable = 1'b0;
+        let mem_addr: logic<16> = r_reg_read_data1 + {9'd0, r_instruction[6:0]};
 
         case r_stage {
             Stage::execute: {
                 if op_code == OpCode::mem {
-                    w_mem_address = r_reg_read_data1 + {9'd0, r_instruction[6:0]};
-                    w_mem_write_enable = ~is_load;
+                    w_mem_address = mem_addr;
                 }
             }
             Stage::memory_access: {
+                w_mem_address = mem_addr;
                 w_reg_write_enable = is_load;
                 w_mem_write_enable = ~is_load;
             }

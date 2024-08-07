@@ -459,6 +459,6 @@ fn disassemble(prog: &[u16], disasm_path: &str) {
 }
 
 fn main() {
-    let prog = div();
-    dump_bin(&prog, "div.bin");
+    let prog = lab();
+    dump_bin(&prog, "lab.bin");
 }

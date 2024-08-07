@@ -1,5 +1,5 @@
 module UART #(
-    param CLOCKS_PER_BIT: u32 = 868, // 115200 baud rate at 100MHz
+    param CLOCKS_PER_BIT: u32 = 109, // 921600 baud rate at 100MHz
 ) (
     i_clk: input clock,
     i_uart_rx: input logic,

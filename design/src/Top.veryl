@@ -51,11 +51,12 @@ module Top (
     var r_prog_addr: logic<16>;
     var r_prog_inst: logic<16>;
     var r_prog_byte_select: logic;
-    var w_display_data: logic<16>;
+    var w_display_data: logic<32>;
     var w_status: logic<3>; // bgr led
     var r_prev_uart_ready: logic;
     var r_read_mode_enable: logic;
     var w_debounced_btn_l: logic;
+    var w_leds: logic<16>;
 
     always_ff (clk) {
         if rst {
@@ -92,16 +93,26 @@ module Top (
         w_ram_write_enable = 1'b0;
         w_ram_address = 16'h0;
         w_ram_write_data = 16'h0;
-        w_display_data = 16'h0;
+        w_display_data = 32'h0;
         w_status = 3'b000;
         w_cpu_clk = 1'b0;
+        w_leds = 16'h0;
 
         case mode {
+            Mode::execute: {
+                w_leds = program_counter;
+                w_cpu_clk = clk;
+                w_ram_write_enable = w_cpu_ram_write_enable;
+                w_ram_address = w_cpu_ram_address;
+                w_ram_write_data = w_cpu_ram_write_data;
+                w_display_data = display_reg;
+            }
             Mode::program: {
+                w_leds = r_prog_addr;
                 w_ram_write_enable = r_prog_byte_select == 1'b1;
                 w_ram_address = r_prog_addr - 1;
                 w_ram_write_data = r_prog_inst;
-                w_display_data = r_prog_addr;
+                w_display_data = {16'd0, r_prog_addr};
 
                 if r_prog_addr == 16'hffff {
                     w_status = 3'b010; // green
@@ -109,18 +120,12 @@ module Top (
                     w_status = 3'b100; // blue
                 }
             }
-            Mode::execute: {
-                w_cpu_clk = clk;
-                w_ram_write_enable = w_cpu_ram_write_enable;
-                w_ram_address = w_cpu_ram_address;
-                w_ram_write_data = w_cpu_ram_write_data;
-                w_display_data = display_reg;
-            }
             Mode::inspect: {
+                w_leds = sw;
                 w_status = 3'b001; // white
                 w_ram_write_enable = 1'b0;
                 w_ram_address = sw;
-                w_display_data = w_ram_read_data;
+                w_display_data = {16'd0, w_ram_read_data};
             }
         }
     }
@@ -201,7 +206,7 @@ module Top (
                     name_table_write_addr = w_cpu_ram_write_data[12:0];
                 }
                 16'hffff: {
-                    name_table_write_addr = name_table_write_addr + 1;
+                    name_table_write_addr += 1;
                 }
                 default: {}
             }
@@ -229,8 +234,7 @@ module Top (
         o_dp: dp,
     );
 
-    assign led = if mode == Mode::execute { program_counter } else { r_uart_data };
-
+    assign led = w_leds;
     assign led16_b = w_status[2];
     assign led16_g = w_status[1];
     assign led16_r = w_status[0];

@@ -4,7 +4,7 @@ import time
 from tqdm import tqdm
 
 SERIAL_PORT = '/dev/ttyUSB2'
-BAUD_RATE = 115200
+BAUD_RATE = 921600
 ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
 
 # Allow some time for the connection to establish

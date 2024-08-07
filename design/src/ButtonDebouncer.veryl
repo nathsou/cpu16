@@ -1,6 +1,6 @@
 
 module ButtonDebouncer #(
-    param CLOCK_CYCLES: u32 = 500_000  // 5ms at 100MHz clock
+    param CLOCK_CYCLES: u32 = 1_000_000
 ) (
     clk: input clock,
     rst: input reset,
