@@ -73,7 +73,7 @@ module CPU (
         i_restore_enable: w_regs_restore_enable,
         i_count_enable: w_count_enable,
         i_write_enable: w_reg_write_enable,
-        i_restore: r_regs_backup,
+        i_restore: r_regs_backup[msb:2],
         i_write_dest: r_reg_write_dest,
         i_write_data: r_reg_write_data,
         i_read_src1: r_reg_read_src1,

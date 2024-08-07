@@ -96,7 +96,7 @@ impl CPU {
                     ControlOp::Setc => self.carry = true,
                     ControlOp::Clrc => self.carry = false,
                     ControlOp::Restore => {
-                        todo!("Restore after interrput not implemented");
+                        todo!("Restore after interrupt not implemented");
                     }
                 };
             }

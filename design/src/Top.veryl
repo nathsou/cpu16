@@ -10,8 +10,21 @@ module Top (
     vga_r: output logic<4>,
     vga_g: output logic<4>,
     vga_b: output logic<4>,
+    // uart_rx: output logic,
+    uart_tx: input logic,
+    sw: input logic<16>,
+    led16_b: output logic,
+    led16_g: output logic,
+    led16_r: output logic,
+    pmod_jd1: output logic,
+    pmod_jd2: output logic,
 ) {
     var rst: reset;
+
+    enum Mode: logic {
+        execute,
+        program,
+    }
 
     inst reset_conditioner: ResetConditioner #(
         Stages: 4,
@@ -38,6 +51,28 @@ module Top (
         i_address: ram_address,
         i_write_data: ram_write_data,
         o_read_data: ram_read_data,
+    );
+
+    var w_uart_ready: logic;
+    var w_uart_data: logic<8>;
+    var r_uart_data: logic<8>;
+    let mode: logic = if sw[0] { Mode::program } else { Mode::execute };
+    var w_uart_state: logic<2>;
+
+    always_ff (clk) {
+        if rst {
+            r_uart_data = '0;
+        } else if w_uart_ready == 1'b1 {
+            r_uart_data = w_uart_data;
+        }
+    }
+
+    inst uart: UART (
+        i_clk: clk,
+        i_uart_rx: uart_tx,
+        o_ready: w_uart_ready,
+        o_data: w_uart_data,
+        o_state: w_uart_state,
     );
 
     inst cpu: CPU (
@@ -91,11 +126,17 @@ module Top (
 
     inst display: SevenSegment (
         i_clk: clk,
-        i_value: display_reg,
+        i_value: if mode == Mode::execute { display_reg } else { r_uart_data },
         o_seg: seg,
         o_an: an,
         o_dp: dp,
     );
 
-    assign led = program_counter;
+    assign led = if mode == Mode::execute { program_counter } else { {uart_tx, w_uart_ready, 13'd0, w_uart_state} };
+    assign led16_b = sw[0];
+    assign led16_g = sw[1];
+    assign led16_r = sw[2];
+
+    assign pmod_jd1 = clk;
+    assign pmod_jd2 = uart_tx;
 }

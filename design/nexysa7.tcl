@@ -18,6 +18,7 @@ set verilogSources [list \
     "$cwd/build/ResetConditioner.sv" \
     "$cwd/build/SevenSegment.sv" \
     "$cwd/build/PPU.sv" \
+    "$cwd/build/UART.sv" \
     "$cwd/build/Top.sv" \
 ]
 

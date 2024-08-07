@@ -1,0 +1,81 @@
+module UART #(
+    param CLOCKS_PER_BIT: u32 = 868, // 115200 baud rate at 100MHz
+) (
+    i_clk: input clock,
+    i_uart_rx: input logic,
+    o_ready: output logic,
+    o_data: output logic<8>,
+    o_state: output logic<2>,
+) {
+    enum State: logic<2> {
+        idle = 2'b00,
+        start_bit = 2'b01,
+        data_bits = 2'b10,
+        stop_bit = 2'b11,
+    }
+
+    var r_clock_counter: logic<10>;
+    var r_bit_index: logic<3>;
+    var r_data: logic<8>;
+    var r_state: logic<2>;
+    var r_ready: logic;
+
+    always_ff (i_clk) {
+        case r_state {
+            State::idle: {
+                r_ready = 1'b0;
+                r_clock_counter = '0;
+                r_bit_index = 3'd0;
+            
+                // Wait for start bit
+                if i_uart_rx == 1'b0 {
+                    r_state = State::start_bit;
+                }
+            }
+            State::start_bit: {
+                // wait for half the start bit
+                if r_clock_counter == (CLOCKS_PER_BIT - 1) / 2 {
+                    r_clock_counter = '0;
+                    
+                    // the signal should still be low
+                    if i_uart_rx == 1'b0 {
+                        r_state = State::data_bits;
+                    } else {
+                        r_state = State::idle;
+                    }
+                } else {
+                    r_clock_counter += 1;
+                }
+            }
+            State::data_bits: {
+                if r_clock_counter <: CLOCKS_PER_BIT - 1 {
+                    r_clock_counter += 1;
+                } else {
+                    r_clock_counter = '0;
+                    r_data[r_bit_index] = i_uart_rx;
+
+                    // check if we have received all the bits
+                    if r_bit_index == 3'd7 {
+                        r_bit_index = '0;
+                        r_state = State::stop_bit;
+                    } else {
+                        r_bit_index += 1;
+                    }
+                }
+            }
+            State::stop_bit: {
+                if r_clock_counter <: CLOCKS_PER_BIT - 1 {
+                    r_clock_counter += 1;
+                } else {
+                    r_ready = 1'b1;
+                    r_clock_counter = '0;
+                    r_state = State::idle;
+                }
+            }
+        }
+    }
+
+    assign o_ready = r_ready;
+    assign o_data = r_data;
+    assign o_state = r_state;
+}
