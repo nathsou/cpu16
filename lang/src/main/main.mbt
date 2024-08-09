@@ -1,19 +1,28 @@
 fn main {
-  let lexer = @lib.Lexer::new("if a == b { 1 } else { 0 }")
-  let tokens = []
+  try {
+    let lexer = @lib.Lexer::new("31 + 7 + 1 - (2 * 11)")
+    let tokens = []
+    
+    while true {
+      let token = lexer.next!()
 
-  while true {
-    let token = lexer.next()
-
-    match token {
-      Some(t) => {
-        tokens.push(t)
-      }
-      None => {
-        break
+      match token {
+        Some(t) => {
+          tokens.push(t)
+        }
+        None => {
+          break
+        }
       }
     }
-  }
 
-  println(tokens)
+    let parser = @lib.Parser::new(tokens)
+    let expr = parser.parse_expr!()
+
+    println(expr)
+  } catch {
+    err => {
+      println(err)
+    }
+  }
 }

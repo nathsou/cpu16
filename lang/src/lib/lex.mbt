@@ -1,13 +1,4 @@
-
-pub enum Keyword {
-    Fn
-    U16
-    U8
-    If
-    Else
-} derive(Show)
-
-pub enum Symbol {
+pub enum Token {
     Lparen
     Rparen
     Lbrace
@@ -26,18 +17,14 @@ pub enum Symbol {
     Pipe
     Bang
     Equal
-} derive(Show)
-
-enum Literal {
-    Integer(Int)
-} derive(Show)
-
-pub enum Token {
-    Keyword(Keyword)
-    Symbol(Symbol)
+    Fn
+    U16
+    U8
+    If
+    Else
     Identifier(String)
-    Literal(Literal)
-} derive(Show)
+    Integer(Int)
+} derive(Show, Eq)
 
 struct Lexer {
     input: String
@@ -80,9 +67,11 @@ fn is_identifier_start(c: Char) -> Bool {
 }
 
 let zero_ascii: Int = '0'.to_int()
+
 fn parse_digit(char: Char) -> Int {
     char.to_int() - zero_ascii
 }
+
 fn parse_integer(self: Lexer) -> Int {
     let mut value = 0
     
@@ -122,7 +111,9 @@ fn parse_identifier(self: Lexer) -> String {
     identifier
 }
 
-pub fn next(self: Lexer) -> Option[Token] {
+type! LexerError String derive (Show)
+
+pub fn next(self: Lexer) -> Option[Token]!LexerError {
     // skip whitespaces
     for i = self.index; i < self.input.length(); i = i + 1  {
         let c = self.input[i]
@@ -141,96 +132,96 @@ pub fn next(self: Lexer) -> Option[Token] {
     let c = self.input[self.index]
 
     match c {
-            '(' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Lparen))
-            }
-            ')' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Rparen))
-            }
-            '{' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Lbrace))
-            }
-            '}' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Rbrace))
-            }
-            ',' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Comma))
-            }
-            ';' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Semicolon))
-            }
-            ':' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Colon))
-            }
-            '.' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Dot))
-            }
-            '+' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Plus))
-            }
-            '-' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Minus))
-            }
-            '*' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Star))
-            }
-            '/' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Slash))
-            }
-            '%' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Percent))
-            }
-            '^' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Caret))
-            }
-            '&' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Ampersand))
-            }
-            '|' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Pipe))
-            }
-            '!' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Bang))
-            }
-            '=' => {
-                self.index += 1
-                Some(Token::Symbol(Symbol::Equal))
-            }
-            _ => {
-                if is_decimal_digit(c) {
-                    let value = self.parse_integer()
-                    Some(Token::Literal(Literal::Integer(value)))
-                } else if is_identifier_start(c) {
-                    let identifier = self.parse_identifier()
+        '(' => {
+            self.index += 1
+            Some(Token::Lparen)
+        }
+        ')' => {
+            self.index += 1
+            Some(Token::Rparen)
+        }
+        '{' => {
+            self.index += 1
+            Some(Token::Lbrace)
+        }
+        '}' => {
+            self.index += 1
+            Some(Token::Rbrace)
+        }
+        ',' => {
+            self.index += 1
+            Some(Token::Comma)
+        }
+        ';' => {
+            self.index += 1
+            Some(Token::Semicolon)
+        }
+        ':' => {
+            self.index += 1
+            Some(Token::Colon)
+        }
+        '.' => {
+            self.index += 1
+            Some(Token::Dot)
+        }
+        '+' => {
+            self.index += 1
+            Some(Token::Plus)
+        }
+        '-' => {
+            self.index += 1
+            Some(Token::Minus)
+        }
+        '*' => {
+            self.index += 1
+            Some(Token::Star)
+        }
+        '/' => {
+            self.index += 1
+            Some(Token::Slash)
+        }
+        '%' => {
+            self.index += 1
+            Some(Token::Percent)
+        }
+        '^' => {
+            self.index += 1
+            Some(Token::Caret)
+        }
+        '&' => {
+            self.index += 1
+            Some(Token::Ampersand)
+        }
+        '|' => {
+            self.index += 1
+            Some(Token::Pipe)
+        }
+        '!' => {
+            self.index += 1
+            Some(Token::Bang)
+        }
+        '=' => {
+            self.index += 1
+            Some(Token::Equal)
+        }
+        _ => {
+            if is_decimal_digit(c) {
+                let value = self.parse_integer()
+                Some(Token::Integer(value))
+            } else if is_identifier_start(c) {
+                let identifier = self.parse_identifier()
 
-                    Some(match identifier {
-                        "fn" => Token::Keyword(Keyword::Fn)
-                        "u16" => Token::Keyword(Keyword::U16)
-                        "u8" => Token::Keyword(Keyword::U8)
-                        "if" => Token::Keyword(Keyword::If)
-                        "else" => Token::Keyword(Keyword::Else)
-                        _ => Token::Identifier(identifier)
-                    })
-                } else {
-                    None
-                }
+                Some(match identifier {
+                    "fn" => Token::Fn
+                    "u16" => Token::U16
+                    "u8" => Token::U8
+                    "if" => Token::If
+                    "else" => Token::Else
+                    _ => Token::Identifier(identifier)
+                })
+            } else {
+                raise LexerError("Unexpected character")
             }
+        }
     }
 }
