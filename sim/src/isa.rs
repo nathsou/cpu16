@@ -209,6 +209,7 @@ impl From<u16> for ControlOp {
             2 => ControlOp::Clrz,
             3 => ControlOp::Setc,
             4 => ControlOp::Clrc,
+            5 => ControlOp::Restore,
             _ => panic!("Invalid control operation"),
         }
     }

@@ -1,0 +1,6 @@
+{
+  "is-main": true,
+  "import": [
+    "nathsou/cpu16-lang/lib"
+  ]
+}
