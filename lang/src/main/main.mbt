@@ -27,8 +27,17 @@ fn main {
     let expr = parser.parse_expr!()
     let type_checker = @lib.TypeChecker::new()
     let ty = type_checker.expr_type!(expr)
+    let tac_lowering = @lib.TACLowering::new()
+    let tac_ret = tac_lowering.lower_expr(expr)
 
-    println("\{expr}: \{ty}")
+    println("\{expr}: \{ty}\n")
+    
+    tac_lowering.tac.iter().each(fn (tac) {
+      println(@lib.TAC::to_string(tac))
+    })
+
+    println("\nret = \{tac_ret}\n")
+
   } catch {
     err => {
       println(err)

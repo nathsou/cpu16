@@ -30,6 +30,8 @@ pub enum Token {
     U8
     If
     Else
+    True
+    False
     Identifier(String)
     Integer(Int, IntKind)
 } derive(Show, Eq)
@@ -281,6 +283,8 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
                     "u8" => Token::U8
                     "if" => Token::If
                     "else" => Token::Else
+                    "true" => Token::True
+                    "false" => Token::False
                     _ => Token::Identifier(identifier)
                 })
             } else {

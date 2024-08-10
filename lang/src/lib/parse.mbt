@@ -229,6 +229,14 @@ fn parse_primary_expr(self: Parser) -> Expr!ParserError {
             self.advance()
             Expr::Const(Const::Integer(n, kind))
         }
+        Some(Token::True) => {
+            self.advance()
+            Expr::Const(Const::Boolean(true))
+        }
+        Some(Token::False) => {
+            self.advance()
+            Expr::Const(Const::Boolean(false))
+        }
         _ => {
             raise ParserError("expected primary expression")
         }
