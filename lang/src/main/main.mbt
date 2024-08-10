@@ -31,12 +31,40 @@ fn main {
     let tac_ret = tac_lowering.lower_expr(expr)
 
     println("\{expr}: \{ty}\n")
+
+    let tac_str = tac_lowering.tac.iter().map(fn (tac) {
+      @lib.TAC::to_string(tac)
+    }).collect()
+
+    let mut last_index = 0
+
+    println("start:")
     
-    tac_lowering.tac.iter().each(fn (tac) {
-      println(@lib.TAC::to_string(tac))
+    tac_lowering.label_pos.iter().each(fn (entry) {
+      let label = entry.0
+      let pos = entry.1
+
+      for i = last_index; i < pos; i = i + 1 {
+        println("  " + tac_str[i])
+      }
+
+      println("L" + label.0.to_string() + ":")
+
+      last_index = pos
     })
 
     println("\nret = \{tac_ret}\n")
+
+    let basic_blocks = tac_lowering.build_basic_blocks()
+
+    for i = 0; i < basic_blocks.length(); i = i + 1 {
+      println("basic block \{i}:")
+      let bb = basic_blocks[i]
+
+      for j = 0; j < bb.instructions.length(); j = j + 1 {
+        println("  " + @lib.TAC::to_string(bb.instructions[j]))
+      }
+    }
 
   } catch {
     err => {
