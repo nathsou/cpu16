@@ -95,21 +95,14 @@ fn parse_additive_expr(self: Parser) -> Expr!ParserError {
 
     while true {
         let op = match self.peek() {
-            Some(Token::Plus) => Some(BinaryOp::Add)
-            Some(Token::Minus) => Some(BinaryOp::Sub)
-            _ => None
+            Some(Token::Plus) => BinaryOp::Add
+            Some(Token::Minus) => BinaryOp::Sub
+            _ => break
         }
 
-        match op {
-            Some(op) => {
-                self.advance()
-                let rhs = self.parse_additive_expr!()
-                lhs = Expr::BinaryOp(lhs, op, rhs)
-            }
-            _ => {
-                break
-            }
-        }
+        self.advance()
+        let rhs = self.parse_additive_expr!()
+        lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
     lhs
@@ -121,22 +114,15 @@ fn parse_multiplicative_expr(self: Parser) -> Expr!ParserError {
 
     while true {
         let op = match self.peek() {
-            Some(Token::Star) => Some(BinaryOp::Mul)
-            Some(Token::Slash) => Some(BinaryOp::Div)
-            Some(Token::Percent) => Some(BinaryOp::Mod)
-            _ => None
+            Some(Token::Star) => BinaryOp::Mul
+            Some(Token::Slash) => BinaryOp::Div
+            Some(Token::Percent) => BinaryOp::Mod
+            _ => break
         }
 
-        match op {
-            Some(op) => {
-                self.advance()
-                let rhs = self.parse_additive_expr!()
-                lhs = Expr::BinaryOp(lhs, op, rhs)
-            }
-            _ => {
-                break
-            }
-        }
+        self.advance()
+        let rhs = self.parse_additive_expr!()
+        lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
     lhs
