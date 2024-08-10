@@ -1,6 +1,6 @@
 
 pub enum Reg {
-  Z; R1; R2; R3; R4; TMP; SP; PC
+  Z; R1; R2; R3; R4; R5; SP; PC
 }
 
 pub enum ControlOp {
@@ -40,7 +40,7 @@ impl Encode for Reg with encode(reg) -> UInt {
     R2 => 2
     R3 => 3
     R4 => 4
-    TMP => 5
+    R5 => 5
     SP => 6
     PC => 7
   }

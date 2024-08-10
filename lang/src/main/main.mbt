@@ -1,6 +1,13 @@
 fn main {
   try {
-    let lexer = @lib.Lexer::new("31 + 7 + 1 - (2 * 11)")
+    let prog =
+      #|if 3 * 7 == 21 {
+      #|  1 + 2 - 3
+      #|} else {
+      #|  4 + 5 + 6
+      #|}
+
+    let lexer = @lib.Lexer::new(prog)
     let tokens = []
     
     while true {

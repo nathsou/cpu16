@@ -14,17 +14,30 @@ pub enum Token {
     Percent
     Caret
     Ampersand
+    AmpersandAmpersand
     Pipe
+    PipePipe
     Bang
     Equal
+    EqualEqual
+    BangEqual
+    LeftChevron
+    RightChevron
+    LeftFatArrow
+    RightFatArrow
     Fn
     U16
     U8
     If
     Else
     Identifier(String)
-    Integer(Int)
+    Integer(Int, IntKind)
 } derive(Show, Eq)
+
+pub enum IntKind {
+    U8
+    U16
+} derive (Show, Eq)
 
 struct Lexer {
     input: String
@@ -113,6 +126,22 @@ fn parse_identifier(self: Lexer) -> String {
 
 type! LexerError String derive (Show)
 
+fn matches(self: Lexer, char: Char) -> Bool {
+    match self.peek() {
+        Some(c) => c == char
+        _ => false
+    }
+}
+
+fn consumes(self: Lexer, char: Char) -> Bool {
+    if self.matches(char) {
+        self.index += 1
+        true
+    } else {
+        false
+    }
+}
+
 pub fn next(self: Lexer) -> Option[Token]!LexerError {
     // skip whitespaces
     for i = self.index; i < self.input.length(); i = i + 1  {
@@ -190,24 +219,59 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
         }
         '&' => {
             self.index += 1
-            Some(Token::Ampersand)
+
+            if self.consumes('&') {
+                Some(Token::AmpersandAmpersand)
+            } else {
+                Some(Token::Ampersand)
+            }
         }
         '|' => {
             self.index += 1
-            Some(Token::Pipe)
+            
+            if self.consumes('|') {
+                Some(Token::PipePipe)
+            } else {
+                Some(Token::Pipe)
+            }
         }
         '!' => {
             self.index += 1
-            Some(Token::Bang)
+
+            if self.consumes('=') {
+                Some(Token::BangEqual)
+            } else {
+                Some(Token::Bang)
+            }
         }
         '=' => {
             self.index += 1
-            Some(Token::Equal)
+
+            Some(if self.consumes('=') {
+                    Token::EqualEqual
+                } else if self.consumes('>') {
+                    Token::RightFatArrow
+                } else {
+                    Token::Equal
+             })
+        }
+        '<' => {
+            self.index += 1
+
+            if self.consumes('=') {
+                Some(Token::LeftFatArrow)
+            } else {
+                Some(Token::LeftChevron)
+            }
+        }
+        '>' => {
+            self.index += 1
+            Some(Token::RightChevron)
         }
         _ => {
             if is_decimal_digit(c) {
                 let value = self.parse_integer()
-                Some(Token::Integer(value))
+                Some(Token::Integer(value, IntKind::U16))
             } else if is_identifier_start(c) {
                 let identifier = self.parse_identifier()
 
