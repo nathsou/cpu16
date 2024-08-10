@@ -25,8 +25,10 @@ fn main {
 
     let parser = @lib.Parser::new(tokens)
     let expr = parser.parse_expr!()
+    let type_checker = @lib.TypeChecker::new()
+    let ty = type_checker.expr_type!(expr)
 
-    println(expr)
+    println("\{expr}: \{ty}")
   } catch {
     err => {
       println(err)

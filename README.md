@@ -22,7 +22,7 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and Veryl design.
 | R2       | General purpose register                       | 2     |
 | R3       | General purpose register                       | 3     |
 | R4       | General purpose register                       | 4     |
-| TMP      | Temporary value register                       | 5     |
+| R5       | General purpose register                       | 5     |
 | SP       | Stack pointer                                  | 6     |
 | PC       | Program counter                                | 7     |
 
