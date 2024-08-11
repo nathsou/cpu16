@@ -15,18 +15,12 @@ pub enum IR {
     Mul(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Div(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Mod(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Equ(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Neq(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Lss(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Leq(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Gtr(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Geq(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Not(~dst: IRVarId, ~src: IRVarId)
     And(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Or(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Xor(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Jump(~label_bb: Int)
-    JumpIf(~label_bb: Int, ~cond: IRVarId)
+    JumpIf(~label_bb: Int, ~cond: TACCond, ~lhs: IRVarId, ~rhs: IRVarId)
     Label(~bb: Int)
 } derive (Show)
 
@@ -121,20 +115,14 @@ pub fn lower_expr(self: IRBuilder, expr: TACExpr, labels: Map[TACLabel, Int], en
             let rhs_id = self.lower_value!(rhs, env)
 
             match op {
-                BinaryOp::Add => self.emit(IR::Add(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Sub => self.emit(IR::Sub(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Mul => self.emit(IR::Mul(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Div => self.emit(IR::Div(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Mod => self.emit(IR::Mod(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Equ => self.emit(IR::Equ(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Neq => self.emit(IR::Neq(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Lss => self.emit(IR::Lss(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Leq => self.emit(IR::Leq(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Gtr => self.emit(IR::Gtr(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Geq => self.emit(IR::Geq(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::And => self.emit(IR::And(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Or => self.emit(IR::Or(~dst, ~src1=lhs_id, ~src2=rhs_id))
-                BinaryOp::Xor => self.emit(IR::Xor(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Add => self.emit(IR::Add(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Sub => self.emit(IR::Sub(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Mul => self.emit(IR::Mul(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Div => self.emit(IR::Div(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Mod => self.emit(IR::Mod(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::And => self.emit(IR::And(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Or => self.emit(IR::Or(~dst, ~src1=lhs_id, ~src2=rhs_id))
+                TACBinaryOp::Xor => self.emit(IR::Xor(~dst, ~src1=lhs_id, ~src2=rhs_id))
             }
 
             env.bind(target, dst)
@@ -157,10 +145,11 @@ pub fn lower_expr(self: IRBuilder, expr: TACExpr, labels: Map[TACLabel, Int], en
             self.emit(IR::Jump(~label_bb))
             unit_var_id
         }
-        TACExpr::CondJump(~label, ~cond) => {
+        TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
             let label_bb = labels[label].unwrap()
-            let cond_id = self.lower_value!(cond, env)
-            self.emit(IR::JumpIf(~label_bb, ~cond=cond_id))
+            let lhs_id = self.lower_value!(lhs, env)
+            let rhs_id = self.lower_value!(rhs, env)
+            self.emit(IR::JumpIf(~label_bb, ~cond=cond, ~lhs=lhs_id, ~rhs=rhs_id))
             unit_var_id
         }
     }

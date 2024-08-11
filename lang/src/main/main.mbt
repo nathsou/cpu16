@@ -28,7 +28,7 @@ fn main {
     let type_checker = @lib.TypeChecker::new()
     let ty = type_checker.expr_type!(expr)
     let tac_lowering = @lib.TACLowering::new()
-    let tac_ret = tac_lowering.lower_expr(expr)
+    let tac_ret = tac_lowering.lower_expr!(expr)
 
     println("\{expr}: \{ty}\n")
 

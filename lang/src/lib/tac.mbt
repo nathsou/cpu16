@@ -24,14 +24,34 @@ pub enum TACValue {
     Variable(TACId)
 }
 
+pub enum TACBinaryOp {
+    Add; Sub; Mul; Div; Mod
+    And; Or; Xor
+} derive (Show)
+
+pub enum TACCond {
+    Equ; Neq; Lss; Leq; Gtr; Geq
+} derive (Show)
+
+pub fn negate(self: TACCond) -> TACCond {
+    match self {
+        TACCond::Equ => TACCond::Neq
+        TACCond::Neq => TACCond::Equ
+        TACCond::Lss => TACCond::Geq
+        TACCond::Leq => TACCond::Gtr
+        TACCond::Gtr => TACCond::Leq
+        TACCond::Geq => TACCond::Lss
+    }
+}
+
 pub enum TACExpr {
     Assign(~target: TACId, ~src: TACValue)
     Unary(~target: TACId, ~op: UnaryOp, ~arg: TACValue)
-    Binary(~target: TACId, ~lhs: TACValue, ~op: BinaryOp, ~rhs: TACValue)
+    Binary(~target: TACId, ~lhs: TACValue, ~op: TACBinaryOp, ~rhs: TACValue)
     Store(~dst: TACId, ~src: TACValue)
     Load(~target: TACId, ~addr: TACValue)
     Jump(~label: TACLabel)
-    CondJump(~label: TACLabel, ~cond: TACValue)
+    JumpIf(~label: TACLabel, ~cond: TACCond, ~lhs: TACValue, ~rhs: TACValue)
 }
 
 pub fn to_string(self: TACValue) -> String {
@@ -58,8 +78,8 @@ pub fn to_string(self: TACExpr) -> String {
         TACExpr::Load(~target, ~addr) => {
             "\{target} = load \{addr}"
         }
-        TACExpr::CondJump(~label, ~cond) => {
-            "jump \{label} if \{cond}"
+        TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
+            "jump \{label} if \{lhs} \{cond} \{rhs}"
         }
         TACExpr::Jump(~label) => {
             "jump \{label}"
@@ -103,11 +123,11 @@ fn emit_assign(self: TACLowering, target: TACId, src: TACValue) -> Unit {
     self.emit(TACExpr::Assign(~target, ~src))
 }
 
-fn emit_unary(self: TACLowering, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
+fn emit_unary_op(self: TACLowering, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
     self.emit(TACExpr::Unary(~target, ~op, ~arg))
 }
 
-fn emit_binary(self: TACLowering, target: TACId, lhs: TACValue, op: BinaryOp, rhs: TACValue) -> Unit {
+fn emit_binary_op(self: TACLowering, target: TACId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
     self.emit(TACExpr::Binary(~target, ~lhs, ~op, ~rhs))
 }
 
@@ -124,57 +144,94 @@ fn def_label(self: TACLowering, label: TACLabel) -> Unit {
     self.label_pos[label] = pos
 }
 
-fn emit_jump(self: TACLowering, label: TACLabel, ~cond: Option[TACValue] = None) -> Unit {
-    match cond {
-        Some(cond) => {
-            self.emit(TACExpr::CondJump(~label, ~cond))
-        }
-        None => {
-            self.emit(TACExpr::Jump(~label))
-        }
-    }
+fn emit_jump_if(self: TACLowering, label: TACLabel, cond: TACCond, lhs: TACValue, rhs: TACValue) -> Unit {
+    self.emit(TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs))
 }
-pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue {
+
+fn emit_jump(self: TACLowering, label: TACLabel) -> Unit {
+    self.emit(TACExpr::Jump(~label))
+}
+
+type! TACLoweringError String derive (Show)
+
+pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue!TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
         }
         Expr::UnaryOp(op, arg) => {
-            let arg = self.lower_expr(arg)
+            let arg = self.lower_expr!(arg)
             let target = self.next_var()
-            self.emit_unary(target, op, arg)
+            self.emit_unary_op(target, op, arg)
             TACValue::Variable(target)
         }
         Expr::BinaryOp(lhs, op, rhs) => {
-            let lhs = self.lower_expr(lhs)
-            let rhs = self.lower_expr(rhs)
+            let lhs = self.lower_expr!(lhs)
+            let rhs = self.lower_expr!(rhs)
             let target = self.next_var()
-            self.emit_binary(target, lhs, op, rhs)
+
+            let tac_binop = match op {
+                BinaryOp::Add => TACBinaryOp::Add
+                BinaryOp::Sub => TACBinaryOp::Sub
+                BinaryOp::Mul => TACBinaryOp::Mul
+                BinaryOp::Div => TACBinaryOp::Div
+                BinaryOp::Mod => TACBinaryOp::Mod
+                BinaryOp::And => TACBinaryOp::And
+                BinaryOp::Or => TACBinaryOp::Or
+                BinaryOp::Xor => TACBinaryOp::Xor
+                _ => {
+                    println("expected arithmetic or logical operator in binary expression, got: \{op}")
+                    raise TACLoweringError("expected arithmetic or logical operator in binary expression")
+                }
+            }
+
+            self.emit_binary_op(target, lhs, tac_binop, rhs)
             TACValue::Variable(target)
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let cond = self.lower_expr(cond)
-            let not_cond_id = self.next_var()
-            self.emit_unary(not_cond_id, UnaryOp::Not, cond)
             let ret = self.next_var()
+
+            let (cond_op, cond_lhs, cond_rhs) = match cond {
+                Expr::BinaryOp(lhs, op, rhs) => {
+                    match op {
+                        BinaryOp::Equ => (TACCond::Equ, lhs, rhs)
+                        BinaryOp::Neq => (TACCond::Neq, lhs, rhs)
+                        BinaryOp::Lss => (TACCond::Lss, lhs, rhs)
+                        BinaryOp::Leq => (TACCond::Leq, lhs, rhs)
+                        BinaryOp::Gtr => (TACCond::Gtr, lhs, rhs)
+                        BinaryOp::Geq => (TACCond::Geq, lhs, rhs)
+                        _ => {
+                            println("expected comparison operator in if condition")
+                            raise TACLoweringError("expected comparison operator in if condition")
+                        }
+                    }
+                }
+                _ => {
+                    println("TODO: implement if with non-comparison condition")
+                    raise TACLoweringError("TODO: implement if with non-comparison condition")
+                }
+            }
+
+            let cond_lhs = self.lower_expr!(cond_lhs)
+            let cond_rhs = self.lower_expr!(cond_rhs)
 
             match else_expr {
                 Some(else_expr) => {
                     let then_label = self.next_label()
                     let end_label = self.next_label()
-                    self.emit_jump(then_label, ~cond=Some(TACValue::Variable(not_cond_id)))
-                    let then = self.lower_expr(then_expr)
+                    self.emit_jump_if(then_label, cond_op.negate(), cond_lhs, cond_rhs)
+                    let then = self.lower_expr!(then_expr)
                     self.emit_assign(ret, then)
-                    self.emit_jump(end_label, ~cond=None)
+                    self.emit_jump(end_label)
                     self.def_label(then_label)
-                    let else_ = self.lower_expr(else_expr)
+                    let else_ = self.lower_expr!(else_expr)
                     self.emit_assign(ret, else_)
                     self.def_label(end_label)
                 }
                 None => {
                     let skip_label = self.next_label()
-                    self.emit_jump(skip_label, ~cond=Some(TACValue::Variable(not_cond_id)))
-                    let _ = self.lower_expr(then_expr)
+                    self.emit_jump_if(skip_label, cond_op.negate(), cond_lhs, cond_rhs)
+                    let _ = self.lower_expr!(then_expr)
                     self.def_label(skip_label)
                 }
             }
@@ -214,10 +271,7 @@ pub fn build_basic_blocks(self: TACLowering) -> BasicBlocks {
     // any instruction that follows a jump is a leader
     self.tac.iter().eachi(fn (idx, tac) {
         match tac {
-            TACExpr::Jump(..) => {
-                leaders.push(idx + 1)
-            }
-            TACExpr::CondJump(..) => {
+            TACExpr::Jump(..) | TACExpr::JumpIf(..) => {
                 leaders.push(idx + 1)
             }
             _ => ()
@@ -282,7 +336,7 @@ pub fn build_basic_blocks(self: TACLowering) -> BasicBlocks {
                     // if the last instruction is an unconditional jump, the target is the successor
                     push_map(successors, i, label_block_index[label].unwrap())
                 }
-                TACExpr::CondJump(~label, ..) => {
+                TACExpr::JumpIf(~label, ..) => {
                     // if the last instruction is a conditional jump, the target and the next block are successors
                     push_map(successors, i, label_block_index[label].unwrap())
 
