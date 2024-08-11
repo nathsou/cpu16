@@ -133,7 +133,7 @@ fn parse_equality_expr(self: Parser) -> Expr!ParserError {
 
     while true {
         let op = match self.peek() {
-            Some(Token::EqualEqual) => BinaryOp::Eq
+            Some(Token::EqualEqual) => BinaryOp::Equ
             Some(Token::BangEqual) => BinaryOp::Neq
             _ => break
         }

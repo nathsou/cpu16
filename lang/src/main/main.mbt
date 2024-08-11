@@ -33,7 +33,7 @@ fn main {
     println("\{expr}: \{ty}\n")
 
     let tac_str = tac_lowering.tac.iter().map(fn (tac) {
-      @lib.TAC::to_string(tac)
+      @lib.TACExpr::to_string(tac)
     }).collect()
 
     let mut last_index = 0
@@ -57,13 +57,21 @@ fn main {
 
     let basic_blocks = tac_lowering.build_basic_blocks()
 
-    for i = 0; i < basic_blocks.length(); i = i + 1 {
+    for i = 0; i < basic_blocks.blocks.length(); i = i + 1 {
       println("basic block \{i}:")
-      let bb = basic_blocks[i]
+      let bb = basic_blocks.blocks[i]
 
       for j = 0; j < bb.instructions.length(); j = j + 1 {
-        println("  " + @lib.TAC::to_string(bb.instructions[j]))
+        println("  " + @lib.TACExpr::to_string(bb.instructions[j]))
       }
+    }
+
+    println("")
+    let ir = @lib.lower_basic_blocks!(basic_blocks)
+
+    // print the IR
+    for i = 0; i < ir.length(); i = i + 1 {
+      println(@lib.IR::to_string(ir[i]))
     }
 
   } catch {

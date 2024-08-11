@@ -12,7 +12,7 @@ pub enum BinaryOp {
     And
     Or
     Xor
-    Eq
+    Equ
     Neq
     Lss
     Gtr
@@ -65,7 +65,7 @@ pub fn to_string(self: Expr) -> String {
                 BinaryOp::And => lhs + " && " + rhs
                 BinaryOp::Or => lhs + " || " + rhs
                 BinaryOp::Xor => lhs + " ^ " + rhs
-                BinaryOp::Eq => lhs + " == " + rhs
+                BinaryOp::Equ => lhs + " == " + rhs
                 BinaryOp::Neq => lhs + " != " + rhs
                 BinaryOp::Lss => lhs + " < " + rhs
                 BinaryOp::Gtr => lhs + " > " + rhs

@@ -3,7 +3,7 @@ pub enum Type {
     U8; U16; Bool; Unit
 } derive (Show, Eq)
 
-type TypeEnv Env[Type]
+type TypeEnv Env[String, Type]
 
 pub struct TypeChecker {
     env: TypeEnv
@@ -60,7 +60,7 @@ pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
                         raise TypeError("expected boolean operands in binary logical op")
                     }
                 }
-                BinaryOp::Eq | BinaryOp::Neq => {
+                BinaryOp::Equ | BinaryOp::Neq => {
                     if lhs_ty == rhs_ty {
                         Type::Bool
                     } else {
