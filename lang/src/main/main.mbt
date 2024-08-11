@@ -1,7 +1,7 @@
 fn main {
   try {
     let prog =
-      #|if 3 * 7 == 21 {
+      #|if 3 + 7 == 21 {
       #|  1 + 2 - 3
       #|} else {
       #|  4 + 5 + 6
@@ -27,52 +27,67 @@ fn main {
     let expr = parser.parse_expr!()
     let type_checker = @lib.TypeChecker::new()
     let ty = type_checker.expr_type!(expr)
-    let tac_lowering = @lib.TACLowering::new()
-    let tac_ret = tac_lowering.lower_expr!(expr)
+
+    let tac_builder = @lib.TACBuilder::new()
+    let tac_ret = tac_builder.lower_expr!(expr)
 
     println("\{expr}: \{ty}\n")
 
-    let tac_str = tac_lowering.tac.iter().map(fn (tac) {
-      @lib.TACExpr::to_string(tac)
-    }).collect()
+    println("TAC:")
 
-    let mut last_index = 0
-
-    println("start:")
-    
-    tac_lowering.label_pos.iter().each(fn (entry) {
-      let label = entry.0
-      let pos = entry.1
-
-      for i = last_index; i < pos; i = i + 1 {
-        println("  " + tac_str[i])
-      }
-
-      println("L" + label.0.to_string() + ":")
-
-      last_index = pos
+    tac_builder.tac.iter().each(fn (tac) {
+        println(@lib.TAC::to_string(tac))
     })
 
-    println("\nret = \{tac_ret}\n")
+    println("\nret = \{tac_ret}")
 
-    let basic_blocks = tac_lowering.build_basic_blocks()
+    let ir_builder = @lib.IRBuilder::new()
+    let env = @lib.Env::new()
 
-    for i = 0; i < basic_blocks.blocks.length(); i = i + 1 {
-      println("basic block \{i}:")
-      let bb = basic_blocks.blocks[i]
-
-      for j = 0; j < bb.instructions.length(); j = j + 1 {
-        println("  " + @lib.TACExpr::to_string(bb.instructions[j]))
-      }
+    for i = 0; i < tac_builder.tac.length(); i = i + 1 {
+        let tac = tac_builder.tac[i]
+        let _ = ir_builder.lower_expr!(tac, env)
     }
 
-    println("")
-    let ir = @lib.lower_basic_blocks!(basic_blocks)
+    println("\nIR:")
 
-    // print the IR
-    for i = 0; i < ir.length(); i = i + 1 {
-      println(@lib.IR::to_string(ir[i]))
+    ir_builder.insts.iter().each(fn (inst) {
+        println(@lib.IR::to_string(inst))
+    })
+
+    let lir_builder = @lib.LIRBuilder::new()
+
+    for i = 0; i < ir_builder.insts.length(); i = i + 1 {
+        let inst = ir_builder.insts[i]
+        let _ = lir_builder.lower_ir!(inst)
     }
+
+    println("\nLIR:")
+
+    lir_builder.insts.iter().each(fn (inst) {
+        println(@lib.LIR::to_string(inst))
+    })
+
+    let intervals = lir_builder.liveness_intervals()
+
+    println("\nLiveness Intervals:")
+    intervals.each(fn (key, val) {
+        println("\{key}: \{val}")
+    })
+
+    let regs = lir_builder.allocate_registers(~regs_count=5)
+
+    println("\nRegisters:")
+    regs.each(fn (key, val) {
+        println("\{key}: \{val}")
+    })
+
+    lir_builder.allocate()
+
+    println("\nAllocated LIR:")
+    lir_builder.insts.iter().each(fn (inst) {
+        println(@lib.LIR::to_string(inst))
+    })
 
   } catch {
     err => {

@@ -1,5 +1,5 @@
 
-pub type IRVarId UInt derive (Show)
+pub type IRVarId UInt derive (Show, Eq, Hash)
 
 pub fn op_add(self: IRVarId, other: IRVarId) -> IRVarId {
     self.0 + other.0
@@ -19,9 +19,9 @@ pub enum IR {
     And(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Or(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
     Xor(~dst: IRVarId, ~src1: IRVarId, ~src2: IRVarId)
-    Jump(~label_bb: Int)
-    JumpIf(~label_bb: Int, ~cond: TACCond, ~lhs: IRVarId, ~rhs: IRVarId)
-    Label(~bb: Int)
+    Jump(~label: TACLabel)
+    JumpIf(~label: TACLabel, ~cond: TACCond, ~lhs: IRVarId, ~rhs: IRVarId)
+    Label(TACLabel)
 } derive (Show)
 
 pub struct IRBuilder {
@@ -88,15 +88,15 @@ fn get_or_declare(self: IRBuilder, env: Env[TACId, IRVarId], target: TACId) -> I
 
 let unit_var_id: IRVarId = 0U
 
-pub fn lower_expr(self: IRBuilder, expr: TACExpr, labels: Map[TACLabel, Int], env: Env[TACId, IRVarId]) -> IRVarId!IRBuilderError {
+pub fn lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId]) -> IRVarId!IRBuilderError {
     match expr {
-        TACExpr::Assign(~target, ~src) => {
+        TAC::Assign(~target, ~src) => {
             let dst_id = self.get_or_declare(env, target)
             let src_id = self.lower_value!(src, env)
             self.emit(IR::Move(~dst=dst_id, ~src=src_id))
             dst_id
         }
-        TACExpr::Unary(~target, ~op, ~arg) => {
+        TAC::Unary(~target, ~op, ~arg) => {
             let dst = self.next_var()
 
             match op {
@@ -109,7 +109,7 @@ pub fn lower_expr(self: IRBuilder, expr: TACExpr, labels: Map[TACLabel, Int], en
             env.bind(target, dst)
             dst
         }
-        TACExpr::Binary(~target, ~lhs, ~op, ~rhs) => {
+        TAC::Binary(~target, ~lhs, ~op, ~rhs) => {
             let dst = self.next_var()
             let lhs_id = self.lower_value!(lhs, env)
             let rhs_id = self.lower_value!(rhs, env)
@@ -128,28 +128,30 @@ pub fn lower_expr(self: IRBuilder, expr: TACExpr, labels: Map[TACLabel, Int], en
             env.bind(target, dst)
             dst
         }
-        TACExpr::Store(~dst, ~src) => {
+        TAC::Store(~dst, ~src) => {
             let dst_id = self.get_or_declare(env, dst)
             let src_id = self.lower_value!(src, env)
             self.emit(IR::Store(~dst=dst_id, ~src=src_id))
             dst_id
         }
-        TACExpr::Load(~target, ~addr) => {
+        TAC::Load(~target, ~addr) => {
             let target_id = self.get_or_declare(env, target)
             let addr_id = self.lower_value!(addr, env)
             self.emit(IR::Load(~dst=target_id, ~src=addr_id))
             target_id
         }
-        TACExpr::Jump(~label) => {
-            let label_bb = labels[label].unwrap()
-            self.emit(IR::Jump(~label_bb))
+        TAC::Jump(~label) => {
+            self.emit(IR::Jump(~label))
             unit_var_id
         }
-        TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
-            let label_bb = labels[label].unwrap()
+        TAC::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
             let lhs_id = self.lower_value!(lhs, env)
             let rhs_id = self.lower_value!(rhs, env)
-            self.emit(IR::JumpIf(~label_bb, ~cond=cond, ~lhs=lhs_id, ~rhs=rhs_id))
+            self.emit(IR::JumpIf(~label, ~cond=cond, ~lhs=lhs_id, ~rhs=rhs_id))
+            unit_var_id
+        }
+        TAC::Label(~label) => {
+            self.emit(IR::Label(label))
             unit_var_id
         }
     }
@@ -161,52 +163,4 @@ pub struct IRBasicBlock {
     predecessors: Array[Int]
     successors: Array[Int]
     env: Env[TACId, IRVarId]
-}
-
-pub fn lower_basic_blocks(basic_blocks: BasicBlocks) -> Array[IR]!IRBuilderError {
-    let env = Env::new()
-    let visited = @sorted_set.new()
-    let ir_bbs: Map[Int, Array[IR]] = Map::new()
-    let builder = IRBuilder::new()
-
-    fn visit_bb(bb_idx: Int) -> Unit!IRBuilderError {
-        if not(visited.contains(bb_idx)) {
-            visited.add(bb_idx)
-            let bb = basic_blocks.blocks[bb_idx]
-            builder.emit(IR::Label(~bb=bb_idx))
-
-            for i = 0; i < bb.predecessors.length(); i = i + 1 {
-                visit_bb!(bb.predecessors[i])
-            }
-
-            builder.insts.clear()
-
-            for i = 0; i < bb.instructions.length(); i = i + 1 {
-                let inst = bb.instructions[i]
-                let _ = builder.lower_expr!(inst, basic_blocks.labels, env)
-            }
-
-            ir_bbs[bb_idx] = builder.insts.copy()
-
-            for i = 0; i < bb.successors.length(); i = i + 1 {
-                visit_bb!(bb.successors[i])
-            }
-            
-        }
-    }
-
-    visit_bb!(0)
-
-    let instructions: Array[IR] = []
-
-    for i = 0; i < basic_blocks.blocks.length(); i = i + 1 {
-        match ir_bbs.get(i) {
-            Some(insts) => {
-                instructions.append(insts)
-            }
-            None => () // unreachable basic block
-        }
-    }
-
-    instructions
 }

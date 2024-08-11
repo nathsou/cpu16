@@ -1,7 +1,7 @@
 // Three Address Code IR
 
 pub type TACId UInt derive (Eq, Hash)
-pub type TACLabel UInt derive (Eq, Hash)
+pub type TACLabel UInt derive (Eq, Hash, Show)
 
 fn op_add(self: TACId, other: TACId) -> TACId {
     self.0 + other.0
@@ -13,10 +13,6 @@ pub fn to_string(self: TACId) -> String {
 
 fn op_add(self: TACLabel, other: TACLabel) -> TACLabel {
     self.0 + other.0
-}
-
-fn to_string(self: TACLabel) -> String {
-    "L" + self.0.to_string()
 }
 
 pub enum TACValue {
@@ -44,7 +40,7 @@ pub fn negate(self: TACCond) -> TACCond {
     }
 }
 
-pub enum TACExpr {
+pub enum TAC {
     Assign(~target: TACId, ~src: TACValue)
     Unary(~target: TACId, ~op: UnaryOp, ~arg: TACValue)
     Binary(~target: TACId, ~lhs: TACValue, ~op: TACBinaryOp, ~rhs: TACValue)
@@ -52,6 +48,7 @@ pub enum TACExpr {
     Load(~target: TACId, ~addr: TACValue)
     Jump(~label: TACLabel)
     JumpIf(~label: TACLabel, ~cond: TACCond, ~lhs: TACValue, ~rhs: TACValue)
+    Label(~label: TACLabel)
 }
 
 pub fn to_string(self: TACValue) -> String {
@@ -61,100 +58,100 @@ pub fn to_string(self: TACValue) -> String {
     }
 }
 
-pub fn to_string(self: TACExpr) -> String {
+pub fn to_string(self: TAC) -> String {
     match self {
-        TACExpr::Assign(~target, ~src) => {
+        TAC::Assign(~target, ~src) => {
             "\{target} = \{src}"
         }
-        TACExpr::Unary(~target, ~op, ~arg) => {
+        TAC::Unary(~target, ~op, ~arg) => {
             "\{target} = \{op} \{arg}"
         }
-        TACExpr::Binary(~target, ~lhs, ~op, ~rhs) => {
+        TAC::Binary(~target, ~lhs, ~op, ~rhs) => {
             "\{target} = \{lhs} \{op} \{rhs}"
         }
-        TACExpr::Store(~dst, ~src) => {
+        TAC::Store(~dst, ~src) => {
             "store \{src} -> \{dst}"
         }
-        TACExpr::Load(~target, ~addr) => {
+        TAC::Load(~target, ~addr) => {
             "\{target} = load \{addr}"
         }
-        TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
+        TAC::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
             "jump \{label} if \{lhs} \{cond} \{rhs}"
         }
-        TACExpr::Jump(~label) => {
+        TAC::Jump(~label) => {
             "jump \{label}"
+        }
+        TAC::Label(~label) => {
+            "\{label}:"
         }
     }
 }
 
-pub struct TACLowering {
-    tac: Array[TACExpr]
+pub struct TACBuilder {
+    tac: Array[TAC]
     mut next_var_id: TACId
     mut next_label_id: TACLabel
-    mut label_pos: Map[TACLabel, Int]
 }
 
-pub fn TACLowering::new() -> TACLowering {
+pub fn TACBuilder::new() -> TACBuilder {
     {
         tac: [],
         next_var_id: 0U,
         next_label_id: 0U,
-        label_pos: Map::new(),
     }
 }
 
-fn next_var(self: TACLowering) -> TACId {
+fn next_var(self: TACBuilder) -> TACId {
     let var_id = self.next_var_id
     self.next_var_id += 1U
     var_id
 }
 
-fn next_label(self: TACLowering) -> TACLabel {
+fn next_label(self: TACBuilder) -> TACLabel {
     let label_id = self.next_label_id
     self.next_label_id += 1U
     label_id
 }
 
-fn emit(self: TACLowering, tac: TACExpr) -> Unit {
+fn emit(self: TACBuilder, tac: TAC) -> Unit {
     self.tac.push(tac)
 }
 
-fn emit_assign(self: TACLowering, target: TACId, src: TACValue) -> Unit {
-    self.emit(TACExpr::Assign(~target, ~src))
+fn emit_assign(self: TACBuilder, target: TACId, src: TACValue) -> Unit {
+    self.emit(TAC::Assign(~target, ~src))
 }
 
-fn emit_unary_op(self: TACLowering, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
-    self.emit(TACExpr::Unary(~target, ~op, ~arg))
+fn emit_unary_op(self: TACBuilder, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
+    self.emit(TAC::Unary(~target, ~op, ~arg))
 }
 
-fn emit_binary_op(self: TACLowering, target: TACId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
-    self.emit(TACExpr::Binary(~target, ~lhs, ~op, ~rhs))
+fn emit_binary_op(self: TACBuilder, target: TACId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
+    self.emit(TAC::Binary(~target, ~lhs, ~op, ~rhs))
 }
 
-fn emit_store(self: TACLowering, dst: TACId, src: TACValue) -> Unit {
-    self.emit(TACExpr::Store(~dst, ~src))
+fn emit_store(self: TACBuilder, dst: TACId, src: TACValue) -> Unit {
+    self.emit(TAC::Store(~dst, ~src))
 }
 
-fn emit_load(self: TACLowering, target: TACId, addr: TACValue) -> Unit {
-    self.emit(TACExpr::Load(~target, ~addr))
+fn emit_load(self: TACBuilder, target: TACId, addr: TACValue) -> Unit {
+    self.emit(TAC::Load(~target, ~addr))
 }
 
-fn def_label(self: TACLowering, label: TACLabel) -> Unit {
-    let pos = self.tac.length()
-    self.label_pos[label] = pos
+fn def_label(self: TACBuilder, label: TACLabel) -> Unit {
+    self.emit(TAC::Label(~label))
 }
 
-fn emit_jump_if(self: TACLowering, label: TACLabel, cond: TACCond, lhs: TACValue, rhs: TACValue) -> Unit {
-    self.emit(TACExpr::JumpIf(~label, ~cond, ~lhs, ~rhs))
+fn emit_jump_if(self: TACBuilder, label: TACLabel, cond: TACCond, lhs: TACValue, rhs: TACValue) -> Unit {
+    self.emit(TAC::JumpIf(~label, ~cond, ~lhs, ~rhs))
 }
 
-fn emit_jump(self: TACLowering, label: TACLabel) -> Unit {
-    self.emit(TACExpr::Jump(~label))
+fn emit_jump(self: TACBuilder, label: TACLabel) -> Unit {
+    self.emit(TAC::Jump(~label))
 }
 
 type! TACLoweringError String derive (Show)
 
-pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue!TACLoweringError {
+pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
@@ -189,8 +186,6 @@ pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue!TACLoweringError {
             TACValue::Variable(target)
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let ret = self.next_var()
-
             let (cond_op, cond_lhs, cond_rhs) = match cond {
                 Expr::BinaryOp(lhs, op, rhs) => {
                     match op {
@@ -214,6 +209,7 @@ pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue!TACLoweringError {
 
             let cond_lhs = self.lower_expr!(cond_lhs)
             let cond_rhs = self.lower_expr!(cond_rhs)
+            let ret = self.next_var()
 
             match else_expr {
                 Some(else_expr) => {
@@ -238,151 +234,5 @@ pub fn lower_expr(self: TACLowering, expr: Expr) -> TACValue!TACLoweringError {
 
             TACValue::Variable(ret)
         }
-    }
-}
-
-fn push_map[K: Eq + Hash, V](map: Map[K, Array[V]], key: K, value: V) -> Unit {
-    match map.get(key) {
-        Some(values) => {
-            values.push(value)
-        }
-        None => {
-            map[key] = [value]
-        }
-    }
-}
-
-pub struct BasicBlock {
-    id: Int
-    instructions: ArrayView[TACExpr]
-    successors: Array[Int]
-    predecessors: Array[Int]
-}
-
-pub struct BasicBlocks {
-    blocks: Array[BasicBlock]
-    labels: Map[TACLabel, Int]
-}
-
-pub fn build_basic_blocks(self: TACLowering) -> BasicBlocks {
-    // identify leaders:
-    let leaders = [0] // the first instruction is a leader
-
-    // any instruction that follows a jump is a leader
-    self.tac.iter().eachi(fn (idx, tac) {
-        match tac {
-            TACExpr::Jump(..) | TACExpr::JumpIf(..) => {
-                leaders.push(idx + 1)
-            }
-            _ => ()
-        }
-    })
-
-    // any instruction that is the target of a jump is a leader
-    self.label_pos.iter().each(fn (pos) {
-        leaders.push(pos.1)
-    })
-
-    leaders.dedup()
-
-    // compute the basic block index for each label
-    let label_block_index: Map[TACLabel, Int] = Map::new()
-
-    fn get_label_block_index(label_pos: Int) -> Option[Int] {
-        for i = 0; i < leaders.length(); i = i + 1 {
-            let leader_pos = leaders[i]
-
-            if leader_pos >= label_pos {
-                return Some(i)
-            }
-        }
-
-        None
-    }
-
-    self.label_pos.iter().each(fn (entry) {
-        let label = entry.0
-        let pos = entry.1
-        match get_label_block_index(pos) {
-            Some(block_index) => {
-                label_block_index[label] = block_index
-            }
-            None => ()
-        }
-    })
-
-    // Starting from a leader, the set of all following instructions until and not including
-    // the next leader is the basic block corresponding to the starting leader
-    let blocks: Array[ArrayView[TACExpr]] = []
-
-    leaders.iter().eachi(fn (idx, leader) {
-        match leaders.get(idx + 1) {
-            Some(next_leader) => {
-                blocks.push(self.tac[leader:next_leader])
-            }
-            None => {
-                blocks.push(self.tac[leader:])
-            }
-        }
-    })
-
-    let successors: Map[Int, Array[Int]] = Map::new()
-
-    for i = 0; i < blocks.length(); i = i + 1 {
-        let block = blocks[i]
-        if block.length() > 0 {
-            match block[block.length() - 1] {
-                TACExpr::Jump(~label) => {
-                    // if the last instruction is an unconditional jump, the target is the successor
-                    push_map(successors, i, label_block_index[label].unwrap())
-                }
-                TACExpr::JumpIf(~label, ..) => {
-                    // if the last instruction is a conditional jump, the target and the next block are successors
-                    push_map(successors, i, label_block_index[label].unwrap())
-
-                    if i + 1 < blocks.length() {
-                        push_map(successors, i, i + 1)
-                    }
-                }
-                _ => {
-                    // otherwise, the next block is the successor
-                    if i + 1 < blocks.length() {
-                        push_map(successors, i, i + 1)
-                    }
-                }
-            }
-        }
-    }
-
-    // compute predecessors (reverse of successors)
-    let predecessors: Map[Int, Array[Int]] = Map::new()
-
-    successors.iter().each(fn (entry) {
-        let block_index = entry.0
-        let succs = entry.1
-        succs.iter().each(fn (succ) {
-            push_map(predecessors, succ, block_index)
-        })
-    })
-    
-    // build basic blocks
-    let basic_blocks: Array[BasicBlock] = []
-
-    for i = 0; i < blocks.length(); i = i + 1 {
-        let block = blocks[i]
-        let successors = successors.get_or_default(i, [])
-        let predecessors = predecessors.get_or_default(i, [])
-
-        basic_blocks.push({
-            id: i,
-            instructions: block,
-            successors,
-            predecessors,
-        })
-    }
-
-    {
-        blocks: basic_blocks,
-        labels: label_block_index,
     }
 }

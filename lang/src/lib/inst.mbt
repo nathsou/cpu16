@@ -1,7 +1,7 @@
 
 pub enum Reg {
   Z; R1; R2; R3; R4; R5; SP; PC
-}
+} derive (Show, Eq)
 
 pub enum ControlOp {
     Halt
@@ -10,7 +10,7 @@ pub enum ControlOp {
     Setc
     Clrc
     Restore
-}
+} derive (Show, Eq)
 
 pub enum AluOp {
   Add; Sub; Adc; Sbc;
@@ -20,7 +20,7 @@ pub enum AluOp {
   AddIfNotCarry; SubIfNotCarry; AdcIfNotCarry; SbcIfNotCarry;
   Inc; Dec;
   And; Nand; Or; Xor; Shl; Shr
-}
+} derive (Show, Eq)
 
 pub enum Inst {
   Ctl(~op: ControlOp)
