@@ -1,3 +1,9 @@
+
+extern "js" fn write_file(file_path: String, contents: Array[UInt]) -> Unit =
+  #|(file_path, contents) => {
+  #|  Bun.write(file_path, new Uint16Array(contents.buf));
+  #|}
+
 fn main {
   try {
     let prog =
@@ -55,7 +61,7 @@ fn main {
         println(@lib.IR::to_string(inst))
     })
 
-    let lir_builder = @lib.LIRBuilder::new()
+    let lir_builder = @lib.LIRBuilder::from(ir_builder)
 
     for i = 0; i < ir_builder.insts.length(); i = i + 1 {
         let inst = ir_builder.insts[i]
@@ -68,27 +74,29 @@ fn main {
         println(@lib.LIR::to_string(inst))
     })
 
-    let intervals = lir_builder.liveness_intervals()
-
-    println("\nLiveness Intervals:")
-    intervals.each(fn (key, val) {
-        println("\{key}: \{val}")
-    })
-
-    let regs = lir_builder.allocate_registers(~regs_count=5)
-
-    println("\nRegisters:")
-    regs.each(fn (key, val) {
-        println("\{key}: \{val}")
-    })
-
+    lir_builder.remove_labels()
+    let _ = lir_builder.allocate_registers(~regs_count=5)
     lir_builder.allocate()
 
     println("\nAllocated LIR:")
-    lir_builder.insts.iter().each(fn (inst) {
+
+    for inst in lir_builder.insts {
         println(@lib.LIR::to_string(inst))
+    }
+
+    let insts = lir_builder.lower_lir!()
+
+    println("\nInsts:")
+    for inst in insts {
+        println(@lib.Inst::to_string(inst))
+    }
+
+    let encoded = insts.map(fn (inst) {
+        @lib.encode_inst(inst)
     })
 
+    // write to file
+    write_file("out.asm", encoded)
   } catch {
     err => {
       println(err)

@@ -14,7 +14,7 @@ pub fn variables(self: Loc) -> Array[IRVarId] {
     }
 }
 
-pub fn substitute(self: Loc, reg_mapping: Map[IRVarId, Int]) -> Loc {
+pub fn substitute_var(self: Loc, reg_mapping: Map[IRVarId, Int]) -> Loc {
     match self {
         Loc::Var(v) => {
             match reg_mapping[v] {
@@ -66,7 +66,8 @@ pub fn variables(self: LIR) -> Array[IRVarId] {
 }
 
 pub struct LIRBuilder {
-    insts: Array[LIR]
+    mut insts: Array[LIR]
+    mut next_var_id: IRVarId
 }
 
 pub type! LIRBuilderError String derive (Show)
@@ -76,10 +77,17 @@ fn raisep(msg: String) -> Unit!LIRBuilderError {
     raise LIRBuilderError(msg)
 }
 
-pub fn LIRBuilder::new() -> LIRBuilder {
+pub fn LIRBuilder::from(ir_builder: IRBuilder) -> LIRBuilder {
     {
         insts: [],
+        next_var_id: ir_builder.next_var_id,
     }
+}
+
+fn next_var_id(self: LIRBuilder) -> IRVarId {
+    let var_id = self.next_var_id
+    self.next_var_id += 1U
+    var_id
 }
 
 fn emit(self: LIRBuilder, inst: LIR) -> Unit {
@@ -198,7 +206,7 @@ fn remove_associative_array[K: Eq, V](array: Array[(K, V)], key: K) -> Unit {
 }
 
 fn insert_associative_array[K: Eq, V](array: Array[(K, V)], ~key: K, ~value: V, ~lss: (V, V) -> Bool) -> Unit {
-    match array.find_index(fn (x) { lss(value, x.1) }) {
+    match array.find_index(fn (x) { lss(x.1, value) }) {
         Some(idx) => {
             array.insert(idx, (key, value))
         }
@@ -218,13 +226,6 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
         free_regs.push(i)
     }
 
-    //  ExpireOldIntervals(i)
-    //     for each interval j in active, in order of increasing end point do
-    //         if endpoint[j] ≥ startpoint[i] then
-    //             return 
-    //         remove j from active
-    //         add register[j] to pool of free registers
-
     fn expire_old_intervals(interval_end: Int) -> Unit {
         active.eachi(fn (j, entry) {
             let (reg, interval) = entry
@@ -237,16 +238,6 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
         })
     }
 
-    // LinearScanRegisterAllocation
-    // active ← {}
-    // for each live interval i, in order of increasing start point do
-    //     ExpireOldIntervals(i)
-    //     if length(active) = R then
-    //         SpillAtInterval(i)
-    //     else
-    //         register[i] ← a register removed from pool of free registers
-    //         add i to active, sorted by increasing end point
-
     intervals.each(fn (var_id, interval) {
         let (_, end) = interval
         expire_old_intervals(end)
@@ -256,11 +247,81 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
         } else {
             let reg = free_regs.pop_exn()
             reg_alloc[var_id] = reg
-            insert_associative_array(active, ~key=reg, ~value=interval, ~lss=fn (x, y) { x.1 < y.1 })
+            insert_associative_array(
+                active,
+                ~key=reg,
+                ~value=interval,
+                ~lss=fn (x, y) { x.1 < y.1 }
+            )
         }
     })
 
     reg_alloc
+}
+
+pub fn remove_labels(self: LIRBuilder) -> Unit {
+    let insts = []
+    let label_pos: Map[TACLabel, Int] = Map::new()
+
+    for idx, inst in self.insts {
+        match inst {
+            LIR::Label(label) => {
+                label_pos[label] = idx - label_pos.size()
+            }
+            _ => ()
+        }
+    }
+
+    let mut additional_insts = 0
+
+    // replace labels
+    for idx, inst in self.insts {
+        match inst {
+            LIR::Jmp(~dst=Loc::Label(label), ~cond) => {
+                let pos = label_pos[label].unwrap() + additional_insts
+                let delta = pos - idx
+
+                let op = if delta >= 0 {
+                    match cond {
+                        Some(LIRCond::IfZero) => AluOp::AddIfZero
+                        Some(LIRCond::IfNotZero) => AluOp::AddIfNotZero
+                        Some(LIRCond::IfCarry) => AluOp::AddIfCarry
+                        Some(LIRCond::IfNotCarry) => AluOp::AddIfNotCarry
+                        None => AluOp::Add
+                    }
+                } else {
+                    match cond {
+                        Some(LIRCond::IfZero) => AluOp::SubIfZero
+                        Some(LIRCond::IfNotZero) => AluOp::SubIfNotZero
+                        Some(LIRCond::IfCarry) => AluOp::SubIfCarry
+                        Some(LIRCond::IfNotCarry) => AluOp::SubIfNotCarry
+                        None => AluOp::Sub
+                    }
+                }
+
+                if delta.abs() < 4096 { // 11 bits
+                    let offset_id = self.next_var_id()
+                    insts.push(LIR::Set(~dst=Loc::Var(offset_id), ~val=delta.abs().to_uint()))
+                    insts.push(LIR::Alu(
+                        ~dst=Loc::Reg(Reg::PC),
+                        ~src1=Loc::Reg(Reg::PC),
+                        ~src2=Loc::Var(offset_id),
+                        ~op,
+                    ))
+
+                    additional_insts += 1
+                } else {
+                    abort("TODO: implement large jump offset")
+                }
+            }
+            Label(_) => ()
+            _ => {
+                insts.push(inst)
+            }
+        }
+    }
+
+    self.insts = insts
 }
 
 pub fn allocate(self: LIRBuilder, ~regs_count: Int = 5) -> Unit {
@@ -269,24 +330,78 @@ pub fn allocate(self: LIRBuilder, ~regs_count: Int = 5) -> Unit {
     for i = 0; i < self.insts.length(); i = i + 1 {
         self.insts[i] = match self.insts[i] {
             LIR::Ctl(~op) => LIR::Ctl(~op=op)
-            LIR::Set(~dst, ~val) => LIR::Set(~dst=dst.substitute(reg_mapping), ~val=val)
+            LIR::Set(~dst, ~val) => LIR::Set(~dst=dst.substitute_var(reg_mapping), ~val=val)
             LIR::Mem(~dst, ~addr, ~load, ~offset) => LIR::Mem(
-                ~dst=dst.substitute(reg_mapping),
-                ~addr=addr.substitute(reg_mapping),
+                ~dst=dst.substitute_var(reg_mapping),
+                ~addr=addr.substitute_var(reg_mapping),
                 ~load=load,
                 ~offset=offset,
             )
             LIR::Alu(~dst, ~src1, ~src2, ~op) => LIR::Alu(
-                ~dst=dst.substitute(reg_mapping),
-                ~src1=src1.substitute(reg_mapping),
-                ~src2=src2.substitute(reg_mapping),
+                ~dst=dst.substitute_var(reg_mapping),
+                ~src1=src1.substitute_var(reg_mapping),
+                ~src2=src2.substitute_var(reg_mapping),
                 ~op=op,
             )
             LIR::Jmp(~dst, ~cond) => LIR::Jmp(
-                ~dst=dst.substitute(reg_mapping),
+                ~dst=dst.substitute_var(reg_mapping),
                 ~cond=cond,
             )
             LIR::Label(_) => self.insts[i]
         }
     }
+}
+
+type! InstLoweringError {
+    UnexpectedJmp
+    UnexpectedLabel
+    InvalidLoc(Loc)
+} derive (Show)
+
+pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
+    let insts = []
+
+    fn get_reg(loc: Loc) -> Reg!InstLoweringError {
+        match loc {
+            Loc::Reg(reg) => reg
+            _ => raise InstLoweringError::InvalidLoc(loc)
+        }
+    }
+
+    for i = 0; i < self.insts.length(); i = i + 1 {
+        let inst = self.insts[i]
+
+        match inst {
+            LIR::Ctl(~op) => {
+                insts.push(Inst::Ctl(~op=op))
+            }
+            LIR::Set(~dst, ~val) => {
+                insts.push(Inst::Set(~dst=get_reg!(dst), ~val=val))
+            }
+            LIR::Mem(~dst, ~addr, ~load, ~offset) => {
+                insts.push(Inst::Mem(
+                    ~dst=get_reg!(dst),
+                    ~addr=get_reg!(addr),
+                    ~load=load,
+                    ~offset=offset,
+                ))
+            }
+            LIR::Alu(~dst, ~src1, ~src2, ~op) => {
+                insts.push(Inst::Alu(
+                    ~dst=get_reg!(dst),
+                    ~src1=get_reg!(src1),
+                    ~src2=get_reg!(src2),
+                    ~op=op,
+                ))
+            }
+            LIR::Jmp(..) => {
+                raise InstLoweringError::UnexpectedJmp
+            }
+            LIR::Label(_) => {
+                raise InstLoweringError::UnexpectedLabel
+            }
+        }
+    }
+
+    insts
 }

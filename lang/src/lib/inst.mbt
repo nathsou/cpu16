@@ -27,9 +27,9 @@ pub enum Inst {
   Set(~dst: Reg, ~val: UInt)
   Mem(~dst: Reg, ~addr: Reg, ~load: Bool, ~offset: UInt)
   Alu(~dst: Reg, ~src1: Reg, ~src2: Reg, ~op: AluOp)
-}
+} derive (Show)
 
-trait Encode {
+pub trait Encode {
   encode(Self) -> UInt
 }
 
@@ -113,4 +113,8 @@ impl Encode for Inst with encode(inst) -> UInt {
       Encode::encode(op)
     }
   }
+}
+
+pub fn encode_inst(inst: Inst) -> UInt {
+  Encode::encode(inst)
 }
