@@ -4,13 +4,24 @@ extern "js" fn write_file(file_path: String, contents: Array[UInt]) -> Unit =
   #|  Bun.write(file_path, new Uint16Array(contents.buf));
   #|}
 
+fn hex(n: Int) -> String {
+  let hex = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F']
+  let s = []
+
+  for i = 0; i < 4; i = i + 1 {
+    s.push(hex[(n >> (i * 4)) & 0xF].to_string())
+  }
+
+  return s.rev().join("")
+}
+
 fn main {
   try {
     let prog =
-      #|if 3 + 7 == 21 {
-      #|  1 + 2 - 3
+      #|if 3 + 7 == 10 {
+      #|  if 2 + 1 == 4 { 1621 } else { 1998 }
       #|} else {
-      #|  4 + 5 + 6
+      #|  4 + 5 + (if 1 + 2 == 3 { 1 } else { 8 })
       #|}
 
     let lexer = @lib.Lexer::new(prog)
@@ -75,7 +86,6 @@ fn main {
     })
 
     lir_builder.remove_labels()
-    let _ = lir_builder.allocate_registers(~regs_count=5)
     lir_builder.allocate()
 
     println("\nAllocated LIR:")
@@ -95,8 +105,14 @@ fn main {
         @lib.encode_inst(inst)
     })
 
+    println("\nHex:")
+
+    for inst in encoded {
+        println("0x" + hex(inst.to_int()) + ",")
+    }
+
     // write to file
-    write_file("out.asm", encoded)
+    // write_file("out.asm", encoded)
   } catch {
     err => {
       println(err)

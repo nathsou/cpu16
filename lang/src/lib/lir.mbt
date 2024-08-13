@@ -103,7 +103,7 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
         IR::Set(~dst, ~val) => {
             let val_uint = val.to_uint()
 
-            if val_uint > 0x7F {
+            if val_uint >= 4096 {
                 raisep!("TODO: implement large constant lowering")
             }
 
@@ -220,9 +220,9 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
     let intervals = self.liveness_intervals()
     let reg_alloc: Map[IRVarId, Int] = Map::new()
     let active: Array[(Int, (Int, Int))] = []
-    let free_regs: @queue.T[Int] = @queue.new()
+    let free_regs: Array[Int] = []
 
-    for i = 0; i < regs_count; i = i + 1 {
+    for i = regs_count - 1; i >= 0; i = i - 1 {
         free_regs.push(i)
     }
 
@@ -231,7 +231,7 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
             let (reg, interval) = entry
             let (_, end) = interval
 
-            if interval_end >= end {
+            if interval_end > end {
                 remove_associative_array(active, j)
                 free_regs.push(reg)
             }
@@ -260,36 +260,16 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
 }
 
 pub fn remove_labels(self: LIRBuilder) -> Unit {
-    let insts = []
-    let label_pos: Map[TACLabel, Int] = Map::new()
+    let without_jumps: Array[LIR] = []
+    let jump_offsets_to_fix: Map[Int, TACLabel] = Map::new()
+    let visited_labels: Map[TACLabel, Unit] = Map::new()
 
-    for idx, inst in self.insts {
-        match inst {
-            LIR::Label(label) => {
-                label_pos[label] = idx - label_pos.size()
-            }
-            _ => ()
-        }
-    }
-
-    let mut additional_insts = 0
-
-    // replace labels
-    for idx, inst in self.insts {
+    for inst in self.insts {
         match inst {
             LIR::Jmp(~dst=Loc::Label(label), ~cond) => {
-                let pos = label_pos[label].unwrap() + additional_insts
-                let delta = pos - idx
-
-                let op = if delta >= 0 {
-                    match cond {
-                        Some(LIRCond::IfZero) => AluOp::AddIfZero
-                        Some(LIRCond::IfNotZero) => AluOp::AddIfNotZero
-                        Some(LIRCond::IfCarry) => AluOp::AddIfCarry
-                        Some(LIRCond::IfNotCarry) => AluOp::AddIfNotCarry
-                        None => AluOp::Add
-                    }
-                } else {
+                let jmp_offset_var_id = self.next_var_id()
+                let is_backward_jump = visited_labels.contains(label)
+                let op = if is_backward_jump {
                     match cond {
                         Some(LIRCond::IfZero) => AluOp::SubIfZero
                         Some(LIRCond::IfNotZero) => AluOp::SubIfNotZero
@@ -297,31 +277,109 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
                         Some(LIRCond::IfNotCarry) => AluOp::SubIfNotCarry
                         None => AluOp::Sub
                     }
-                }
-
-                if delta.abs() < 4096 { // 11 bits
-                    let offset_id = self.next_var_id()
-                    insts.push(LIR::Set(~dst=Loc::Var(offset_id), ~val=delta.abs().to_uint()))
-                    insts.push(LIR::Alu(
-                        ~dst=Loc::Reg(Reg::PC),
-                        ~src1=Loc::Reg(Reg::PC),
-                        ~src2=Loc::Var(offset_id),
-                        ~op,
-                    ))
-
-                    additional_insts += 1
                 } else {
-                    abort("TODO: implement large jump offset")
+                    match cond {
+                        Some(LIRCond::IfZero) => AluOp::AddIfZero
+                        Some(LIRCond::IfNotZero) => AluOp::AddIfNotZero
+                        Some(LIRCond::IfCarry) => AluOp::AddIfCarry
+                        Some(LIRCond::IfNotCarry) => AluOp::AddIfNotCarry
+                        None => AluOp::Add
+                    }
                 }
+
+                without_jumps.push(LIR::Set(~dst=Loc::Var(jmp_offset_var_id), ~val=0U)) // placeholder
+                jump_offsets_to_fix[without_jumps.length()] = label
+                without_jumps.push(LIR::Alu(
+                    ~dst=Loc::Reg(Reg::PC),
+                    ~src1=Loc::Reg(Reg::PC),
+                    ~src2=Loc::Var(jmp_offset_var_id),
+                    ~op,
+                ))
             }
-            Label(_) => ()
+            LIR::Label(label) => {
+                visited_labels[label] = ()
+                without_jumps.push(inst)
+            }
             _ => {
-                insts.push(inst)
+                without_jumps.push(inst)
             }
         }
     }
 
-    self.insts = insts
+    fn max(a: Int, b: Int) -> Int {
+        if a > b { a } else { b }
+    }
+
+    // Compute relative offset of a label
+    fn compute_relative_offset(index: Int, label: TACLabel) -> UInt {
+        let max_offset = max(index, without_jumps.length() - index)
+
+        let mut delta_forward = 0U
+        let mut delta_backward = 0U
+
+        for i = 0; i < max_offset; i = i + 1 {
+            if index + 1 < without_jumps.length() {
+                let inst_forward = without_jumps[index + i]
+
+                match inst_forward {
+                    LIR::Label(l) => {
+                        if l == label {
+                            return delta_forward
+                        }
+                    }
+                    _ => {
+                        // Skip labels
+                        delta_forward += 1
+                    }
+                }
+            }
+
+            if index - i >= 0 {
+                let inst_backward = without_jumps[index - i]
+
+                match inst_backward {
+                    LIR::Label(l) => {
+                        if l == label {
+                            return delta_backward
+                        }
+                    }
+                    _ => {
+                        // Skip labels
+                        delta_backward += 1
+                    }
+                }
+            }
+        }
+
+        abort("label not found")
+    }
+
+    // Fix jump offsets
+    for index, label in jump_offsets_to_fix {
+        let offset = compute_relative_offset(index, label)
+        let inst = without_jumps[index - 1]
+
+        match inst {
+            LIR::Set(~dst=Loc::Var(var_id), ~val=_) => {
+                without_jumps[index - 1] = LIR::Set(~dst=Loc::Var(var_id), ~val=offset)
+            }
+            _ => {
+                abort("unexpected instruction during jump offset fixing")
+            }
+        }
+    }
+
+    // Remove labels
+    let without_labels: Array[LIR] = []
+
+    for inst in without_jumps {
+        match inst {
+            LIR::Label(_) => ()
+            _ => without_labels.push(inst)
+        }
+    }
+
+    self.insts = without_labels
 }
 
 pub fn allocate(self: LIRBuilder, ~regs_count: Int = 5) -> Unit {

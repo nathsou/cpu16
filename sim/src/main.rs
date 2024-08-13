@@ -459,6 +459,52 @@ fn disassemble(prog: &[u16], disasm_path: &str) {
 }
 
 fn main() {
-    let prog = lab();
-    dump_bin(&prog, "lab.bin");
+    // let prog = lab();
+    // dump_bin(&prog, "lab.bin");
+    let prog: [u16; 41] = [
+        0x4803,
+        0x5007,
+        0xC940,
+        0x500A,
+        0xC141,
+        0x4811,
+        0xFF28,
+        0x4802,
+        0x5001,
+        0xC940,
+        0x5004,
+        0xC141,
+        0x4805,
+        0xFF28,
+        0x4E55,
+        0xC900,
+        0x5003,
+        0xFF40,
+        0x57CE,
+        0xCA00,
+        0xC900,
+        0x5013,
+        0xFF40,
+        0x5004,
+        0x5805,
+        0xD260,
+        0x5801,
+        0x6002,
+        0xDB80,
+        0x6003,
+        0xC381,
+        0x5805,
+        0xFF68,
+        0x5801,
+        0xDB00,
+        0x6003,
+        0xFF80,
+        0x6008,
+        0xDC00,
+        0xDA60,
+        0xCB00,
+    ];
+
+    let mut cpu = CPU::from(&prog, 0);
+    cpu.run_with_fuel(1000, true);
 }
