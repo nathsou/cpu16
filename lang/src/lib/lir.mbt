@@ -1,9 +1,10 @@
-// Lower Intermidiate Representation
+// Lower Intermediate Representation
 // Raw instructions with variables instead of registers (before register allocation)
 
 pub enum Loc {
     Reg(Reg)
     Var(IRVarId)
+    Mem(~offset: Int)
     Label(TACLabel)
 } derive (Show)
 
@@ -14,10 +15,15 @@ pub fn variables(self: Loc) -> Array[IRVarId] {
     }
 }
 
-pub fn substitute_var(self: Loc, reg_mapping: Map[IRVarId, Int]) -> Loc {
+struct VariableAllocation {
+    reg_alloc: Map[IRVarId, Int]
+    mem_alloc: Map[IRVarId, Int]
+}
+
+pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
     match self {
         Loc::Var(v) => {
-            match reg_mapping[v] {
+            match alloc.reg_alloc[v] {
                 Some(reg) => Loc::Reg(match reg {
                     0 => Reg::R1
                     1 => Reg::R2
@@ -26,7 +32,10 @@ pub fn substitute_var(self: Loc, reg_mapping: Map[IRVarId, Int]) -> Loc {
                     4 => Reg::R5
                     _ => abort("invalid register")
                 })
-                None => Loc::Var(v)
+                None => match alloc.mem_alloc[v] {
+                    Some(mem) => Loc::Mem(~offset=mem)
+                    None => Loc::Var(v)
+                }
             }
         }
         _ => self
@@ -239,7 +248,7 @@ struct LivenessInterval {
 
 // Linear scan register allocation
 // TODO: Graph coloring register allocation
-pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, Int] {
+pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> VariableAllocation {
     let intervals = self.liveness_intervals()
     let reg_alloc: Map[IRVarId, Int] = Map::new()
     let mem_alloc: Map[IRVarId, Int] = Map::new()
@@ -288,7 +297,7 @@ pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, In
         }
     }
 
-    reg_alloc
+    { reg_alloc, mem_alloc }
 }
 
 pub fn remove_labels(self: LIRBuilder) -> Unit {
@@ -415,26 +424,26 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
 }
 
 pub fn allocate(self: LIRBuilder, ~regs_count: Int = 5) -> Unit {
-    let reg_mapping = self.allocate_registers(~regs_count)
+    let alloc = self.allocate_registers(~regs_count)
 
     for i = 0; i < self.insts.length(); i = i + 1 {
         self.insts[i] = match self.insts[i] {
             LIR::Ctl(~op) => LIR::Ctl(~op=op)
-            LIR::Set(~dst, ~val) => LIR::Set(~dst=dst.substitute_var(reg_mapping), ~val=val)
+            LIR::Set(~dst, ~val) => LIR::Set(~dst=dst.substitute_var(alloc), ~val=val)
             LIR::Mem(~dst, ~addr, ~load, ~offset) => LIR::Mem(
-                ~dst=dst.substitute_var(reg_mapping),
-                ~addr=addr.substitute_var(reg_mapping),
+                ~dst=dst.substitute_var(alloc),
+                ~addr=addr.substitute_var(alloc),
                 ~load=load,
                 ~offset=offset,
             )
             LIR::Alu(~dst, ~src1, ~src2, ~op) => LIR::Alu(
-                ~dst=dst.substitute_var(reg_mapping),
-                ~src1=src1.substitute_var(reg_mapping),
-                ~src2=src2.substitute_var(reg_mapping),
+                ~dst=dst.substitute_var(alloc),
+                ~src1=src1.substitute_var(alloc),
+                ~src2=src2.substitute_var(alloc),
                 ~op=op,
             )
             LIR::Jmp(~dst, ~cond) => LIR::Jmp(
-                ~dst=dst.substitute_var(reg_mapping),
+                ~dst=dst.substitute_var(alloc),
                 ~cond=cond,
             )
             LIR::Label(_) => self.insts[i]
@@ -454,6 +463,10 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
     fn get_reg(loc: Loc) -> Reg!InstLoweringError {
         match loc {
             Loc::Reg(reg) => reg
+            Loc::Mem(~offset=_) => {
+                println("TODO: handle variables in memory")
+                abort("memory access")
+            }
             _ => raise InstLoweringError::InvalidLoc(loc)
         }
     }
