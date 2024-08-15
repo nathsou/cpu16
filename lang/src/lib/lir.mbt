@@ -170,7 +170,7 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
 }
 
 // TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
-pub fn liveness_intervals(self: LIRBuilder) -> Map[IRVarId, (Int, Int)] {
+pub fn liveness_intervals(self: LIRBuilder) -> Array[LivenessInterval] {
     let intervals: Map[IRVarId, (Int, Int)] = Map::new()
 
     for i = 0; i < self.insts.length(); i = i + 1 {
@@ -190,71 +190,103 @@ pub fn liveness_intervals(self: LIRBuilder) -> Map[IRVarId, (Int, Int)] {
         }
     }
 
-    intervals
+    let liveness_intervals: Array[LivenessInterval] = []
+
+    for var_id, interval in intervals {
+        liveness_intervals.push({ var_id, start: interval.0, end: interval.1 })
+    }
+
+    liveness_intervals
 }
 
 type! RegAllocationError String derive (Show)
 
-fn remove_associative_array[K: Eq, V](array: Array[(K, V)], key: K) -> Unit {
-    match array.find_index(fn (x) { x.0 == key }) {
+struct SortedArray[T] {
+    values: Array[T]
+    lss: (T, T) -> Bool
+}
+
+fn SortedArray::new[T](lss: (T, T) -> Bool) -> SortedArray[T] {
+    { values: [], lss }
+}
+
+fn remove[T: Eq](self: SortedArray[T], value: T) -> Unit {
+    match self.values.find_index(fn (x) { x == value }) {
         Some(idx) => {
-            array.swap(idx, array.length() - 1)
-            let _ = array.pop_exn()
+            self.values.swap(idx, self.values.length() - 1)
+            let _ = self.values.pop_exn()
         }
         None => ()
     }
 }
 
-fn insert_associative_array[K: Eq, V](array: Array[(K, V)], ~key: K, ~value: V, ~lss: (V, V) -> Bool) -> Unit {
-    match array.find_index(fn (x) { lss(x.1, value) }) {
+fn insert[T: Eq](self: SortedArray[T], value: T) -> Unit {
+    match self.values.find_index(fn (x) { (self.lss)(x, value) }) {
         Some(idx) => {
-            array.insert(idx, (key, value))
+            self.values.insert(idx, value)
         }
         None => {
-            array.push((key, value))
+            self.values.push(value)
         }
     }
 }
 
+struct LivenessInterval {
+    var_id: IRVarId
+    start: Int
+    end: Int
+} derive (Eq)
+
+// Linear scan register allocation
+// TODO: Graph coloring register allocation
 pub fn allocate_registers(self: LIRBuilder, ~regs_count: Int) -> Map[IRVarId, Int] {
     let intervals = self.liveness_intervals()
     let reg_alloc: Map[IRVarId, Int] = Map::new()
-    let active: Array[(Int, (Int, Int))] = []
+    let mem_alloc: Map[IRVarId, Int] = Map::new()
+    let active: SortedArray[LivenessInterval] = SortedArray::new(fn (a, b) { a.end < b.end })
     let free_regs: Array[Int] = []
 
     for i = regs_count - 1; i >= 0; i = i - 1 {
         free_regs.push(i)
     }
 
-    fn expire_old_intervals(interval_end: Int) -> Unit {
-        active.eachi(fn (j, entry) {
-            let (reg, interval) = entry
-            let (_, end) = interval
-
-            if interval_end > end {
-                remove_associative_array(active, j)
-                free_regs.push(reg)
+    fn expire_old_intervals(expired_interval: LivenessInterval) -> Unit {
+        for i = 0; i < active.values.length(); i = i + 1 {
+            let interval = active.values[i]
+            if interval.end < expired_interval.start {
+                active.remove(interval)
+                free_regs.push(reg_alloc[interval.var_id].unwrap())
             }
-        })
+        }
     }
 
-    intervals.each(fn (var_id, interval) {
-        let (_, end) = interval
-        expire_old_intervals(end)
+    fn spill_at_interval(interval: LivenessInterval) -> Unit {
+        let spill_candidate = active.values.last().unwrap()
+        let new_mem_loc = mem_alloc.size()
+        
+        if spill_candidate.end > interval.end {
+            reg_alloc[interval.var_id] = reg_alloc[spill_candidate.var_id].unwrap() 
+            mem_alloc[spill_candidate.var_id] = new_mem_loc
+            active.remove(spill_candidate)
+        } else {
+            mem_alloc[interval.var_id] = new_mem_loc
+        }
+    }
 
-        if active.length() >= regs_count {
-            abort("TODO: implement SpillAtInterval")
+    let intervals_sorted_by_start = intervals.copy()
+    intervals_sorted_by_start.sort_by(fn (a, b) { a.start - b.start })
+
+    for interval in intervals_sorted_by_start {
+        expire_old_intervals(interval)
+
+        if active.values.length() >= regs_count {
+            spill_at_interval(interval)
         } else {
             let reg = free_regs.pop_exn()
-            reg_alloc[var_id] = reg
-            insert_associative_array(
-                active,
-                ~key=reg,
-                ~value=interval,
-                ~lss=fn (x, y) { x.1 < y.1 }
-            )
+            reg_alloc[interval.var_id] = reg
+            active.insert(interval)
         }
-    })
+    }
 
     reg_alloc
 }
