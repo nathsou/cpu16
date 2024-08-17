@@ -7,14 +7,14 @@ pub struct Env[K, T] {
 pub fn Env::new[K, T]() -> Env[K, T] {
     {
         parent: None,
-        bindings: Map::new()
+        bindings: Map::new(),
     }
 }
 
 pub fn child[K, T](self: Env[K, T]) -> Env[K, T] {
     {
         parent: Some(self),
-        bindings: Map::new()
+        bindings: Map::new(),
     }
 }
 pub fn bind[K: Eq + Hash, T](self: Env[K, T], name: K, value: T) -> Unit {

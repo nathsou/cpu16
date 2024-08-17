@@ -249,7 +249,7 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
 
 pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
     match stmt {
-        Stmt::Let(~name, ~value) => {
+        Stmt::Let(~name, ~mutable=_, ~value) => {
             let value = self.lower_expr!(value)
             let var_id = self.next_var()
             self.env.bind(name, var_id)
@@ -257,6 +257,23 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
         }
         Stmt::Semi(expr) => {
             let _ = self.lower_expr!(expr)
+        }
+        Stmt::Assign(~lhs, ~rhs) => {
+            let rhs = self.lower_expr!(rhs)
+
+            match lhs {
+                Expr::Var(name) => {
+                    match self.env.lookup(name) {
+                        Some(var_id) => self.emit_assign(var_id, rhs)
+                        None => {
+                            raise TACLoweringError("undefined variable: '\{name}'")
+                        }
+                    }
+                }
+                _ => {
+                    raise TACLoweringError("expected variable on the left-hand side of assignment")
+                }
+            }
         }
     }
 }

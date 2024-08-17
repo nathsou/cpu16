@@ -31,6 +31,7 @@ pub enum Token {
     If
     Else
     Let
+    Var
     True
     False
     Identifier(String)
@@ -280,6 +281,7 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
 
                 Some(match identifier {
                     "let" => Token::Let
+                    "var" => Token::Var
                     "fn" => Token::Fn
                     "u16" => Token::U16
                     "u8" => Token::U8

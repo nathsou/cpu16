@@ -3,8 +3,13 @@ pub enum Type {
     U8; U16; Bool; Unit
 } derive (Show, Eq)
 
+pub struct VarInfo {
+    ty: Type
+    mutable: Bool
+}
+
 pub struct TypeChecker {
-    env: Env[String, Type]
+    env: Env[String, VarInfo]
 }
 
 pub fn TypeChecker::new() -> TypeChecker {
@@ -14,6 +19,7 @@ pub fn TypeChecker::new() -> TypeChecker {
 }
 
 type! TypeError String derive (Show)
+
 pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
     match expr {
         Expr::Const(c) => match c {
@@ -25,7 +31,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
         }
         Expr::Var(name) => {
             match self.env.lookup(name) {
-                Some(ty) => ty
+                Some({ ty, .. }) => ty
                 None => raise TypeError("Undefined variable: '\{name}'")
             }
         }
@@ -103,12 +109,33 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
 
 pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
     match stmt {
-        Stmt::Let(~name, ~value) => {
+        Stmt::Let(~name, ~mutable, ~value) => {
             let valTy = self.type_expr!(value)
-            self.env.bind(name, valTy)
+            self.env.bind(name, { ty: valTy, mutable })
         }
         Stmt::Semi(expr) => {
             let _ = self.type_expr!(expr)
+        }
+        Stmt::Assign(~lhs, ~rhs) => {
+            match lhs {
+                Expr::Var(name) => {
+                    match self.env.lookup(name) {
+                        Some({ ty, mutable }) => {
+                            if mutable {
+                                let rhsTy = self.type_expr!(rhs)
+
+                                if ty != rhsTy {
+                                    raise TypeError("Incompatible types in assignment for \{name}: '\{ty}' and '\{rhsTy}'")
+                                }
+                            } else {
+                                raise TypeError("Cannot assign to immutable variable: '\{name}'")
+                            }
+                        }
+                        None => raise TypeError("Undefined variable: '\{name}'")
+                    }
+                }
+                _ => raise TypeError("Invalid assignment target: '\{lhs}'")
+            }
         }
     }
 }

@@ -31,7 +31,7 @@ fn expect(self: Parser, expected: Token) -> Unit!ParserError {
             if token == expected {
                 self.advance()
             } else {
-                raise ParserError("unexpected token")
+                raise ParserError("unexpected token: '\{token}', expected '\{expected}'")
             }
         }
         _ => {
@@ -249,8 +249,15 @@ fn parse_primary_expr(self: Parser) -> Expr!ParserError {
 
 pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
     match self.peek() {
-        Some(Token::Let) => self.parse_let_stmt!()
-        _ => self.parse_expr_stmt!()
+        Some(Token::Let) => {
+            self.advance()
+            self.parse_let_stmt!(~mutable=false)
+        }
+        Some(Token::Var) => {
+            self.advance()
+            self.parse_let_stmt!(~mutable=true)
+        }
+        _ => self.parse_assignment_stmt!()
     }
 }
 
@@ -264,17 +271,30 @@ pub fn parse_stmts(self: Parser) -> Array[Stmt]!ParserError {
     stmts
 }
 
-fn parse_expr_stmt(self: Parser) -> Stmt!ParserError {
-    let expr = self.parse_expr!()
-    self.expect!(Token::Semicolon)
-    Stmt::Semi(expr)
+fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
+    let lhs = self.parse_expr!()
+    
+    match self.peek() {
+        Some(Token::Equal) => {
+            self.advance()
+            let rhs = self.parse_expr!()
+            self.expect!(Token::Semicolon)
+            Stmt::Assign(~lhs, ~rhs)
+        }
+        Some(Token::Semicolon) => {
+            self.advance()
+            Stmt::Semi(lhs)
+        }
+        _ => {
+            raise ParserError("expected assignment or expression statement")
+        }
+    }
 }
 
-fn parse_let_stmt(self: Parser) -> Stmt!ParserError {
-    self.expect!(Token::Let)
+fn parse_let_stmt(self: Parser, ~mutable: Bool) -> Stmt!ParserError {
     let name = self.identifier!()
     self.expect!(Token::Equal)
     let value = self.parse_expr!()
     self.expect!(Token::Semicolon)
-    Stmt::Let(~name, ~value)
+    Stmt::Let(~name, ~mutable, ~value)
 }

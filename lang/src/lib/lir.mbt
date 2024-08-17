@@ -471,9 +471,7 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
         }
     }
 
-    for i = 0; i < self.insts.length(); i = i + 1 {
-        let inst = self.insts[i]
-
+    for inst in self.insts {
         match inst {
             LIR::Ctl(~op) => {
                 insts.push(Inst::Ctl(~op=op))
