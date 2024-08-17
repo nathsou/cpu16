@@ -241,8 +241,11 @@ fn parse_primary_expr(self: Parser) -> Expr!ParserError {
             self.advance()
             Expr::Var(name)
         }
+        Some(token) => {
+            raise ParserError("Expected primary expression, got '\{token}'")
+        }
         _ => {
-            raise ParserError("expected primary expression")
+            raise ParserError("Expected primary expression, got <EOF>")
         }
     }
 }
@@ -256,6 +259,10 @@ pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
         Some(Token::Var) => {
             self.advance()
             self.parse_let_stmt!(~mutable=true)
+        }
+        Some(Token::While) => {
+            self.advance()
+            self.parse_while_stmt!()
         }
         _ => self.parse_assignment_stmt!()
     }
@@ -297,4 +304,18 @@ fn parse_let_stmt(self: Parser, ~mutable: Bool) -> Stmt!ParserError {
     let value = self.parse_expr!()
     self.expect!(Token::Semicolon)
     Stmt::Let(~name, ~mutable, ~value)
+}
+
+fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
+    let cond = self.parse_expr!()
+    self.expect!(Token::Lbrace)
+
+    let body = []
+    while self.peek() != Some(Token::Rbrace) {
+        let stmt = self.parse_stmt!()
+        body.push(stmt)
+    }
+    
+    self.expect!(Token::Rbrace)
+    Stmt::While(~cond, ~body)
 }

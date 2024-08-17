@@ -32,6 +32,7 @@ pub enum Token {
     Else
     Let
     Var
+    While
     True
     False
     Identifier(String)
@@ -289,6 +290,7 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
                     "else" => Token::Else
                     "true" => Token::True
                     "false" => Token::False
+                    "while" => Token::While
                     _ => Token::Identifier(identifier)
                 })
             } else {

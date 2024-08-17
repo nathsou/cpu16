@@ -53,8 +53,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
             let rhs_ty = self.type_expr!(rhs)
 
             match op {
-                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod |
-                BinaryOp::Lss | BinaryOp::Gtr | BinaryOp::Leq | BinaryOp::Geq => {  
+                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
                     if lhs_ty == Type::U8 && rhs_ty == Type::U8 {
                         Type::U8
                     } else if lhs_ty == Type::U16 && rhs_ty == Type::U16 {
@@ -70,7 +69,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
                         raise TypeError("expected boolean operands in binary logical op")
                     }
                 }
-                BinaryOp::Equ | BinaryOp::Neq => {
+                BinaryOp::Equ | BinaryOp::Neq | BinaryOp::Lss | BinaryOp::Leq | BinaryOp::Gtr | BinaryOp::Geq => {
                     if lhs_ty == rhs_ty {
                         Type::Bool
                     } else {
@@ -135,6 +134,17 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
                     }
                 }
                 _ => raise TypeError("Invalid assignment target: '\{lhs}'")
+            }
+        }
+        Stmt::While(~cond, ~body) => {
+            let condTy = self.type_expr!(cond)
+
+            if condTy != Type::Bool {
+                raise TypeError("expected boolean condition in while loop")
+            }
+
+            for stmt in body {
+                self.type_stmt!(stmt)
             }
         }
     }

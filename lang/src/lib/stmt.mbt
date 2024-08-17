@@ -4,6 +4,17 @@ pub enum Stmt {
     // Expr(Expr) // expr without semicolon
     Semi(Expr) // expr with a trailing semicolon
     Assign(~lhs: Expr, ~rhs: Expr)
+    While(~cond: Expr, ~body: Array[Stmt])
+}
+
+fn show_stmts(stmts: Array[Stmt]) -> String {
+    let s = []
+
+    for stmt in stmts {
+        s.push(stmt.to_string())
+    }
+
+    s.join("\n")
 }
 
 pub fn to_string(self: Stmt) -> String {
@@ -15,5 +26,6 @@ pub fn to_string(self: Stmt) -> String {
         // Stmt::Expr(expr) => expr.to_string()
         Stmt::Semi(expr) => "\{expr};"
         Stmt::Assign(~lhs, ~rhs) => "\{lhs} = \{rhs};"
+        Stmt::While(~cond, ~body) => "while \{cond} \n{" + show_stmts(body) + "\n}"
     }
 }

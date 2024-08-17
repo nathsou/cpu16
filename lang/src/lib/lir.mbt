@@ -81,11 +81,6 @@ pub struct LIRBuilder {
 
 pub type! LIRBuilderError String derive (Show)
 
-fn raisep(msg: String) -> Unit!LIRBuilderError {
-    println(msg)
-    raise LIRBuilderError(msg)
-}
-
 pub fn LIRBuilder::from(ir_builder: IRBuilder) -> LIRBuilder {
     {
         insts: [],
@@ -113,7 +108,7 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
             let val_uint = val.to_uint()
 
             if val_uint >= 4096 {
-                raisep!("TODO: implement large constant lowering")
+                raise LIRBuilderError("TODO: implement large constant lowering")
             }
 
             self.emit(LIR::Set(~dst=Loc::Var(dst), ~val=val_uint))
@@ -134,25 +129,25 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
             self.emit(LIR::Alu(~dst=Loc::Var(dst), ~src1=Loc::Var(src1), ~src2=Loc::Var(src2), ~op=AluOp::Sub))
         }
         IR::Mul(..) => {
-            raisep!("TODO: implement Mul")
+            raise LIRBuilderError("TODO: implement Mul")
         }
         IR::Div(..) => {
-            raisep!("TODO: implement Div")
+            raise LIRBuilderError("TODO: implement Div")
         }
         IR::Mod(..) => {
-            raisep!("TODO: implement Mod")
+            raise LIRBuilderError("TODO: implement Mod")
         }
         IR::Not(..) => {
-            raisep!("TODO: implement Not")
+            raise LIRBuilderError("TODO: implement Not")
         }
         IR::And(..) => {
-            raisep!("TODO: implement And")
+            raise LIRBuilderError("TODO: implement And")
         }
         IR::Or(..) => {
-            raisep!("TODO: implement Or")
+            raise LIRBuilderError("TODO: implement Or")
         }
         IR::Xor(..) => {
-            raisep!("TODO: implement Xor")
+            raise LIRBuilderError("TODO: implement Xor")
         }
         IR::Jump(~label) => {
             self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=None))
@@ -167,8 +162,22 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
                     self.emit(LIR::Alu(~dst=Loc::Reg(Reg::Z), ~src1=Loc::Var(lhs), ~src2=Loc::Var(rhs), ~op=AluOp::Sub))
                     self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=Some(LIRCond::IfNotZero)))
                 }
-                _ => {
-                    raisep!("TODO: implement other conditions")
+                TACCond::Lss => {
+                    self.emit(LIR::Alu(~dst=Loc::Reg(Reg::Z), ~src1=Loc::Var(lhs), ~src2=Loc::Var(rhs), ~op=AluOp::Sub))
+                    self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=Some(LIRCond::IfNotCarry)))
+                }
+                TACCond::Gtr => {
+                    self.emit(LIR::Alu(~dst=Loc::Reg(Reg::Z), ~src1=Loc::Var(lhs), ~src2=Loc::Var(rhs), ~op=AluOp::Sub))
+                    self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=Some(LIRCond::IfCarry)))
+                }
+                TACCond::Geq => {
+                    self.emit(LIR::Alu(~dst=Loc::Reg(Reg::Z), ~src1=Loc::Var(rhs), ~src2=Loc::Var(lhs), ~op=AluOp::Sub))
+                    self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=Some(LIRCond::IfNotCarry)))
+                }
+                TACCond::Leq => {
+                    // reverse lhs and rhs
+                    self.emit(LIR::Alu(~dst=Loc::Reg(Reg::Z), ~src1=Loc::Var(rhs), ~src2=Loc::Var(lhs), ~op=AluOp::Sub))
+                    self.emit(LIR::Jmp(~dst=Loc::Label(label), ~cond=Some(LIRCond::IfCarry)))
                 }
             }
         }
@@ -328,8 +337,8 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
                     }
                 }
 
-                without_jumps.push(LIR::Set(~dst=Loc::Var(jmp_offset_var_id), ~val=0U)) // placeholder
                 jump_offsets_to_fix[without_jumps.length()] = label
+                without_jumps.push(LIR::Set(~dst=Loc::Var(jmp_offset_var_id), ~val=0U)) // placeholder
                 without_jumps.push(LIR::Alu(
                     ~dst=Loc::Reg(Reg::PC),
                     ~src1=Loc::Reg(Reg::PC),
@@ -359,7 +368,7 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
         let mut delta_backward = 0U
 
         for i = 0; i < max_offset; i = i + 1 {
-            if index + 1 < without_jumps.length() {
+            if index + i < without_jumps.length() {
                 let inst_forward = without_jumps[index + i]
 
                 match inst_forward {
@@ -398,11 +407,11 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
     // Fix jump offsets
     for index, label in jump_offsets_to_fix {
         let offset = compute_relative_offset(index, label)
-        let inst = without_jumps[index - 1]
+        let inst = without_jumps[index]
 
         match inst {
             LIR::Set(~dst=Loc::Var(var_id), ~val=_) => {
-                without_jumps[index - 1] = LIR::Set(~dst=Loc::Var(var_id), ~val=offset)
+                without_jumps[index] = LIR::Set(~dst=Loc::Var(var_id), ~val=offset)
             }
             _ => {
                 abort("unexpected instruction during jump offset fixing")
@@ -503,6 +512,9 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
             }
         }
     }
+
+    // halt
+    insts.push(Inst::Ctl(~op=ControlOp::Halt))
 
     insts
 }

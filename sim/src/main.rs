@@ -1,4 +1,4 @@
-use std::{fmt::format, io::Write};
+use std::{fmt::format, io::{Read, Write}};
 
 use asm::Assembler;
 use isa::Reg;
@@ -458,13 +458,26 @@ fn disassemble(prog: &[u16], disasm_path: &str) {
     }
 }
 
+fn read_bin_file(bin_path: &str) -> std::io::Result<[u16; 65536]> {
+    let mut bin = [0u16; 65536];
+
+    let mut file = std::fs::File::open(bin_path).expect("failed to open bin file");
+    let mut temp_buffer = [0u8; 131072]; // 128kB = 131072 bytes
+    file.read_exact(&mut temp_buffer)?;
+    
+    // Convert the u8 buffer to u16 array
+    for (i, chunk) in temp_buffer.chunks_exact(2).enumerate() {
+        bin[i] = u16::from_le_bytes([chunk[0], chunk[1]]);
+    }
+
+    Ok(bin)
+}
+
 fn main() {
     // let prog = lab();
     // dump_bin(&prog, "lab.bin");
-    let prog: [u16; 3] = [
-        0x4803, 0x5007, 0xd940,
-    ];
+    let prog = read_bin_file("../lang/out.bin").expect("failed to read bin file");
 
-    let mut cpu = CPU::from(&prog, 0);
+    let mut cpu = CPU::new(prog, START_PC);
     cpu.run_with_fuel(1000, true);
 }

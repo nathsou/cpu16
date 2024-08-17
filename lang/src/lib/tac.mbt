@@ -153,6 +153,31 @@ fn emit_jump(self: TACBuilder, label: TACLabel) -> Unit {
 
 type! TACLoweringError String derive (Show)
 
+fn temp_get_comparison_cond(cond: Expr) -> (TACCond, Expr, Expr)!TACLoweringError {
+        let (cond_op, cond_lhs, cond_rhs) = match cond {
+        Expr::BinaryOp(lhs, op, rhs) => {
+            match op {
+                BinaryOp::Equ => (TACCond::Equ, lhs, rhs)
+                BinaryOp::Neq => (TACCond::Neq, lhs, rhs)
+                BinaryOp::Lss => (TACCond::Lss, lhs, rhs)
+                BinaryOp::Leq => (TACCond::Leq, lhs, rhs)
+                BinaryOp::Gtr => (TACCond::Gtr, lhs, rhs)
+                BinaryOp::Geq => (TACCond::Geq, lhs, rhs)
+                _ => {
+                    println("expected comparison operator in condition")
+                    raise TACLoweringError("expected comparison operator in condition")
+                }
+            }
+        }
+        _ => {
+            println("TODO: implement if with non-comparison condition")
+            raise TACLoweringError("TODO: implement conditions with non-comparison operators")
+        }
+    }
+
+    (cond_op, cond_lhs, cond_rhs)
+}
+
 pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
     match expr {
         Expr::Const(c) => {
@@ -196,27 +221,7 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
             TACValue::Variable(target)
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let (cond_op, cond_lhs, cond_rhs) = match cond {
-                Expr::BinaryOp(lhs, op, rhs) => {
-                    match op {
-                        BinaryOp::Equ => (TACCond::Equ, lhs, rhs)
-                        BinaryOp::Neq => (TACCond::Neq, lhs, rhs)
-                        BinaryOp::Lss => (TACCond::Lss, lhs, rhs)
-                        BinaryOp::Leq => (TACCond::Leq, lhs, rhs)
-                        BinaryOp::Gtr => (TACCond::Gtr, lhs, rhs)
-                        BinaryOp::Geq => (TACCond::Geq, lhs, rhs)
-                        _ => {
-                            println("expected comparison operator in if condition")
-                            raise TACLoweringError("expected comparison operator in if condition")
-                        }
-                    }
-                }
-                _ => {
-                    println("TODO: implement if with non-comparison condition")
-                    raise TACLoweringError("TODO: implement if with non-comparison condition")
-                }
-            }
-
+            let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond!(cond)
             let cond_lhs = self.lower_expr!(cond_lhs)
             let cond_rhs = self.lower_expr!(cond_rhs)
             let ret = self.next_var()
@@ -274,6 +279,22 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
                     raise TACLoweringError("expected variable on the left-hand side of assignment")
                 }
             }
+        }
+        Stmt::While(~cond, ~body) => {
+            let start_label = self.next_label()
+            let end_label = self.next_label()
+            self.def_label(start_label)
+            let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond!(cond)
+            let cond_lhs = self.lower_expr!(cond_lhs)
+            let cond_rhs = self.lower_expr!(cond_rhs)
+            self.emit_jump_if(end_label, cond_op.negate(), cond_lhs, cond_rhs)
+
+            for stmt in body {
+                self.lower_stmt!(stmt)
+            }
+
+            self.emit_jump(start_label)
+            self.def_label(end_label)
         }
     }
 }
