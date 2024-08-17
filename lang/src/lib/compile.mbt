@@ -16,21 +16,25 @@ pub fn compile(source: String, ~verbose: Bool = false) -> FixedArray[UInt]!Error
   }
 
   let parser = Parser::new(tokens)
-  let expr = parser.parse_expr!()
+  let stmts = parser.parse_stmts!()
   let type_checker = TypeChecker::new()
-  let ty = type_checker.expr_type!(expr)
+
+  for stmt in stmts {
+    let _ = type_checker.type_stmt!(stmt)
+  }
+
   let tac_builder = TACBuilder::new()
-  let tac_ret = tac_builder.lower_expr!(expr)
+  
+  for stmt in stmts {
+    tac_builder.lower_stmt!(stmt)
+  }
 
   if verbose {
-    println("\{expr}: \{ty}\n")
     println("TAC:")
 
     for tac in tac_builder.tac {
       println(TAC::to_string(tac))
     }
-
-    println("\nret = \{tac_ret}")
   }
 
   let ir_builder = IRBuilder::new()

@@ -39,6 +39,7 @@ pub fn to_string(self: Const) -> String {
 
 pub enum Expr {
     Const(Const)
+    Var(String)
     UnaryOp(UnaryOp, Expr)
     BinaryOp(Expr, BinaryOp, Expr)
     If(Expr, Expr, Option[Expr])
@@ -47,6 +48,7 @@ pub enum Expr {
 pub fn to_string(self: Expr) -> String {
     match self {
         Expr::Const(c) => c.to_string()
+        Expr::Var(name) => name
         Expr::UnaryOp(op, arg) => {
             let arg = arg.to_string()
             match op {

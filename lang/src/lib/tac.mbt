@@ -89,6 +89,7 @@ pub fn to_string(self: TAC) -> String {
 
 pub struct TACBuilder {
     tac: Array[TAC]
+    env: Env[String, TACId]
     mut next_var_id: TACId
     mut next_label_id: TACLabel
 }
@@ -96,6 +97,7 @@ pub struct TACBuilder {
 pub fn TACBuilder::new() -> TACBuilder {
     {
         tac: [],
+        env: Env::new(),
         next_var_id: 0U,
         next_label_id: 0U,
     }
@@ -155,6 +157,14 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
+        }
+        Expr::Var(name) => {
+            match self.env.lookup(name) {
+                Some(var_id) => TACValue::Variable(var_id)
+                None => {
+                    raise TACLoweringError("undefined variable: '\{name}'")
+                }
+            }
         }
         Expr::UnaryOp(op, arg) => {
             let arg = self.lower_expr!(arg)
@@ -233,6 +243,20 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
             }
 
             TACValue::Variable(ret)
+        }
+    }
+}
+
+pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
+    match stmt {
+        Stmt::Let(~name, ~value) => {
+            let value = self.lower_expr!(value)
+            let var_id = self.next_var()
+            self.env.bind(name, var_id)
+            self.emit_assign(var_id, value)
+        }
+        Stmt::Semi(expr) => {
+            let _ = self.lower_expr!(expr)
         }
     }
 }

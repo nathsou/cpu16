@@ -30,6 +30,7 @@ pub enum Token {
     U8
     If
     Else
+    Let
     True
     False
     Identifier(String)
@@ -278,6 +279,7 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
                 let identifier = self.parse_identifier()
 
                 Some(match identifier {
+                    "let" => Token::Let
                     "fn" => Token::Fn
                     "u16" => Token::U16
                     "u8" => Token::U8

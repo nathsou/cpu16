@@ -35,7 +35,7 @@ fn expect(self: Parser, expected: Token) -> Unit!ParserError {
             }
         }
         _ => {
-            raise ParserError("unexpected end of input")
+            raise ParserError("Expected \{expected}, got <EOF>")
         }
     }
 }
@@ -237,8 +237,44 @@ fn parse_primary_expr(self: Parser) -> Expr!ParserError {
             self.advance()
             Expr::Const(Const::Boolean(false))
         }
+        Some(Token::Identifier(name)) => {
+            self.advance()
+            Expr::Var(name)
+        }
         _ => {
             raise ParserError("expected primary expression")
         }
     }
+}
+
+pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
+    match self.peek() {
+        Some(Token::Let) => self.parse_let_stmt!()
+        _ => self.parse_expr_stmt!()
+    }
+}
+
+pub fn parse_stmts(self: Parser) -> Array[Stmt]!ParserError {
+    let stmts = []
+
+    while self.index < self.tokens.length() {
+        stmts.push(self.parse_stmt!())
+    }
+
+    stmts
+}
+
+fn parse_expr_stmt(self: Parser) -> Stmt!ParserError {
+    let expr = self.parse_expr!()
+    self.expect!(Token::Semicolon)
+    Stmt::Semi(expr)
+}
+
+fn parse_let_stmt(self: Parser) -> Stmt!ParserError {
+    self.expect!(Token::Let)
+    let name = self.identifier!()
+    self.expect!(Token::Equal)
+    let value = self.parse_expr!()
+    self.expect!(Token::Semicolon)
+    Stmt::Let(~name, ~value)
 }

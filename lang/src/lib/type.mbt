@@ -3,10 +3,8 @@ pub enum Type {
     U8; U16; Bool; Unit
 } derive (Show, Eq)
 
-type TypeEnv Env[String, Type]
-
 pub struct TypeChecker {
-    env: TypeEnv
+    env: Env[String, Type]
 }
 
 pub fn TypeChecker::new() -> TypeChecker {
@@ -16,7 +14,7 @@ pub fn TypeChecker::new() -> TypeChecker {
 }
 
 type! TypeError String derive (Show)
-pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
+pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
     match expr {
         Expr::Const(c) => match c {
             Const::Integer(_, kind) => match kind {
@@ -25,8 +23,14 @@ pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
             Const::Boolean(_) => Type::Bool
         }
+        Expr::Var(name) => {
+            match self.env.lookup(name) {
+                Some(ty) => ty
+                None => raise TypeError("Undefined variable: '\{name}'")
+            }
+        }
         Expr::UnaryOp(op, rhs) => {
-            let rhs_ty = self.expr_type!(rhs)
+            let rhs_ty = self.type_expr!(rhs)
 
             match op {
                 UnaryOp::Not => {
@@ -39,8 +43,8 @@ pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
         }
         Expr::BinaryOp(lhs, op, rhs) => {
-            let lhs_ty = self.expr_type!(lhs)
-            let rhs_ty = self.expr_type!(rhs)
+            let lhs_ty = self.type_expr!(lhs)
+            let rhs_ty = self.type_expr!(rhs)
 
             match op {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod |
@@ -70,13 +74,13 @@ pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let cond_ty = self.expr_type!(cond)
-            let then_ty = self.expr_type!(then_expr)
+            let cond_ty = self.type_expr!(cond)
+            let then_ty = self.type_expr!(then_expr)
 
             if cond_ty == Type::Bool {
                 match else_expr {
                     Some(else_expr) => {
-                        let else_ty = self.expr_type!(else_expr)
+                        let else_ty = self.type_expr!(else_expr)
 
                         if then_ty == else_ty {
                             then_ty
@@ -93,6 +97,18 @@ pub fn expr_type(self: TypeChecker, expr: Expr) -> Type!TypeError {
             } else {
                 raise TypeError("expected boolean condition in if expression")
             }
+        }
+    }
+}
+
+pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
+    match stmt {
+        Stmt::Let(~name, ~value) => {
+            let valTy = self.type_expr!(value)
+            self.env.bind(name, valTy)
+        }
+        Stmt::Semi(expr) => {
+            let _ = self.type_expr!(expr)
         }
     }
 }
