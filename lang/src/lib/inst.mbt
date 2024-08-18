@@ -1,6 +1,6 @@
 
 pub enum Reg {
-  Z; R1; R2; R3; R4; R5; SP; PC
+  Z; R1; R2; R3; R4; R5; R6; PC
 } derive (Show, Eq)
 
 pub enum ControlOp {
@@ -41,7 +41,7 @@ impl Encode for Reg with encode(reg) -> UInt {
     R3 => 3
     R4 => 4
     R5 => 5
-    SP => 6
+    R6 => 6
     PC => 7
   }
 }

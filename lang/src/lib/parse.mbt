@@ -68,6 +68,33 @@ fn identifier(self: Parser) -> String!ParserError {
     }
 }
 
+fn parse_type(self: Parser) -> Type!ParserError {
+    match self.peek() {
+        Some(Token::U8) => {
+            self.advance()
+            Type::U8
+        }
+        Some(Token::U16) => {
+            self.advance()
+            Type::U16
+        }
+        Some(Token::Identifier("bool")) => {
+            self.advance()
+            Type::Bool
+        }
+        Some(Token::Identifier("unit")) => {
+            self.advance()
+            Type::Unit
+        }
+        Some(token) => {
+            raise ParserError("expected type, got '\{token}'")
+        }
+        _ => {
+            raise ParserError("expected type, got <EOF>")
+        }
+    }
+}
+
 pub fn parse_expr(self: Parser) -> Expr!ParserError {
     self.parse_if_expr!()
 }
@@ -318,4 +345,48 @@ fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
     
     self.expect!(Token::Rbrace)
     Stmt::While(~cond, ~body)
+}
+
+pub fn parse_decl(self: Parser) -> Decl!ParserError {
+    match self.peek() {
+        Some(Token::Fn) => {
+            self.advance()
+            self.parse_fn_decl!()
+        }
+        _ => {
+            Decl::Stmt(self.parse_stmt!())
+        }
+    }
+}
+
+fn parse_fn_decl(self: Parser) -> Decl!ParserError {
+    let name = self.identifier!()
+    self.expect!(Token::Lparen)
+    let arguments = []
+
+    while self.peek() != Some(Token::Rparen) {
+        let argName = self.identifier!()
+        self.expect!(Token::Colon)
+        let argType = self.parse_type!()
+        arguments.push({ name: argName, ty: argType })
+
+        if self.consumes(Token::Comma) {
+            continue
+        } else {
+            break
+        }
+    }
+
+    self.expect!(Token::Rparen)
+    let returnType = if self.consumes(Token::Colon) {
+        self.parse_type!()
+    } else {
+        Type::Unit
+    }
+
+    self.expect!(Token::Lbrace)
+    let body = self.parse_stmts!()
+    self.expect!(Token::Rbrace)
+
+    Decl::Func(~name, ~arguments, ~returnType, ~body)
 }
