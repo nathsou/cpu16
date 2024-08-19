@@ -43,6 +43,7 @@ pub enum Expr {
     UnaryOp(UnaryOp, Expr)
     BinaryOp(Expr, BinaryOp, Expr)
     If(Expr, Expr, Option[Expr])
+    Call(String, Array[Expr])
 }
 
 pub fn to_string(self: Expr) -> String {
@@ -85,6 +86,10 @@ pub fn to_string(self: Expr) -> String {
                 }
                 None => "if " + cond + " { " + then_expr + " }"
             }
+        }
+        Expr::Call(name, params) => {
+            let params_str = params.map(fn (param) { param.to_string() }).join(", ")
+            name + "(" + params_str + ")"
         }
     }
 }

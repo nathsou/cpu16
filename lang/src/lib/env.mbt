@@ -17,7 +17,7 @@ pub fn child[K, T](self: Env[K, T]) -> Env[K, T] {
         bindings: Map::new(),
     }
 }
-pub fn bind[K: Eq + Hash, T](self: Env[K, T], name: K, value: T) -> Unit {
+pub fn declare[K: Eq + Hash, T](self: Env[K, T], name: K, value: T) -> Unit {
     self.bindings[name] = value
 }
 

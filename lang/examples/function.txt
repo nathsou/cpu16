@@ -1,0 +1,7 @@
+
+fn add(a: u16, b: u16): u16 {
+    return a + b;
+}
+
+let a = 3 + 7;
+let c = add(a, 2);

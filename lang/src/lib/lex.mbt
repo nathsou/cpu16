@@ -35,6 +35,7 @@ pub enum Token {
     While
     True
     False
+    Return
     Identifier(String)
     Integer(Int, IntKind)
 } derive(Show, Eq)
@@ -291,6 +292,7 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
                     "true" => Token::True
                     "false" => Token::False
                     "while" => Token::While
+                    "return" => Token::Return
                     _ => Token::Identifier(identifier)
                 })
             } else {

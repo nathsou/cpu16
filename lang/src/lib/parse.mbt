@@ -239,7 +239,35 @@ fn parse_unary_expr(self: Parser) -> Expr!ParserError {
         let expr = self.parse_unary_expr!()
         Expr::UnaryOp(UnaryOp::Not, expr)
     } else {
-        self.parse_primary_expr!()
+        self.parse_call_expr!()
+    }
+}
+
+// parameters ::= <expr> (',' <expr>)*
+// <primary> ('(' <parameters>? ')')?
+fn parse_call_expr(self: Parser) -> Expr!ParserError {
+    let lhs = self.parse_primary_expr!()
+
+    if self.consumes(Token::Lparen) {
+        let params = []
+        let name = match lhs {
+            Expr::Var(name) => name
+            _ => raise ParserError("expected function name in call expression")
+        }
+
+        while not(self.consumes(Token::Rparen)) {
+            let param = self.parse_expr!()
+            params.push(param)
+
+            if not(self.consumes(Token::Comma)) {
+                self.expect!(Token::Rparen)
+                break
+            }
+        }
+
+        Expr::Call(name, params)
+    } else {
+        lhs
     }
 }
 
@@ -291,18 +319,12 @@ pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
             self.advance()
             self.parse_while_stmt!()
         }
+        Some(Token::Return) => {
+            self.advance()
+            self.parse_return_stmt!()
+        }
         _ => self.parse_assignment_stmt!()
     }
-}
-
-pub fn parse_stmts(self: Parser) -> Array[Stmt]!ParserError {
-    let stmts = []
-
-    while self.index < self.tokens.length() {
-        stmts.push(self.parse_stmt!())
-    }
-
-    stmts
 }
 
 fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
@@ -347,6 +369,18 @@ fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
     Stmt::While(~cond, ~body)
 }
 
+fn parse_return_stmt(self: Parser) -> Stmt!ParserError {
+    let value = if self.consumes(Token::Semicolon) {
+        None
+    } else {
+        let expr = self.parse_expr!()
+        self.expect!(Token::Semicolon)
+        Some(expr)
+    }
+
+    Stmt::Return(~value)
+}
+
 pub fn parse_decl(self: Parser) -> Decl!ParserError {
     match self.peek() {
         Some(Token::Fn) => {
@@ -362,22 +396,21 @@ pub fn parse_decl(self: Parser) -> Decl!ParserError {
 fn parse_fn_decl(self: Parser) -> Decl!ParserError {
     let name = self.identifier!()
     self.expect!(Token::Lparen)
-    let arguments = []
+    let parameters = []
 
-    while self.peek() != Some(Token::Rparen) {
-        let argName = self.identifier!()
+    while true {
+        let param_name = self.identifier!()
         self.expect!(Token::Colon)
         let argType = self.parse_type!()
-        arguments.push({ name: argName, ty: argType })
+        parameters.push({ name: param_name, ty: argType })
 
-        if self.consumes(Token::Comma) {
-            continue
-        } else {
+        if not(self.consumes(Token::Comma)) {
             break
         }
     }
 
     self.expect!(Token::Rparen)
+
     let returnType = if self.consumes(Token::Colon) {
         self.parse_type!()
     } else {
@@ -385,8 +418,24 @@ fn parse_fn_decl(self: Parser) -> Decl!ParserError {
     }
 
     self.expect!(Token::Lbrace)
-    let body = self.parse_stmts!()
+    let body = []
+
+    while self.peek() != Some(Token::Rbrace) {
+        let stmt = self.parse_stmt!()
+        body.push(stmt)
+    }
+
     self.expect!(Token::Rbrace)
 
-    Decl::Func(~name, ~arguments, ~returnType, ~body)
+    Decl::Func(~name, ~parameters, return_type=returnType, ~body)
+}
+
+pub fn parse_decls(self: Parser) -> Array[Decl]!ParserError {
+    let decls = []
+
+    while self.index < self.tokens.length() {
+        decls.push(self.parse_decl!())
+    }
+
+    decls
 }

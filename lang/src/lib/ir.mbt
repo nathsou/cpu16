@@ -42,7 +42,7 @@ pub fn emit(self: IRBuilder, inst: IR) -> Unit {
 
 type! IRBuilderError String derive (Show)
 
-pub fn next_var(self: IRBuilder) -> IRVarId {
+fn next_var(self: IRBuilder) -> IRVarId {
     let var_id = self.next_var_id
     self.next_var_id += 1U
     var_id
@@ -80,7 +80,7 @@ fn get_or_declare(self: IRBuilder, env: Env[TACId, IRVarId], target: TACId) -> I
         Some(dst) => dst
         None => {
             let dst = self.next_var()
-            env.bind(target, dst)
+            env.declare(target, dst)
             dst
         }
     }
@@ -106,7 +106,7 @@ pub fn lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId]) -> IRVar
                 }
             }
 
-            env.bind(target, dst)
+            env.declare(target, dst)
             dst
         }
         TAC::Binary(~target, ~lhs, ~op, ~rhs) => {
@@ -125,7 +125,7 @@ pub fn lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId]) -> IRVar
                 TACBinaryOp::Xor => self.emit(IR::Xor(~dst, ~src1=lhs_id, ~src2=rhs_id))
             }
 
-            env.bind(target, dst)
+            env.declare(target, dst)
             dst
         }
         TAC::Store(~dst, ~src) => {

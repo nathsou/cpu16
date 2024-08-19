@@ -5,6 +5,7 @@ pub enum Stmt {
     Semi(Expr) // expr with a trailing semicolon
     Assign(~lhs: Expr, ~rhs: Expr)
     While(~cond: Expr, ~body: Array[Stmt])
+    Return(~value: Option[Expr])
 }
 
 fn show_stmts(stmts: Array[Stmt]) -> String {
@@ -27,5 +28,11 @@ pub fn to_string(self: Stmt) -> String {
         Stmt::Semi(expr) => "\{expr};"
         Stmt::Assign(~lhs, ~rhs) => "\{lhs} = \{rhs};"
         Stmt::While(~cond, ~body) => "while \{cond} \n{" + show_stmts(body) + "\n}"
+        Stmt::Return(~value) => {
+            match value {
+                Some(expr) => "return \{expr};"
+                None => "return;"
+            }
+        }
     }
 }

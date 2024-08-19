@@ -16,17 +16,17 @@ pub fn compile(source: String, ~verbose: Bool = false) -> FixedArray[UInt]!Error
   }
 
   let parser = Parser::new(tokens)
-  let stmts = parser.parse_stmts!()
+  let decls = parser.parse_decls!()
   let type_checker = TypeChecker::new()
 
-  for stmt in stmts {
-    let _ = type_checker.type_stmt!(stmt)
+  for decl in decls {
+    let _ = type_checker.type_decl!(decl)
   }
 
   let tac_builder = TACBuilder::new()
   
-  for stmt in stmts {
-    tac_builder.lower_stmt!(stmt)
+  for decl in decls {
+    tac_builder.lower_decl!(decl)
   }
 
   if verbose {
@@ -37,53 +37,53 @@ pub fn compile(source: String, ~verbose: Bool = false) -> FixedArray[UInt]!Error
     }
   }
 
-  let ir_builder = IRBuilder::new()
-  let env = Env::new()
+  // let ir_builder = IRBuilder::new()
+  // let env = Env::new()
 
-  for tac in tac_builder.tac {
-    let _ = ir_builder.lower_expr!(tac, env)
-  }
+  // for tac in tac_builder.tac {
+  //   let _ = ir_builder.lower_expr!(tac, env)
+  // }
 
-  if verbose {
-    println("\nIR:")
+  // if verbose {
+  //   println("\nIR:")
 
-    for inst in ir_builder.insts {
-      println(IR::to_string(inst))
-    }
-  }
+  //   for inst in ir_builder.insts {
+  //     println(IR::to_string(inst))
+  //   }
+  // }
 
-  let lir_builder = LIRBuilder::from(ir_builder)
+  // let lir_builder = LIRBuilder::from(ir_builder)
   
-  for inst in ir_builder.insts {
-    let _ = lir_builder.lower_ir!(inst)
-  }
+  // for inst in ir_builder.insts {
+  //   let _ = lir_builder.lower_ir!(inst)
+  // }
 
-  if verbose {
-    println("\nLIR:")
+  // if verbose {
+  //   println("\nLIR:")
 
-    for inst in lir_builder.insts {
-      println(LIR::to_string(inst))
-    }
-  }
+  //   for inst in lir_builder.insts {
+  //     println(LIR::to_string(inst))
+  //   }
+  // }
 
-  lir_builder.remove_labels()
-  lir_builder.allocate()
-  let insts = lir_builder.lower_lir!()
+  // lir_builder.remove_labels()
+  // lir_builder.allocate()
+  // let insts = lir_builder.lower_lir!()
 
-  if verbose {
-    println("\nAllocated LIR:")
+  // if verbose {
+  //   println("\nAllocated LIR:")
 
-    for inst in insts {
-      println(Inst::to_string(inst))
-    }
-  }
+  //   for inst in insts {
+  //     println(Inst::to_string(inst))
+  //   }
+  // }
 
   let prog = FixedArray::make(65536, 0U)
-  let start_addr = 0x8000
+  // let start_addr = 0x8000
 
-  for i, inst in insts {
-    prog[start_addr + i] = encode_inst(inst)
-  }
+  // for i, inst in insts {
+  //   prog[start_addr + i] = encode_inst(inst)
+  // }
 
   prog
 }

@@ -5,22 +5,22 @@ pub struct FunctionArgument {
 }
 
 pub enum Decl {
-  Func(~name: String, ~arguments: Array[FunctionArgument], ~returnType: Type, ~body: Array[Stmt])
+  Func(~name: String, ~parameters: Array[FunctionArgument], ~return_type: Type, ~body: Array[Stmt])
   Stmt(Stmt)
 }
 
 pub fn to_string(self: Decl) -> String {
   match self {
-    Decl::Func(~name, ~arguments, ~returnType, ~body) => {
+    Decl::Func(~name, ~parameters, ~return_type, ~body) => {
       let args = []
 
-      for arg in arguments {
-        args.push(arg.name + ": " + arg.ty.to_string())
+      for param in parameters {
+        args.push(param.name + ": " + param.ty.to_string())
       }
       
       let argsStr = args.join(", ")
       let bodyStr = show_stmts(body)
-      "fn \{name}(\{argsStr}): \{returnType} \n{" + bodyStr + "\n}"
+      "fn \{name}(\{argsStr}): \{return_type} \n{" + bodyStr + "\n}"
     }
     Decl::Stmt(stmt) => stmt.to_string()
   }

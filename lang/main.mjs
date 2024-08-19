@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { compile } from './target/js/release/build/lib/lib.js';
 
-const source = readFileSync('./examples/fib.txt', 'utf8');
+const source = readFileSync('./examples/function.txt', 'utf8');
 const prog = compile(source, true);
 
 if (prog.$tag === 1) {
