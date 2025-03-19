@@ -11,7 +11,7 @@ pub fn Env::new[K, T]() -> Env[K, T] {
     }
 }
 
-pub fn child[K, T](self: Env[K, T]) -> Env[K, T] {
+pub fn Env::child[K, T](self: Env[K, T]) -> Env[K, T] {
     {
         parent: Some(self),
         bindings: Map::new(),

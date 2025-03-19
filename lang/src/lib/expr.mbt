@@ -25,8 +25,8 @@ pub enum Const {
     Boolean(Bool)
 }
 
-pub fn to_string(self: Const) -> String {
-    match self {
+pub impl Show for Const with output(self, logger) {
+    let output = match self {
         Const::Integer(n, kind) => {
             match kind {
                 IntKind::U8 => n.to_string() + "u8"
@@ -35,6 +35,8 @@ pub fn to_string(self: Const) -> String {
         }
         Const::Boolean(q) => q.to_string()
     }
+
+    logger.write_string(output)
 }
 
 pub enum Expr {
@@ -46,8 +48,8 @@ pub enum Expr {
     Call(String, Array[Expr])
 }
 
-pub fn to_string(self: Expr) -> String {
-    match self {
+pub impl Show for Expr with output(self, logger) {
+    let output = match self {
         Expr::Const(c) => c.to_string()
         Expr::Var(name) => name
         Expr::UnaryOp(op, arg) => {
@@ -92,4 +94,6 @@ pub fn to_string(self: Expr) -> String {
             name + "(" + params_str + ")"
         }
     }
+
+    logger.write_string(output)
 }

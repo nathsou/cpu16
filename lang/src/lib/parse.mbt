@@ -13,7 +13,7 @@ pub fn Parser::new(tokens: Array[Token]) -> Parser {
 
 type! ParserError String derive (Show)
 
-fn peek(self: Parser) -> Option[Token] {
+fn Parser::peek(self: Parser) -> Option[Token] {
     if self.index < self.tokens.length() {
         Some(self.tokens[self.index])
     } else {
@@ -40,14 +40,14 @@ fn expect(self: Parser, expected: Token) -> Unit!ParserError {
     }
 }
 
-fn matches(self: Parser, expected: Token) -> Bool {
+fn Parser::matches(self: Parser, expected: Token) -> Bool {
     match self.peek() {
         Some(token) => token == expected
         _ => false
     }
 }
 
-fn consumes(self: Parser, expected: Token) -> Bool {
+fn Parser::consumes(self: Parser, expected: Token) -> Bool {
     if self.matches(expected) {
         self.advance()
         true
@@ -309,11 +309,11 @@ pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
     match self.peek() {
         Some(Token::Let) => {
             self.advance()
-            self.parse_let_stmt!(~mutable=false)
+            self.parse_let_stmt!(mutable=false)
         }
         Some(Token::Var) => {
             self.advance()
-            self.parse_let_stmt!(~mutable=true)
+            self.parse_let_stmt!(mutable=true)
         }
         Some(Token::While) => {
             self.advance()
@@ -335,7 +335,7 @@ fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
             self.advance()
             let rhs = self.parse_expr!()
             self.expect!(Token::Semicolon)
-            Stmt::Assign(~lhs, ~rhs)
+            Stmt::Assign(lhs~, rhs~)
         }
         Some(Token::Semicolon) => {
             self.advance()
@@ -347,12 +347,12 @@ fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
     }
 }
 
-fn parse_let_stmt(self: Parser, ~mutable: Bool) -> Stmt!ParserError {
+fn parse_let_stmt(self: Parser, mutable~: Bool) -> Stmt!ParserError {
     let name = self.identifier!()
     self.expect!(Token::Equal)
     let value = self.parse_expr!()
     self.expect!(Token::Semicolon)
-    Stmt::Let(~name, ~mutable, ~value)
+    Stmt::Let(name~, mutable~, value~)
 }
 
 fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
@@ -366,7 +366,7 @@ fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
     }
     
     self.expect!(Token::Rbrace)
-    Stmt::While(~cond, ~body)
+    Stmt::While(cond~, body~)
 }
 
 fn parse_return_stmt(self: Parser) -> Stmt!ParserError {
@@ -378,7 +378,7 @@ fn parse_return_stmt(self: Parser) -> Stmt!ParserError {
         Some(expr)
     }
 
-    Stmt::Return(~value)
+    Stmt::Return(value~)
 }
 
 pub fn parse_decl(self: Parser) -> Decl!ParserError {
@@ -427,7 +427,7 @@ fn parse_fn_decl(self: Parser) -> Decl!ParserError {
 
     self.expect!(Token::Rbrace)
 
-    Decl::Func(~name, ~parameters, return_type=returnType, ~body)
+    Decl::Func(name~, parameters~, return_type=returnType, body~)
 }
 
 pub fn parse_decls(self: Parser) -> Array[Decl]!ParserError {

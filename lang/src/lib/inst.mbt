@@ -23,10 +23,10 @@ pub enum AluOp {
 } derive (Show, Eq)
 
 pub enum Inst {
-  Ctl(~op: ControlOp)
-  Set(~dst: Reg, ~val: UInt)
-  Mem(~dst: Reg, ~addr: Reg, ~load: Bool, ~offset: UInt)
-  Alu(~dst: Reg, ~src1: Reg, ~src2: Reg, ~op: AluOp)
+  Ctl(op~: ControlOp)
+  Set(dst~: Reg, val~: UInt)
+  Mem(dst~: Reg, addr~: Reg, load~: Bool, offset~: UInt)
+  Alu(dst~: Reg, src1~: Reg, src2~: Reg, op~: AluOp)
 } derive (Show)
 
 pub trait Encode {
@@ -92,20 +92,20 @@ impl Encode for AluOp with encode(op) -> UInt {
 
 impl Encode for Inst with encode(inst) -> UInt {
   match inst {
-    Ctl(~op) => {
+    Ctl(op~) => {
       0b00U << 14 | Encode::encode(op)
     }
-    Set(~dst, ~val) => {
+    Set(dst~, val~) => {
       0b01U << 14 | Encode::encode(dst) << 11 | (val & 0x7ff)
     }
-    Mem(~dst, ~addr, ~load, ~offset) => {
+    Mem(dst~, addr~, load~, offset~) => {
       0b10U << 14 |
       Encode::encode(dst) << 11 |
       Encode::encode(addr) << 8 |
       (if load { 1U } else { 0U }) << 7 |
       (offset & 0x7f)
     }
-    Alu(~dst, ~src1, ~src2, ~op) => {
+    Alu(dst~, src1~, src2~, op~) => {
       0b11U << 14 |
       Encode::encode(dst) << 11 |
       Encode::encode(src1) << 8 |

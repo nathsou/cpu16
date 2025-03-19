@@ -13,7 +13,7 @@ fn main {
       #|}
 
     try {
-      let compiled = @lib.compile!(prog, ~verbose=true)
+      let compiled = @lib.compile!(prog, verbose=true)
       write_file("out.bin", compiled)
     } catch {
       _ => { println("Error") }

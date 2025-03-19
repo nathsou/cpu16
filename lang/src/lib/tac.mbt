@@ -4,15 +4,15 @@ pub type TACId UInt derive (Eq, Hash)
 pub type TACLabel UInt derive (Eq, Hash, Show)
 
 fn op_add(self: TACId, other: TACId) -> TACId {
-    self.0 + other.0
+    self._ + other._
 }
 
-pub fn to_string(self: TACId) -> String {
-    "%" + self.0.to_string()
+pub impl Show for TACId with output(self, logger) {
+    logger.write_string("%" + self._.to_string())
 }
 
-fn op_add(self: TACLabel, other: TACLabel) -> TACLabel {
-    self.0 + other.0
+fn TACLabel::op_add(self: TACLabel, other: TACLabel) -> TACLabel {
+    self._ + other._
 }
 
 pub enum TACValue {
@@ -41,67 +41,69 @@ pub fn negate(self: TACCond) -> TACCond {
 }
 
 pub enum TAC {
-    Assign(~target: TACId, ~src: TACValue)
-    Unary(~target: TACId, ~op: UnaryOp, ~arg: TACValue)
-    Binary(~target: TACId, ~lhs: TACValue, ~op: TACBinaryOp, ~rhs: TACValue)
-    Store(~dst: TACId, ~src: TACValue, ~offset: UInt)
-    Load(~target: TACId, ~addr: TACValue, ~offset: UInt)
-    Jump(~label: TACLabel)
-    JumpIf(~label: TACLabel, ~cond: TACCond, ~lhs: TACValue, ~rhs: TACValue)
-    Label(~label: TACLabel)
-    Func(~name: String, ~parameters: Array[FunctionArgument], ~return_type: Type, ~body: Array[TAC])
-    GetLocal(~target: TACId, ~index: UInt)
-    SetLocal(~index: UInt, ~src: TACValue)
-    Return(~value: Option[TACValue])
-    Call(~target: TACId, ~name: String, ~parameters: Array[TACValue])
+    Assign(target~: TACId, src~: TACValue)
+    Unary(target~: TACId, op~: UnaryOp, arg~: TACValue)
+    Binary(target~: TACId, lhs~: TACValue, op~: TACBinaryOp, rhs~: TACValue)
+    Store(dst~: TACId, src~: TACValue, offset~: UInt)
+    Load(target~: TACId, addr~: TACValue, offset~: UInt)
+    Jump(label~: TACLabel)
+    JumpIf(label~: TACLabel, cond~: TACCond, lhs~: TACValue, rhs~: TACValue)
+    Label(label~: TACLabel)
+    Func(name~: String, parameters~: Array[FunctionArgument], return_type~: Type, body~: Array[TAC])
+    GetLocal(target~: TACId, index~: UInt)
+    SetLocal(index~: UInt, src~: TACValue)
+    Return(value~: Option[TACValue])
+    Call(target~: TACId, name~: String, parameters~: Array[TACValue])
 }
 
-pub fn to_string(self: TACValue) -> String {
-    match self {
+pub impl Show for TACValue with output(self, logger) {
+    let output = match self {
         TACValue::Const(c) => c.to_string()
         TACValue::Variable(v) => v.to_string()
     }
+
+    logger.write_string(output)
 }
 
-pub fn to_string(self: TAC) -> String {
-    match self {
-        TAC::Assign(~target, ~src) => {
+pub impl Show for TAC with output(self, logger) {
+    let output = match self {
+        TAC::Assign(target~, src~) => {
             "\{target} = \{src}"
         }
-        TAC::Unary(~target, ~op, ~arg) => {
+        TAC::Unary(target~, op~, arg~) => {
             "\{target} = \{op} \{arg}"
         }
-        TAC::Binary(~target, ~lhs, ~op, ~rhs) => {
+        TAC::Binary(target~, lhs~, op~, rhs~) => {
             "\{target} = \{lhs} \{op} \{rhs}"
         }
-        TAC::Store(~dst, ~src, ~offset) => {
+        TAC::Store(dst~, src~, offset~) => {
             "store \{src} -> \{dst} + \{offset}"
         }
-        TAC::Load(~target, ~addr, ~offset) => {
+        TAC::Load(target~, addr~, offset~) => {
             "\{target} = load \{addr} + \{offset}"
         }
-        TAC::JumpIf(~label, ~cond, ~lhs, ~rhs) => {
+        TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
             "jump \{label} if \{lhs} \{cond} \{rhs}"
         }
-        TAC::Jump(~label) => {
+        TAC::Jump(label~) => {
             "jump \{label}"
         }
-        TAC::Label(~label) => {
+        TAC::Label(label~) => {
             "\{label}:"
         }
-        TAC::GetLocal(~target, ~index) => {
+        TAC::GetLocal(target~, index~) => {
             "\{target} = get_local \{index}"
         }
-        TAC::SetLocal(~index, ~src) => {
+        TAC::SetLocal(index~, src~) => {
             "set_local \{index} = \{src}"
         }
-        TAC::Return(~value) => {
+        TAC::Return(value~) => {
             match value {
                 Some(value) => "return \{value}"
                 None => "return"
             }
         }
-        TAC::Func(~name, ~parameters, ~return_type=_, ~body) => {
+        TAC::Func(name~, parameters~, return_type=_, body~) => {
             let args = []
 
             for param in parameters {
@@ -111,11 +113,13 @@ pub fn to_string(self: TAC) -> String {
             let bodyStr = body.map(fn (tac) { "  " + tac.to_string() }).join("\n")
             "fn \{name} {\n" + bodyStr + "\n}"
         }
-        TAC::Call(~target, ~name, ~parameters) => {
+        TAC::Call(target~, name~, parameters~) => {
             let args = parameters.map(fn (param) { param.to_string() }).join(", ")
             "\{target} = call \{name}(\{args})"   
         }
     }
+
+    logger.write_string(output)
 }
 
 pub struct TACBuilder {
@@ -162,47 +166,47 @@ fn emit(self: TACBuilder, tac: TAC) -> Unit {
 }
 
 fn emit_assign(self: TACBuilder, target: TACId, src: TACValue) -> Unit {
-    self.emit(TAC::Assign(~target, ~src))
+    self.emit(TAC::Assign(target~, src~))
 }
 
 fn emit_unary_op(self: TACBuilder, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
-    self.emit(TAC::Unary(~target, ~op, ~arg))
+    self.emit(TAC::Unary(target~, op~, arg~))
 }
 
 fn emit_binary_op(self: TACBuilder, target: TACId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
-    self.emit(TAC::Binary(~target, ~lhs, ~op, ~rhs))
+    self.emit(TAC::Binary(target~, lhs~, op~, rhs~))
 }
 
 fn emit_store(self: TACBuilder, dst: TACId, src: TACValue, offset: UInt) -> Unit {
-    self.emit(TAC::Store(~dst, ~src, ~offset))
+    self.emit(TAC::Store(dst~, src~, offset~))
 }
 
-fn emit_load(self: TACBuilder, target: TACId, addr: TACValue, ~offset: UInt) -> Unit {
-    self.emit(TAC::Load(~target, ~addr, ~offset))
+fn emit_load(self: TACBuilder, target: TACId, addr: TACValue, offset~: UInt) -> Unit {
+    self.emit(TAC::Load(target~, addr~, offset~))
 }
 
 fn def_label(self: TACBuilder, label: TACLabel) -> Unit {
-    self.emit(TAC::Label(~label))
+    self.emit(TAC::Label(label~))
 }
 
 fn emit_jump_if(self: TACBuilder, label: TACLabel, cond: TACCond, lhs: TACValue, rhs: TACValue) -> Unit {
-    self.emit(TAC::JumpIf(~label, ~cond, ~lhs, ~rhs))
+    self.emit(TAC::JumpIf(label~, cond~, lhs~, rhs~))
 }
 
 fn emit_jump(self: TACBuilder, label: TACLabel) -> Unit {
-    self.emit(TAC::Jump(~label))
+    self.emit(TAC::Jump(label~))
 }
 
 fn emit_get_local(self: TACBuilder, target: TACId, index: UInt) -> Unit {
-    self.emit(TAC::GetLocal(~target, ~index))
+    self.emit(TAC::GetLocal(target~, index~))
 }
 
 fn emit_set_local(self: TACBuilder, index: UInt, src: TACValue) -> Unit {
-    self.emit(TAC::SetLocal(~index, ~src))
+    self.emit(TAC::SetLocal(index~, src~))
 }
 
 fn emit_return(self: TACBuilder, value: Option[TACValue]) -> Unit {
-    self.emit(TAC::Return(~value))
+    self.emit(TAC::Return(value~))
 }
 
 type! TACLoweringError String derive (Show)
@@ -311,7 +315,7 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
             }
 
             let target = next_var_()
-            self.emit(TAC::Call(~target, ~name, ~parameters=args))
+            self.emit(TAC::Call(target~, name~, parameters=args))
             TACValue::Variable(target)            
         }
     }
@@ -319,7 +323,7 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue!TACLoweringError {
 
 pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
     match stmt {
-        Stmt::Let(~name, ~mutable=_, ~value) => {
+        Stmt::Let(name~, mutable=_, value~) => {
             let value = self.lower_expr!(value)
             match value {
                 TACValue::Variable(var_id) => {
@@ -335,7 +339,7 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
         Stmt::Semi(expr) => {
             let _ = self.lower_expr!(expr)
         }
-        Stmt::Assign(~lhs, ~rhs) => {
+        Stmt::Assign(lhs~, rhs~) => {
             let rhs = self.lower_expr!(rhs)
 
             match lhs {
@@ -352,7 +356,7 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
                 }
             }
         }
-        Stmt::While(~cond, ~body) => {
+        Stmt::While(cond~, body~) => {
             let start_label = self.next_label()
             let end_label = self.next_label()
             self.def_label(start_label)
@@ -368,7 +372,7 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
             self.emit_jump(start_label)
             self.def_label(end_label)
         }
-        Stmt::Return(~value) => {
+        Stmt::Return(value~) => {
             let value = match value {
                 Some(value) => Some(self.lower_expr!(value))
                 None => None
@@ -382,20 +386,20 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit!TACLoweringError {
 pub fn lower_decl(self: TACBuilder, decl: Decl) -> Unit!TACLoweringError {
     match decl {
         Decl::Stmt(stmt) => self.lower_stmt!(stmt)
-        Decl::Func(~name, ~parameters, ~return_type, ~body) => {
+        Decl::Func(name~, parameters~, return_type~, body~) => {
             let func_builder = self.child()
 
             for i, param in parameters {
                 let var_id = next_var_()
                 func_builder.env.declare(param.name, var_id)
-                func_builder.emit_get_local(var_id, i.to_uint())
+                func_builder.emit_get_local(var_id, i.reinterpret_as_uint())
             }
 
             for stmt in body {
                 func_builder.lower_stmt!(stmt)
             }
 
-            self.emit(TAC::Func(~name, ~parameters, ~return_type, ~body=func_builder.tac))
+            self.emit(TAC::Func(name~, parameters~, return_type~, body=func_builder.tac))
         }
     }
 }

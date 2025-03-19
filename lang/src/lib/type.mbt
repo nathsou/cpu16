@@ -43,11 +43,11 @@ fn get_top_env_exn(self: TypeChecker) -> Env[String, VarInfo] {
     }
 }
 
-fn lookup(self: TypeChecker, name: String) -> Option[VarInfo] {
+fn TypeChecker::lookup(self: TypeChecker, name: String) -> Option[VarInfo] {
     self.get_top_env_exn().lookup(name)
 }
 
-fn declare(self: TypeChecker, name: String, info: VarInfo) -> Unit {
+fn TypeChecker::declare(self: TypeChecker, name: String, info: VarInfo) -> Unit {
     self.get_top_env_exn().declare(name, info)
 }
 
@@ -165,14 +165,14 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
 
 pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
     match stmt {
-        Stmt::Let(~name, ~mutable, ~value) => {
+        Stmt::Let(name~, mutable~, value~) => {
             let valTy = self.type_expr!(value)
             self.declare(name, { ty: valTy, mutable })
         }
         Stmt::Semi(expr) => {
             let _ = self.type_expr!(expr)
         }
-        Stmt::Assign(~lhs, ~rhs) => {
+        Stmt::Assign(lhs~, rhs~) => {
             match lhs {
                 Expr::Var(name) => {
                     match self.lookup(name) {
@@ -193,7 +193,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
                 _ => raise TypeError("Invalid assignment target: '\{lhs}'")
             }
         }
-        Stmt::While(~cond, ~body) => {
+        Stmt::While(cond~, body~) => {
             let condTy = self.type_expr!(cond)
 
             if condTy != Type::Bool {
@@ -204,7 +204,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
                 self.type_stmt!(stmt)
             }
         }
-        Stmt::Return(~value) => {
+        Stmt::Return(value~) => {
             let expected_ret_ty = match self.fun_stack.last() {
                 Some(ty) => ty
                 None => raise TypeError("Return statement outside of function")
@@ -228,7 +228,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
 
 pub fn type_decl(self: TypeChecker, decl: Decl) -> Unit!TypeError {
     match decl {
-        Decl::Func(~name, ~parameters, ~return_type, ~body) => {
+        Decl::Func(name~, parameters~, return_type~, body~) => {
             self.functions.declare(name, { parameters, return_type })
             self.env_stack.push(Env::new())
             self.fun_stack.push(return_type)
@@ -241,8 +241,8 @@ pub fn type_decl(self: TypeChecker, decl: Decl) -> Unit!TypeError {
                 self.type_stmt!(stmt)
             }
             
-            let _ = self.fun_stack.pop_exn()
-            let _ = self.env_stack.pop_exn()
+            let _ = self.fun_stack.unsafe_pop()
+            let _ = self.env_stack.unsafe_pop()
         }
         Decl::Stmt(stmt) => {
             self.type_stmt!(stmt)
