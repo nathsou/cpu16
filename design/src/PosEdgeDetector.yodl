@@ -1,0 +1,11 @@
+
+module PosEdgeDetector (
+    clk: clock,
+    rst: bool,
+    d: bool,
+) -> (
+    edge: bool,
+) {
+    let prev = Reg<bool>(clk, rst, d);
+    edge = (not prev.q) and d;
+}

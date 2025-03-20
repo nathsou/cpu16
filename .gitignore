@@ -6,3 +6,5 @@
 /design/tests/sim_build/
 /design/tests/__pycache__/
 /design/tests/.pytest_cache
+yodl
+output/

@@ -1,0 +1,174 @@
+import RegisterFile
+import ALU
+
+package OpCode {
+    const CTL = 2'b00;
+    const SET = 2'b01;
+    const MEM = 2'b10;
+    const ALU = 2'b11;
+}
+
+package Stage {
+    const FETCH = 3'd0;
+    const DECODE = 3'd1;
+    const EXECUTE = 3'd2;
+    const MEMORY_ACCESS = 3'd3;
+    const WRITEBACK = 3'd4;
+}
+
+package CtlOp {
+    const HALT = 3'd0;
+    const SET_ZERO = 3'd1;
+    const CLEAR_ZERO = 3'd2;
+    const SET_CARRY = 3'd3;
+    const CLEAR_CARRY = 3'd4;
+}
+
+type Flags = {
+    halt: bool,
+    zero: bool,
+    carry: bool,
+};
+
+module CPU(
+    clk: clock,
+    rst: bool,
+    ram_read_data: uint<16>,
+) -> (
+    program_counter: uint<16>,
+    display_reg: uint<32>,
+    flags: Flags,
+    ram_write_enable: bool,
+    ram_address: uint<16>,
+    ram_write_data: uint<16>,
+) {
+    let inst = Reg<uint<16>>(clk, rst);
+    let opcode = inst.q[15:14];
+    let is_alu = opcode == OpCode::ALU;
+    let stage = Reg<uint<3>>(clk, rst);
+    let rs1 = Reg<uint<16>>(clk, rst);
+    let rs2 = Reg<uint<16>>(clk, rst);
+    let hzc = Reg<Flags>(clk, rst, q: flags);
+    let is_load = ram_read_data[7];
+    let is_store = not is_load;
+    let regs = RegisterFile::RegisterFile(clk, rst, program_counter, display_reg);
+    let alu = ALU::ALU(
+        a: rs1.q,
+        b: rs2.q,
+        op: inst.q[4:0],
+        enable: is_alu,
+        flags: { zero: hzc.q.zero, carry: hzc.q.carry },
+    );
+
+    regs.write_dest = inst.q[13:11];
+    regs.read_src1 = stage.q == Stage::DECODE ? ram_read_data[10:8] : inst.q[10:8];
+    regs.read_src2 = stage.q == Stage::DECODE ? ram_read_data[7:5] : inst.q[7:5];
+    regs.write_data = is_alu ? alu.q[15:0] : {5'd0, ram_read_data[10:0]};
+    regs.write_enable = false;
+    regs.count_enable = false;
+    ram_write_enable = false;
+    ram_address = regs.program_counter;
+    ram_write_data = 16'd0;
+
+    $printf("inst: %h, stage: %h, rs1_addr: %h, rs2_addr: %h, rs1: %h, rs2: %h, alu: %h\n", inst.q, stage.q, regs.read_src1, regs.read_src2, regs.read_data1, regs.read_data2, alu.q);
+
+    if not hzc.q.halt {
+        match stage.q {
+            Stage::FETCH => {
+                stage.d = Stage::DECODE;
+            },
+            Stage::DECODE => {
+                inst.d = ram_read_data;
+                rs1.d = regs.read_data1;
+                rs2.d = regs.read_data2;
+
+                match ram_read_data[15:14] {
+                    OpCode::SET => {
+                        $printf("SET: %h\n", regs.write_data);
+                        stage.d = Stage::WRITEBACK;
+                    },
+                    OpCode::MEM => {
+                        if is_store {
+                            regs.read_src2 = ram_read_data[13:11];
+                        }
+
+                        stage.d = Stage::EXECUTE;
+                    },
+                    _ => {
+                        stage.d = Stage::EXECUTE;
+                    },
+                }
+            },
+            Stage::EXECUTE => {
+                match opcode {
+                    OpCode::CTL => {
+                        match inst.q[2:0] {
+                            3'b000 => { hzc.d.halt = true; },
+                            3'b001 => { hzc.d.zero = true; },
+                            3'b010 => { hzc.d.zero = false; },
+                            3'b011 => { hzc.d.carry = true; },
+                            3'b100 => { hzc.d.carry = false; },
+                        }
+
+                        stage.d = Stage::WRITEBACK;
+                    },
+                    OpCode::MEM => {
+                        ram_address = regs.read_data1 + {9'd0, inst.q[6:0]};
+                        ram_write_enable = is_store;
+
+                        if is_store {
+                            ram_write_data = regs.read_data2;
+                        }
+
+                        stage.d = Stage::MEMORY_ACCESS;
+                    },
+                    OpCode::ALU => {
+                        if alu.condition_met {
+                            hzc.d.zero = alu.new_flags.zero;
+                            hzc.d.carry = alu.new_flags.carry;
+                        }
+
+                        $printf("op: %h, a: %h, b: %h, q: %h\n", inst.q[4:0], rs1.q, rs2.q, alu.q);
+
+                        stage.d = Stage::WRITEBACK;
+                    },
+                    _ => {
+                        stage.d = Stage::WRITEBACK;
+                    },
+                }
+            },
+            Stage::MEMORY_ACCESS => {
+                regs.write_enable = is_load;
+                ram_write_enable = is_store;
+
+                if is_load {
+                    regs.write_data = ram_read_data;
+                }
+
+                stage.d = Stage::WRITEBACK;
+            },
+            Stage::WRITEBACK => {
+                match opcode {
+                    OpCode::SET => {
+                        regs.write_enable = true;
+                        regs.count_enable = true;
+                    },
+                    OpCode::MEM => {
+                        if is_load {
+                            regs.write_enable = true;
+                        }
+
+                        regs.count_enable = true;
+                    },
+                    OpCode::ALU => {
+                        regs.write_enable = alu.condition_met;
+                        $printf("ALU condition met: %h, q: %h\n", alu.condition_met, alu.q);
+                        regs.count_enable = true;
+                    },
+                }
+
+                stage.d = Stage::FETCH;
+            },
+        }
+    }
+}

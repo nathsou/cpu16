@@ -1,0 +1,87 @@
+
+package Op {
+    const ADD = 5'b000_00;
+    const SUB = 5'b000_01;
+    const ADC = 5'b000_10;
+    const SBC = 5'b000_11;
+
+    const ADD_IF_ZERO = 5'b001_00;
+    const SUB_IF_ZERO = 5'b001_01;
+    const ADC_IF_ZERO = 5'b001_10;
+    const SBC_IF_ZERO = 5'b001_11;
+
+    const ADD_IF_NOT_ZERO = 5'b010_00;
+    const SUB_IF_NOT_ZERO = 5'b010_01;
+    const ADC_IF_NOT_ZERO = 5'b010_10;
+    const SBC_IF_NOT_ZERO = 5'b010_11;
+
+    const ADD_IF_CARRY = 5'b011_00;
+    const SUB_IF_CARRY = 5'b011_01;
+    const ADC_IF_CARRY = 5'b011_10;
+    const SBC_IF_CARRY = 5'b011_11;
+
+    const ADD_IF_NOT_CARRY = 5'b100_00;
+    const SUB_IF_NOT_CARRY = 5'b100_01;
+    const ADC_IF_NOT_CARRY = 5'b100_10;
+    const SBC_IF_NOT_CARRY = 5'b100_11;
+
+    const INC = 5'b101_00;
+    const DEC = 5'b101_01;
+
+    const AND = 5'b110_00;
+    const NAND = 5'b110_01;
+    const OR = 5'b110_10;
+    const XOR = 5'b110_11;
+    const SHL = 5'b111_00;
+    const SHR = 5'b111_01;
+}
+
+type Flags = { zero: bool, carry: bool };
+
+module ALU(
+    a: uint<16>,
+    b: uint<16>,
+    op: uint<5>,
+    enable: bool,
+    flags: Flags,
+) -> (
+    condition_met: bool,
+    new_flags: Flags,
+    q: uint<17>,
+) {
+    let is_sub = (op and 5'b1)[0];
+    let include_carry = (op and 5'b11) == 5'b10 or (op and 5'b11) == 5'b11; // all adc/sbc ops
+    let force_carry = (op and 5'b11) == 5'b01 or (op == Op::INC);
+    let condition = op[4:2];
+    let zin = flags.zero;
+    let cin = flags.carry;
+    let carry_in = op != Op::DEC and (force_carry or (include_carry and cin));
+
+    condition_met = true;
+    q = 17'h00000;
+    new_flags = flags;
+
+    if enable {
+        match op {
+            Op::AND  => { q = {1'b0, a and b}; },
+            Op::NAND => { q = {1'b0, a nand b}; },
+            Op::OR   => { q = {1'b0, a or b}; },
+            Op::XOR  => { q = {1'b0, a xor b}; },
+            Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; q = {1'b0, shifted}; },
+            Op::SHR  => { q = {1'b0, a shr b[3:0]}; },
+            _ => {
+                condition_met = match condition {
+                    3'b001 => zin, // if zero
+                    3'b010 => not zin, // if not zero
+                    3'b011 => cin, // if carry
+                    3'b100 => not cin, // if not carry
+                    _ => true, // always
+                };
+
+                q = {1'b0, a} + {1'b0, ((is_sub ? not b : b) and 16'hFFFF)} + {15'd0, carry_in};
+            }
+        }
+    }
+
+    new_flags = { zero: q[15:0] == 16'd0, carry: q[16] };
+}

@@ -1,0 +1,36 @@
+
+module RegisterFile(
+    clk: clock,
+    rst: bool,
+    count_enable: bool,
+    write_enable: bool,
+    write_dest: uint<3>,
+    write_data: uint<16>,
+    read_src1: uint<3>,
+    read_src2: uint<3>,
+) -> (
+    read_data1: uint<16>,
+    read_data2: uint<16>,
+    program_counter: uint<16>,
+    display_reg: uint<32>,
+) {
+    let regs = 8*[Reg<uint<16>>(clk, rst)];
+
+    for i in 0..=7 {
+        regs[i].d = regs[i].q;
+    }
+
+    if count_enable and not(write_enable and write_dest == 7) {
+        regs[7].d = regs[7].q + 1;
+    }
+
+    if write_enable and write_dest != 0 {
+        $printf("write %h to %h\n", write_data, write_dest);
+        regs[write_dest].d = write_data;
+    }
+
+    read_data1 = regs[read_src1].q;
+    read_data2 = regs[read_src2].q;
+    program_counter = regs[7].q;
+    display_reg = {regs[2].q, regs[1].q};
+}

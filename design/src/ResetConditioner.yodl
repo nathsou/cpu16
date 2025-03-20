@@ -1,0 +1,19 @@
+
+module ResetConditioner<Stages: uint>(
+    clk: clock,
+    d: bool,
+) -> (
+    q: bool,
+) {
+    let stage = Reg<uint<Stages>>(clk);
+    let initialized = Reg<bool>(clk);
+
+    if d or (not initialized.q) {
+        stage.d = 1;
+        initialized.d = true;
+    } else {
+        stage.d = {stage.q[Stages - 2 : 0], 1'b0};
+    }
+
+    q = stage.q[Stages - 1];
+}
