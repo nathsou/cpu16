@@ -103,11 +103,11 @@ module CPU(
                 match opcode {
                     OpCode::CTL => {
                         match inst.q[2:0] {
-                            3'b000 => { hzc.d.halt = true; },
-                            3'b001 => { hzc.d.zero = true; },
-                            3'b010 => { hzc.d.zero = false; },
-                            3'b011 => { hzc.d.carry = true; },
-                            3'b100 => { hzc.d.carry = false; },
+                            CtlOp::HALT => { hzc.d.halt = true; },
+                            CtlOp::SET_ZERO => { hzc.d.zero = true; },
+                            CtlOp::CLEAR_ZERO => { hzc.d.zero = false; },
+                            CtlOp::SET_CARRY => { hzc.d.carry = true; },
+                            CtlOp::CLEAR_CARRY => { hzc.d.carry = false; },
                         }
 
                         stage.d = Stage::WRITEBACK;

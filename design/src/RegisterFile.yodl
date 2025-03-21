@@ -26,6 +26,7 @@ module RegisterFile(
 
     if write_enable and write_dest != 0 {
         $printf("write %h to %h\n", write_data, write_dest);
+        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs[1].q, regs[2].q, regs[3].q, regs[4].q, regs[5].q, regs[6].q, regs[7].q);
         regs[write_dest].d = write_data;
     }
 

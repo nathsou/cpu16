@@ -28,12 +28,12 @@ package Op {
     const INC = 5'b101_00;
     const DEC = 5'b101_01;
 
-    const AND = 5'b110_00;
-    const NAND = 5'b110_01;
-    const OR = 5'b110_10;
-    const XOR = 5'b110_11;
-    const SHL = 5'b111_00;
-    const SHR = 5'b111_01;
+    const AND = 5'b101_10;
+    const NAND = 5'b101_11;
+    const OR = 5'b110_00;
+    const XOR = 5'b110_01;
+    const SHL = 5'b110_10;
+    const SHR = 5'b110_11;
 }
 
 type Flags = { zero: bool, carry: bool };
@@ -49,39 +49,37 @@ module ALU(
     new_flags: Flags,
     q: uint<17>,
 ) {
-    let is_sub = (op and 5'b1)[0];
-    let include_carry = (op and 5'b11) == 5'b10 or (op and 5'b11) == 5'b11; // all adc/sbc ops
-    let force_carry = (op and 5'b11) == 5'b01 or (op == Op::INC);
+    let is_sub = op[0];
+    let include_carry = (op and 2'b11) == 2'b10 or (op and 2'b11) == 2'b11; // all adc/sbc ops
+    let force_carry = (op and 2'b11) == 2'b01 or (op == Op::INC);
     let condition = op[4:2];
-    let zin = flags.zero;
-    let cin = flags.carry;
-    let carry_in = op != Op::DEC and (force_carry or (include_carry and cin));
+    let carry_in = op != Op::DEC and (force_carry or (include_carry and flags.carry));
 
     condition_met = true;
-    q = 17'h00000;
+    q = 17'd0;
     new_flags = flags;
 
     if enable {
-        match op {
-            Op::AND  => { q = {1'b0, a and b}; },
-            Op::NAND => { q = {1'b0, a nand b}; },
-            Op::OR   => { q = {1'b0, a or b}; },
-            Op::XOR  => { q = {1'b0, a xor b}; },
-            Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; q = {1'b0, shifted}; },
-            Op::SHR  => { q = {1'b0, a shr b[3:0]}; },
+        q = match op {
+            Op::AND  => {1'b0, a and b},
+            Op::NAND => {1'b0, a nand b},
+            Op::OR   => {1'b0, a or b},
+            Op::XOR  => {1'b0, a xor b},
+            Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; {1'b0, shifted}; },
+            Op::SHR  => {1'b0, a shr b[3:0]},
             _ => {
                 condition_met = match condition {
-                    3'b001 => zin, // if zero
-                    3'b010 => not zin, // if not zero
-                    3'b011 => cin, // if carry
-                    3'b100 => not cin, // if not carry
+                    3'b001 => flags.zero,
+                    3'b010 => not flags.zero,
+                    3'b011 => flags.carry,
+                    3'b100 => not flags.carry,
                     _ => true, // always
                 };
 
-                q = {1'b0, a} + {1'b0, ((is_sub ? not b : b) and 16'hFFFF)} + {15'd0, carry_in};
+                ({1'b0, a} + {1'b0, ((is_sub ? not b : b) and 16'hFFFF)} + {15'd0, carry_in});
             }
-        }
-    }
+        };
 
-    new_flags = { zero: q[15:0] == 16'd0, carry: q[16] };
+        new_flags = { zero: q[15:0] == 16'd0, carry: q[16] };
+    }
 }

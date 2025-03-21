@@ -12,10 +12,10 @@ module Top(
     leds: uint<4>,
 ) {
     let rst = buttons[3];
-    // let clk_ = clk;
-    let counter = Reg<uint<23>>(clk, rst);
-    counter.d = counter.q + 1;
-    let clk_ = clock(counter.q[22]);
+    let clk_ = clk;
+    // let counter = Reg<uint<23>>(clk, rst);
+    // counter.d = counter.q + 1;
+    // let clk_ = clock(counter.q[22]);
 
     let ram = RAM::RAM(clk: clk_);
     let cpu = CPU::CPU(clk: clk_, rst);
@@ -25,7 +25,7 @@ module Top(
     ram.write_data = cpu.ram_write_data;
     cpu.ram_read_data = ram.read_data;
 
-    // $printf("PC: %h, RAM addr: %h, RAM write data: %h, RAM read data: %h, disp: %h\n", cpu.program_counter, ram.addr, ram.write_data, ram.read_data, cpu.display_reg);
+    $printf("PC: %h, z: %h, c: %h\n", cpu.program_counter, cpu.flags.zero, cpu.flags.carry);
 
     if cpu.flags.halt {
         $stop(0);

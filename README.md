@@ -1,6 +1,6 @@
 # CPU 16
 
-Simple load-store 16-bit CPU ISA, along with a Rust simulator and Veryl design.
+Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https://github.com/nathsou/yodl) design.
 
 <img src="res/cpu16.png" alt="CPU16 Running on an Alchitry Au" width="400">
 

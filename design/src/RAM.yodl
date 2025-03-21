@@ -19,7 +19,7 @@ module RAM(
         write: [{ clk: clk, en: write_enable, addr: addr[9:0], data: write_data, mask: true }],
     );
 
-    $readmemh("/Volumes/S/code/yodl/cpu16/sim/verilator/prog.hex", mem);
+    $readmemh("prog.hex", mem);
 
     read_data = mem.q[0];
 }
