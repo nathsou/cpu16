@@ -12,7 +12,7 @@ mod isa;
 mod procedures;
 mod sim;
 
-const START_PC: u16 = 0x8000;
+const START_PC: u16 = 0x0000;
 
 fn add() -> Vec<u16> {
     use Reg::*;
@@ -192,10 +192,12 @@ fn mem() -> Vec<u16> {
     use Reg::*;
 
     Assembler::new()
+        .set(PC, 0x0100)
+        .fill(0xff)
         .set(R1, 0x23)
-        .store(R1, Z, 3)
-        .set(R1, 0)
-        .load(R1, Z, 3)
+        .store(R1, Z, 64)
+        .set(R2, 0)
+        .load(R2, Z, 64)
         .halt()
         .assemble()
 }
@@ -408,15 +410,25 @@ fn dump_instructions(prog: &[u16]) {
     println!("}}");
 }
 
-fn dump_bin(prog: &[u16], bin_paht: &str) {
+fn dump_bin(prog: &[u16], bin_path: &str) {
     let mut bin = [0u16; 65536];
     bin[START_PC as usize..(START_PC as usize + prog.len())].copy_from_slice(prog);
 
     // save the raw binary to a file
-    let mut rom_file = std::fs::File::create(bin_paht).expect("failed to create bin file");
+    let mut rom_file = std::fs::File::create(bin_path).expect("failed to create bin file");
     rom_file
         .write_all(&bin.iter().flat_map(|&inst| inst.to_le_bytes()).collect::<Vec<_>>())
         .expect("failed to write to bin file");
+}
+
+fn dump_hex(prog: &[u16], hex_path: &str) {
+    let mut hex_file = std::fs::File::create(hex_path).expect("failed to create hex file");
+
+    for inst in prog {
+        hex_file
+            .write_all(format!("{:04x}\n", inst).as_bytes())
+            .expect("failed to write to hex file");
+    }
 }
 
 fn trace(prog: &[u16], trace_path: &str) {
@@ -474,10 +486,10 @@ fn read_bin_file(bin_path: &str) -> std::io::Result<[u16; 65536]> {
 }
 
 fn main() {
-    // let prog = lab();
-    // dump_bin(&prog, "lab.bin");
-    let prog = read_bin_file("../lang/out.bin").expect("failed to read bin file");
+    let prog = mem();
+    dump_hex(&prog, "mem.hex");
+    // let prog = read_bin_file("count.bin").expect("failed to read bin file");
 
-    let mut cpu = CPU::new(prog, START_PC);
+    let mut cpu = CPU::from(&prog, START_PC);
     cpu.run_with_fuel(1000, true);
 }

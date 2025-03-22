@@ -21,5 +21,9 @@ module RAM(
 
     $readmemh("prog.hex", mem);
 
+    if write_enable {
+        $printf("RAM write %h to %h\n", write_data, addr);
+    }
+
     read_data = mem.q[0];
 }
