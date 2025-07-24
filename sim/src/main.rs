@@ -111,7 +111,10 @@ fn euler1() -> Vec<u16> {
 
     let mut asm = Assembler::new();
 
-    asm.init_sp()
+    asm
+        .set(PC, 0x0100)
+        .fill(0xff)
+        .init_sp()
         .store(Z, Z, sum_lo)
         .store(Z, Z, sum_hi)
         .setw(TMP, 1000, R1)
@@ -486,10 +489,10 @@ fn read_bin_file(bin_path: &str) -> std::io::Result<[u16; 65536]> {
 }
 
 fn main() {
-    let prog = mem();
-    dump_hex(&prog, "mem.hex");
+    let prog = euler1();
+    dump_hex(&prog, "euler1.hex");
     // let prog = read_bin_file("count.bin").expect("failed to read bin file");
 
     let mut cpu = CPU::from(&prog, START_PC);
-    cpu.run_with_fuel(1000, true);
+    cpu.run_verbose();
 }

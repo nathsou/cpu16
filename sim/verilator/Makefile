@@ -11,10 +11,10 @@ VTop: VTop.mk
 	make -C ./obj_dir -f VTop.mk
 
 Top.fir:
-	cd ../.. && ./yodl design/src/Top.yodl "write_firrtl sim/verilator/Top.fir"
+	cd ../.. && yodl design/src/Top.yodl "write_firrtl sim/verilator/Top.fir"
 
 Top.sv: Top.fir
-	firtool -O=release --format=fir --verilog -disable-all-randomization -strip-debug-info Top.fir -o Top.sv
+	firtool -O=release --format=fir --verilog Top.fir -o Top.sv
 
 clean:
 	rm -rf obj_dir sim Top.sv Top.fir VTop.mk

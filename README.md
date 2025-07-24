@@ -35,7 +35,6 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https:/
 | 0b010  | ClearZero           |
 | 0b011  | SetCarry            |
 | 0b100  | ClearCarry          |
-| 0b101  | RestoreRegsAndFlags |
 
 ### AluOps
 
@@ -62,6 +61,6 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https:/
 ### Nexys A7 (Xilinx Artix 7 XC7A100T)
 
 1. Install [Vivado](https://alchitry.com/tutorials/setup/vivado/)
-2. Run `make build-vivado` in the fpga directory
-3. The bitstream will be in fpga/build/cpu16_Top.bin
+2. Run `make build-vivado` in the desing/ directory
+3. The bitstream will be in design/build/cpu16_Top.bin
 4. Run openFPGALoader or any other compatible tool to program the FPGA

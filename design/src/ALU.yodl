@@ -1,42 +1,42 @@
 
 package Op {
-    const ADD = 5'b000_00;
-    const SUB = 5'b000_01;
-    const ADC = 5'b000_10;
-    const SBC = 5'b000_11;
+    const ADD = 5'b000_00
+    const SUB = 5'b000_01
+    const ADC = 5'b000_10
+    const SBC = 5'b000_11
 
-    const ADD_IF_ZERO = 5'b001_00;
-    const SUB_IF_ZERO = 5'b001_01;
-    const ADC_IF_ZERO = 5'b001_10;
-    const SBC_IF_ZERO = 5'b001_11;
+    const ADD_IF_ZERO = 5'b001_00
+    const SUB_IF_ZERO = 5'b001_01
+    const ADC_IF_ZERO = 5'b001_10
+    const SBC_IF_ZERO = 5'b001_11
 
-    const ADD_IF_NOT_ZERO = 5'b010_00;
-    const SUB_IF_NOT_ZERO = 5'b010_01;
-    const ADC_IF_NOT_ZERO = 5'b010_10;
-    const SBC_IF_NOT_ZERO = 5'b010_11;
+    const ADD_IF_NOT_ZERO = 5'b010_00
+    const SUB_IF_NOT_ZERO = 5'b010_01
+    const ADC_IF_NOT_ZERO = 5'b010_10
+    const SBC_IF_NOT_ZERO = 5'b010_11
 
-    const ADD_IF_CARRY = 5'b011_00;
-    const SUB_IF_CARRY = 5'b011_01;
-    const ADC_IF_CARRY = 5'b011_10;
-    const SBC_IF_CARRY = 5'b011_11;
+    const ADD_IF_CARRY = 5'b011_00
+    const SUB_IF_CARRY = 5'b011_01
+    const ADC_IF_CARRY = 5'b011_10
+    const SBC_IF_CARRY = 5'b011_11
 
-    const ADD_IF_NOT_CARRY = 5'b100_00;
-    const SUB_IF_NOT_CARRY = 5'b100_01;
-    const ADC_IF_NOT_CARRY = 5'b100_10;
-    const SBC_IF_NOT_CARRY = 5'b100_11;
+    const ADD_IF_NOT_CARRY = 5'b100_00
+    const SUB_IF_NOT_CARRY = 5'b100_01
+    const ADC_IF_NOT_CARRY = 5'b100_10
+    const SBC_IF_NOT_CARRY = 5'b100_11
 
-    const INC = 5'b101_00;
-    const DEC = 5'b101_01;
+    const INC = 5'b101_00
+    const DEC = 5'b101_01
 
-    const AND = 5'b101_10;
-    const NAND = 5'b101_11;
-    const OR = 5'b110_00;
-    const XOR = 5'b110_01;
-    const SHL = 5'b110_10;
-    const SHR = 5'b110_11;
+    const AND = 5'b101_10
+    const NAND = 5'b101_11
+    const OR = 5'b110_00
+    const XOR = 5'b110_01
+    const SHL = 5'b110_10
+    const SHR = 5'b110_11
 }
 
-type Flags = { zero: bool, carry: bool };
+type Flags = { zero: bool, carry: bool }
 
 module ALU(
     a: uint<16>,
@@ -49,37 +49,37 @@ module ALU(
     new_flags: Flags,
     q: uint<17>,
 ) {
-    let is_sub = op[0];
-    let include_carry = (op and 2'b11) == 2'b10 or (op and 2'b11) == 2'b11; // all adc/sbc ops
-    let force_carry = (op and 2'b11) == 2'b01 or (op == Op::INC);
-    let condition = op[4:2];
-    let carry_in = op != Op::DEC and (force_carry or (include_carry and flags.carry));
+    let is_sub = (op and 5'b1) == 5'b1
+    let include_carry = ((op and 2'b11) == 2'b10) or ((op and 2'b11) == 2'b11) // all adc/sbc ops
+    let force_carry = ((op and 2'b11) == 2'b01) or (op == Op::INC)
+    let condition = op[4:2]
+    let carry_in = (op != Op::DEC) and (force_carry or (include_carry and flags.carry))
 
-    condition_met = true;
-    q = 17'd0;
-    new_flags = flags;
+    condition_met = true
+    q = 17'd0
+    new_flags = flags
 
     if enable {
         q = match op {
-            Op::AND  => {1'b0, a and b},
-            Op::NAND => {1'b0, a nand b},
-            Op::OR   => {1'b0, a or b},
-            Op::XOR  => {1'b0, a xor b},
-            Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; {1'b0, shifted}; },
-            Op::SHR  => {1'b0, a shr b[3:0]},
+            Op::AND  => {1'b0, a and b}
+            Op::NAND => {1'b0, not (a and b)}
+            Op::OR   => {1'b0, a or b}
+            Op::XOR  => {1'b0, a xor b}
+            Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; {1'b0, shifted}; }
+            Op::SHR  => {1'b0, a shr b[3:0]}
             _ => {
                 condition_met = match condition {
-                    3'b001 => flags.zero,
-                    3'b010 => not flags.zero,
-                    3'b011 => flags.carry,
-                    3'b100 => not flags.carry,
-                    _ => true, // always
-                };
+                    3'b001 => flags.zero
+                    3'b010 => not flags.zero
+                    3'b011 => flags.carry
+                    3'b100 => not flags.carry
+                    _ => true // always
+                }
 
-                ({1'b0, a} + {1'b0, ((is_sub ? not b : b) and 16'hFFFF)} + {15'd0, carry_in});
+                ({1'b0, a} + {1'b0, ((is_sub ? not b : b) and 16'hFFFF)} + {15'd0, carry_in})
             }
-        };
+        }
 
-        new_flags = { zero: q[15:0] == 16'd0, carry: q[16] };
+        new_flags = { zero: q[15:0] == 16'd0, carry: q[16] }
     }
 }

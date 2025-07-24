@@ -8,3 +8,10 @@
 /design/tests/.pytest_cache
 yodl
 output/
+sim/verilator/obj_dir
+sim/*.hex
+sim/verilator/*.fir
+sim/verilator/*.sv
+sim/verilator/*.hex
+.DS_Store
+.vscode/

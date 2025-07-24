@@ -17,13 +17,9 @@ module RAM(
     >(
         read: [{ clk: clk, en: true, addr: addr[9:0] }],
         write: [{ clk: clk, en: write_enable, addr: addr[9:0], data: write_data, mask: true }],
-    );
+    )
 
-    $readmemh("prog.hex", mem);
+    $readmemh("prog.hex", mem)
 
-    if write_enable {
-        $printf("RAM write %h to %h\n", write_data, addr);
-    }
-
-    read_data = mem.q[0];
+    read_data = mem.q[0]
 }

@@ -2,6 +2,8 @@ import CPU
 import RAM
 import Segments
 import PosEdgeDetector
+import ResetConditioner
+import RegisterFile
 
 module Top(
     clk: clock,
@@ -11,27 +13,30 @@ module Top(
     seg2: uint<7>,
     leds: uint<4>,
 ) {
-    let rst = buttons[3];
-    let clk_ = clk;
-    // let counter = Reg<uint<23>>(clk, rst);
-    // counter.d = counter.q + 1;
-    // let clk_ = clock(counter.q[22]);
+    let conditioner = ResetConditioner::ResetConditioner<Stages: 8>(clk, d: buttons[3])
+    let rst = conditioner.q
+    let clk_ = clk
+    // let clk_ = {
+    //     let counter = Reg<uint<23>>(clk, rst);
+    //     counter.d = counter.q + 1
+    //     clock(counter.q[22])
+    // }
 
-    let ram = RAM::RAM(clk: clk_);
-    let cpu = CPU::CPU(clk: clk_, rst);
+    let ram = RAM::RAM(clk: clk_)
+    let cpu = CPU::CPU(clk: clk_, rst)
 
-    ram.write_enable = cpu.ram_write_enable;
-    ram.addr = cpu.ram_address;
-    ram.write_data = cpu.ram_write_data;
-    cpu.ram_read_data = ram.read_data;
-
-    $printf("PC: %h, z: %h, c: %h\n", cpu.program_counter, cpu.flags.zero, cpu.flags.carry);
+    ram.write_enable = cpu.ram_write_enable
+    ram.addr = cpu.ram_address
+    ram.write_data = cpu.ram_write_data
+    cpu.ram_read_data = ram.read_data
 
     if cpu.flags.halt {
-        $stop(0);
+        $stop()
     }
 
-    seg1 = not Segments::Decoder(char: cpu.display_reg[7:4]).segs;
-    seg2 = not Segments::Decoder(char: cpu.display_reg[3:0]).segs;
-    leds = cpu.flags.halt ? 4'd0 : uint(4*{uint(clk_)});
+    let disp = cpu.display_reg
+
+    seg1 = not Segments::Decoder(char: disp[7:4]).segs
+    seg2 = not Segments::Decoder(char: disp[3:0]).segs
+    leds = {uint(3*{cpu.flags.halt}), uint(clk_)}
 }

@@ -1,4 +1,6 @@
 
+const DEBUG = true
+
 module RegisterFile(
     clk: clock,
     rst: bool,
@@ -14,24 +16,26 @@ module RegisterFile(
     program_counter: uint<16>,
     display_reg: uint<32>,
 ) {
-    let regs = 8*[Reg<uint<16>>(clk, rst)];
+    let regs = 8*[Reg<uint<16>>(clk, rst)]
 
     for i in 0..=7 {
-        regs[i].d = regs[i].q;
+        regs[i].d = regs[i].q
     }
 
-    if count_enable and not(write_enable and write_dest == 7) {
-        regs[7].d = regs[7].q + 1;
+    if count_enable and not(write_enable and (write_dest == 3'd7)) {
+        regs[7].d = regs[7].q + 1
     }
 
-    if write_enable and write_dest != 0 {
-        $printf("write %h to %h\n", write_data, write_dest);
-        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs[1].q, regs[2].q, regs[3].q, regs[4].q, regs[5].q, regs[6].q, regs[7].q);
-        regs[write_dest].d = write_data;
+    if write_enable and (write_dest != 3'd0) {
+        regs[write_dest].d = write_data
     }
 
-    read_data1 = regs[read_src1].q;
-    read_data2 = regs[read_src2].q;
-    program_counter = regs[7].q;
-    display_reg = {regs[2].q, regs[1].q};
+    if DEBUG {
+        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs[1].q, regs[2].q, regs[3].q, regs[4].q, regs[5].q, regs[6].q, regs[7].q)
+    }
+
+    read_data1 = regs[read_src1].q
+    read_data2 = regs[read_src2].q
+    program_counter = regs[7].q
+    display_reg = {regs[1].q, regs[2].q}
 }
