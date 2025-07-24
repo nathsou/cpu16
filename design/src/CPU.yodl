@@ -69,7 +69,7 @@ module CPU(
     let regs = RegisterFile::RegisterFile(
         clk,
         rst,
-        count_enable: r_stage.q == Stage::WRITEBACK,
+        count_enable: (r_stage.q == Stage::WRITEBACK) and (not r_halt_flag.q),
         write_enable: w_reg_write_enable,
         write_dest: r_reg_write_dest.q,
         write_data: r_reg_write_data.q,
