@@ -1,4 +1,21 @@
 
+
+// module reset_conditioner #(
+//     STAGES = 4 : STAGES > 1 // number of stages
+//   )(
+//     input clk,  // clock
+//     input in,   // async reset
+//     output out  // snyc reset
+//   ) {
+  
+//   dff stage[STAGES] (.clk(clk), .rst(in), #INIT(STAGESx{1}));
+
+//   always {
+//     stage.d = c{stage.q[STAGES-2:0],0};
+//     out = stage.q[STAGES-1];
+//   }
+// }
+
 module ResetConditioner<Stages: uint>(
     clk: clock,
     d: bool,
@@ -6,11 +23,11 @@ module ResetConditioner<Stages: uint>(
     q: bool,
 ) {
     let stage = Reg<uint<Stages>>(clk)
-    let initialized = Reg<bool>(clk)
+    let init = Reg<bool>(clk)
 
-    if d or (not initialized.q) {
+    if d or (not init.q) {
         stage.d = 1
-        initialized.d = true
+        init.d = true
     } else {
         stage.d = {stage.q[Stages - 2 : 0], 1'b0}
     }

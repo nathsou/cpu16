@@ -1,7 +1,6 @@
 import CPU
 import RAM
 import Segments
-import PosEdgeDetector
 import ResetConditioner
 import RegisterFile
 
@@ -9,17 +8,16 @@ module Top(
     clk: clock,
     buttons: uint<4>,
 ) -> (
+    leds: uint<4>,
     seg1: uint<7>,
     seg2: uint<7>,
-    leds: uint<4>,
 ) {
-    let conditioner = ResetConditioner::ResetConditioner<Stages: 8>(clk, d: buttons[3])
-    let rst = conditioner.q
+    let rst = ResetConditioner::ResetConditioner<Stages: 8>(clk, d: orr buttons).q
     let clk_ = clk
     // let clk_ = {
-    //     let counter = Reg<uint<23>>(clk, rst);
+    //     let counter = Reg<uint<21>>(clk)
     //     counter.d = counter.q + 1
-    //     clock(counter.q[22])
+    //     clock(counter.q[20])
     // }
 
     let ram = RAM::RAM(clk: clk_)
@@ -34,9 +32,67 @@ module Top(
         $stop()
     }
 
-    let disp = cpu.display_reg
+    let display = {
+        let counter = Reg<uint<27>>(clk)
+        counter.d = counter.q + 1
 
-    seg1 = not Segments::Decoder(char: disp[7:4]).segs
-    seg2 = not Segments::Decoder(char: disp[3:0]).segs
-    leds = {uint(3*{cpu.flags.halt}), uint(clk_)}
+        let sel = match counter.q[26:25] {
+            2'b00 => 4'b0001
+            2'b01 => 4'b0010
+            2'b10 => 4'b0100
+            2'b11 => 4'b1000
+        }
+        
+        let val = match counter.q[26:25] {
+            2'b00 => cpu.display_reg[31:24]
+            2'b01 => cpu.display_reg[23:16]
+            2'b10 => cpu.display_reg[15:8]
+            2'b11 => cpu.display_reg[7:0]
+        }
+
+        { sel: sel, val: val }
+    }
+
+    seg1 = not Segments::Decoder(char: display.val[7:4]).segs
+    seg2 = not Segments::Decoder(char: display.val[3:0]).segs
+    leds = display.sel
 }
+
+// module Top(
+//     clk: clock,
+//     rst_n: bool,
+// ) -> (
+//     io_led: uint<24>,
+//     io_an: uint<4>,
+//     io_seg: uint<8>,
+// ) {
+//     let clk_ = {
+//         let counter = Reg<uint<5>>(clk);
+//         counter.d = counter.q + 1
+//         clock(counter.q[4])
+//     }
+
+//     let rst = ResetConditioner::ResetConditioner<Cycles: 100_000>(clk: clk_, d: not rst_n).q
+//     let ram = RAM::RAM(clk: clk_)
+//     let cpu = CPU::CPU(clk: clk_, rst)
+
+//     ram.write_enable = cpu.ram_write_enable
+//     ram.addr = cpu.ram_address
+//     ram.write_data = cpu.ram_write_data
+//     cpu.ram_read_data = ram.read_data
+
+//     if cpu.flags.halt {
+//         $stop()
+//     }
+
+//     let disp = {
+//         let counter = Reg<uint<28>>(clk)
+//         counter.d = counter.q + 1
+//         (counter.q[27] ? cpu.display_reg[15:0] : cpu.display_reg[31:16])
+//     }
+
+//     let segs = Segments::Multi(clk, rst, value: disp)
+//     io_led = uint({uint(clk_), cpu.flags.halt, cpu.flags.carry, cpu.flags.zero, rst, cpu.stage, cpu.program_counter})
+//     io_seg = segs.segs
+//     io_an = segs.sel
+// }
