@@ -104,7 +104,7 @@ module CPU(
     
     match r_stage.q {
         Stage::FETCH => {
-            r_stage.d = Stage::DECODE
+            r_stage.d = Stage::DECODE // 1 cycle to read from RAM
         }
         Stage::DECODE => {
             r_instruction.d = ram_read_data
