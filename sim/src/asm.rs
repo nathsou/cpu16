@@ -434,4 +434,12 @@ impl Assembler {
         self.labels.insert(label.to_string(), self.output.len());
         self
     }
+
+    pub fn fill(&mut self, count: usize) -> &mut Self {
+        for _ in 0..count {
+            self.halt();
+        }
+
+        self
+    }
 }

@@ -209,7 +209,7 @@ impl std::fmt::Display for CPU {
         }
 
         let inst = self.rom[self.regs[Reg::PC as usize] as usize];
-        let inst = Inst::from(inst);
+        let inst_fmt = Inst::from(inst);
 
         write!(
             f,
@@ -217,7 +217,7 @@ impl std::fmt::Display for CPU {
             self.carry as u8, self.zero as u8
         )?;
 
-        write!(f, " {inst}")?;
+        write!(f, " {inst:04x}: {inst_fmt}")?;
 
         let stack_ptr = self.regs[Reg::SP as usize];
 

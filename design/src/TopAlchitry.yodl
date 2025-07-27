@@ -1,0 +1,43 @@
+import CPU
+import RAM
+import Segments
+import ResetConditioner
+import RegisterFile
+
+module Top(
+    clk: clock,
+    rst_n: bool,
+    io_sw: uint<4>,
+) -> (
+    led: uint<8>,
+    io_led: uint<24>,
+    io_an: uint<4>,
+    io_seg: uint<8>,
+) {
+    let clk_div = {
+        let div = Reg<bool>(clk)
+        div.d = not div.q
+        clock(div.q)
+    }
+
+    let rst = ResetConditioner::ResetConditioner<Stages: 4>(clk: clk_div, d: not rst_n).q
+    let ram = RAM::RAM(clk: clk_div)
+    let cpu = CPU::CPU(clk: clk_div, rst)
+
+    ram.write_enable = cpu.ram_write_enable
+    ram.addr = cpu.ram_address
+    ram.write_data = cpu.ram_write_data
+    cpu.ram_read_data = ram.read_data
+
+    if cpu.flags.halt {
+        $stop()
+    }
+
+    let disp = (orr io_sw) ? cpu.display_reg[15:0] : cpu.display_reg[31:16]
+    let segs = Segments::Multi(clk, rst, value: disp)
+
+    led = uint(8*{not rst_n})
+    io_led = {uint(clk_div), cpu.flags.halt, cpu.flags.carry, cpu.flags.zero, rst, cpu.stage, cpu.program_counter}
+    io_seg = segs.segs
+    io_an = segs.sel
+}
