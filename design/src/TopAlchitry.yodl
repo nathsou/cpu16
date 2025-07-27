@@ -1,3 +1,8 @@
+import CPU
+import RAM
+import Segments
+import ResetConditioner
+import RegisterFile
 
 module Top(
     clk: clock,
@@ -32,7 +37,7 @@ module Top(
     let segs = Segments::Multi(clk, rst, value: disp)
 
     led = uint(8*{not rst_n})
-    io_led = uint({uint(clk_div), cpu.flags.halt, cpu.flags.carry, cpu.flags.zero, rst, cpu.stage, cpu.program_counter})
+    io_led = {uint(clk_div), cpu.flags.halt, cpu.flags.carry, cpu.flags.zero, rst, cpu.stage, cpu.program_counter}
     io_seg = segs.segs
     io_an = segs.sel
 }

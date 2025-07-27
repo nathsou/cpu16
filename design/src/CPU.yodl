@@ -97,10 +97,11 @@ module CPU(
     r_zero_flag.d = alu.new_flags.zero
     r_carry_flag.d = alu.new_flags.carry
     ram_write_data = 16'd0
-
+    w_reg_write_enable = false
+    w_mem_address = program_counter
+    ram_write_enable = false
     regs.count_enable = false
     
-    // Sequential logic
     match r_stage.q {
         Stage::FETCH => {
             r_stage.d = Stage::DECODE
@@ -110,6 +111,7 @@ module CPU(
             r_reg_write_dest.d = ram_read_data[13:11]
             r_reg_read_src1.d = ram_read_data[10:8]
             r_reg_read_src2.d = ram_read_data[7:5]
+            r_stage.d = Stage::EXECUTE
 
             match ram_read_data[15:14] {
                 OpCode::SET => {
@@ -120,14 +122,6 @@ module CPU(
                     if not ram_read_data[7] { // Store
                         r_reg_read_src2.d = ram_read_data[13:11]
                     }
-
-                    r_stage.d = Stage::EXECUTE
-                }
-                OpCode::CTL => {
-                    r_stage.d = Stage::EXECUTE
-                }
-                OpCode::ALU => {
-                    r_stage.d = Stage::EXECUTE
                 }
             }
         }
@@ -148,6 +142,9 @@ module CPU(
                     }
                 }
                 OpCode::MEM => {
+                    w_mem_address = regs.read_data1 + {9'd0, r_instruction.q[6:0]}
+                    ram_write_enable = not is_load
+
                     if not is_load {
                         ram_write_data = regs.read_data2
                     }
@@ -171,34 +168,17 @@ module CPU(
             }
         }
         Stage::MEMORY_ACCESS => {
+            r_stage.d = Stage::WRITEBACK
+            w_reg_write_enable = is_load
+
             if is_load {
                 r_reg_write_data.d = ram_read_data
             }
-
-            r_stage.d = Stage::WRITEBACK
         }
         Stage::WRITEBACK => {
             r_stage.d = Stage::FETCH
             regs.count_enable = true
-        }
-    }
 
-    // Combinational logic
-    w_reg_write_enable = false
-    w_mem_address = program_counter
-    ram_write_enable = false
-
-    match r_stage.q {
-        Stage::EXECUTE => {
-            if op_code == OpCode::MEM {
-                w_mem_address = regs.read_data1 + {9'd0, r_instruction.q[6:0]}
-                ram_write_enable = not is_load
-            }
-        }
-        Stage::MEMORY_ACCESS => {
-            w_reg_write_enable = is_load
-        }
-        Stage::WRITEBACK => {
             match op_code {
                 OpCode::SET => {
                     w_reg_write_enable = true

@@ -11,7 +11,7 @@ VTop: VTop.mk
 	make -C ./obj_dir -f VTop.mk
 
 Top.fir:
-	cd ../.. && yodl design/src/Top.yodl "write_firrtl sim/verilator/Top.fir"
+	cd ../.. && yodl design/src/TopNandlandGo.yodl "write_firrtl sim/verilator/Top.fir"
 
 Top.sv: Top.fir
 	firtool -O=release --format=fir --verilog Top.fir -o Top.sv
