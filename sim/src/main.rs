@@ -105,9 +105,9 @@ fn euler1() -> Vec<u16> {
     use Reg::*;
 
     // ram addresses
-    let n = 0;
-    let sum_hi = 1;
-    let sum_lo = 2;
+    let n = 1;
+    let sum_hi = 2;
+    let sum_lo = 3;
 
     let mut asm = Assembler::new();
 
