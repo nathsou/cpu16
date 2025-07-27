@@ -2,14 +2,14 @@ set_io clk P7
 
 set_io rst_n P8
 
-# set_io led[0] J11
-# set_io led[1] K11
-# set_io led[2] K12
-# set_io led[3] K14
-# set_io led[4] L12
-# set_io led[5] L14
-# set_io led[6] M12
-# set_io led[7] N14
+set_io led[0] J11
+set_io led[1] K11
+set_io led[2] K12
+set_io led[3] K14
+set_io led[4] L12
+set_io led[5] L14
+set_io led[6] M12
+set_io led[7] N14
 
 # set_io usb_rx P14
 # set_io usb_tx M9
@@ -39,11 +39,11 @@ set_io io_led[21] C1
 set_io io_led[22] D1
 set_io io_led[23] E1
 
-# set_io io_sw[0] G11
-# set_io io_sw[1] H11
-# set_io io_sw[2] H12
-# set_io io_sw[3] J12
-# set_io io_sw[4] P2
+set_io io_sw[0] G11
+set_io io_sw[1] H11
+set_io io_sw[2] H12
+set_io io_sw[3] J12
+set_io io_sw[4] P2
 
 set_io io_an[0] G3
 set_io io_an[1] G1
