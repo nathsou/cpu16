@@ -1,19 +1,16 @@
 
-module ResetConditioner<Stages: uint>(
+module ResetConditioner<Cycles: uint>(
     clk: clock,
     d: bool,
 ) -> (
     q: bool,
 ) {
-    let stage = Reg<uint<Stages>>(clk)
-    let init = Reg<bool>(clk)
+    let counter = Reg<uint<$clog2(Cycles - 1)>>(clk)
 
-    if d or (not init.q) {
-        stage.d = 1
-        init.d = true
+    q = if counter.q != Cycles - 1 {
+        counter.d = counter.q + 1
+        true
     } else {
-        stage.d = {stage.q[Stages - 2 : 0], 1'b0}
+        d
     }
-
-    q = stage.q[Stages - 1]
 }

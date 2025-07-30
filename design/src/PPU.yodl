@@ -1,0 +1,10 @@
+
+// tiles: 16px by 16px
+// resolution: 640x480px (40x30 tiles)
+// background tables: 2 (1 active, 1 for updates) manually swapped
+// sprite tables: 2 (1 active, 1 for updates) manually swapped
+// sprite count: 64
+// color palette: 16 colors (4 bits per pixel)
+// hardware interrupts: 1 (VBlank)
+// DMA: To be investigated
+

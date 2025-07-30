@@ -24,11 +24,7 @@ package CtlOp {
     const CLEAR_CARRY = 3'd4
 }
 
-type Flags = {
-    halt: bool,
-    zero: bool,
-    carry: bool,
-}
+type Flags = { halt: bool, zero: bool, carry: bool }
 
 module CPU(
     clk: clock,
@@ -58,9 +54,9 @@ module CPU(
     let r_carry_flag = Reg<bool>(clk, rst)
 
     // Wires
-    let w_reg_write_enable: bool;
-    let w_alu_condition_met: bool;
-    let w_mem_address: uint<16>;
+    let w_reg_write_enable: bool
+    let w_alu_condition_met: bool
+    let w_mem_address: uint<16>
 
     // Instruction decoding
     let op_code = r_instruction.q[15:14]

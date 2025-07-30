@@ -2,7 +2,6 @@ import CPU
 import RAM
 import Segments
 import ResetConditioner
-import RegisterFile
 
 module Top(
     clk: clock,
@@ -12,7 +11,7 @@ module Top(
     seg1: uint<7>,
     seg2: uint<7>,
 ) {
-    let rst = ResetConditioner::ResetConditioner<Stages: 4>(clk, d: orr buttons).q
+    let rst = ResetConditioner::ResetConditioner<Cycles: 64>(clk, d: orr buttons).q
     let ram = RAM::RAM(clk)
     let cpu = CPU::CPU(clk, rst)
 
@@ -37,7 +36,7 @@ module Top(
         }
     }
 
-    seg1 = not Segments::Decoder(char: display.val[7:4]).segs
-    seg2 = not Segments::Decoder(char: display.val[3:0]).segs
+    seg1 = Segments::Decoder(char: display.val[7:4]).segs
+    seg2 = Segments::Decoder(char: display.val[3:0]).segs
     leds = display.sel
 }
