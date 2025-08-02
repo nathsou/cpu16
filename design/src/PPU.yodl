@@ -1,10 +1,98 @@
+import VGA
 
 // tiles: 16px by 16px
 // resolution: 640x480px (40x30 tiles)
-// background tables: 2 (1 active, 1 for updates) manually swapped
-// sprite tables: 2 (1 active, 1 for updates) manually swapped
 // sprite count: 64
 // color palette: 16 colors (4 bits per pixel)
 // hardware interrupts: 1 (VBlank)
 // DMA: To be investigated
 
+const TILES_X = 40
+const TILES_Y = 30
+const TILE_SIZE = 16
+const PATTERN_TABLE_SIZE = 256
+
+type VGASignals = {
+    hsync: bool,
+    vsync: bool,
+    col: uint<10>,
+    row: uint<10>,
+    is_active_area: bool,
+    color: {
+        r: uint<3>,
+        g: uint<3>,
+        b: uint<3>,
+    },
+}
+
+module PPU(
+    pixel_clk: clock,
+    rst: bool,
+) -> (
+    vga: VGASignals,
+) {
+    let vga_count_enable = Reg<bool>(clk: pixel_clk, rst)
+    let row_shift_reg = Reg<uint<16>>(clk: pixel_clk, rst)
+
+    // 1 byte per tile (index into pattern table)
+    // let name_table = Memory<
+    //     T: uint<8>,
+    //     Depth: TILES_X * TILES_Y,
+    //     ReadPorts: 1,
+    //     WritePorts: 1,
+    //     ReadLatency: 1,
+    //     WriteLatency: 1,
+    // > (
+    //     read: [],
+    //     write: [],
+    // )
+
+    let sync_pulses = VGA::SyncPulses(pixel_clk, count_enable: true)
+    let name_table_index = Reg<uint<8>>(clk: pixel_clk, rst)
+    let y = sync_pulses.row[3:0] // 4 bits for row within tile
+    let x = sync_pulses.col[3:0]
+    let pattern_table_addr: uint<13> = (name_table_index.q shl 5) + (y shl 1) + x[3]
+
+    let pattern_table = Memory<
+        T: uint<8>,
+        Depth: PATTERN_TABLE_SIZE * 32,
+        ReadPorts: 1,
+        WritePorts: 0,
+        ReadLatency: 1,
+        WriteLatency: 1,
+    >(
+        read: [{ clk: pixel_clk, en: true, addr: pattern_table_addr }],
+    )
+
+    $readmemh("font.hex", pattern_table)
+
+    if not vga_count_enable.q {
+        // prefetch the first 8 pixels
+        row_shift_reg.d = {pattern_table.q[0], 8'0}
+        vga_count_enable.d = true
+        name_table_index.d = 8'd40
+    } else if sync_pulses.is_active_area {
+        if x[2:0] == 3'd7 {
+            // load next 8 pixels from the pattern table
+            row_shift_reg.d = {row_shift_reg.q[14:7], pattern_table.q[0]}
+        } else {
+            // shift the row shift register to the left
+            row_shift_reg.d = {row_shift_reg.q[14:0], 1'0}
+        }
+    }
+
+    // $printf("counter: %d, Row Shift Reg: %b\n", tile_counter.q, row_shift_reg.q)
+
+    let pixel = row_shift_reg.q[15]
+    vga.color = if sync_pulses.is_active_area and pixel {
+        { r: 3'd7, g: 3'd0, b: 3'd7 } // foreground color
+    } else {
+        { r: 3'd0, g: 3'd0, b: 3'd0 } // background color
+    }
+
+    vga.hsync = sync_pulses.hsync
+    vga.vsync = sync_pulses.vsync
+    vga.col = sync_pulses.col
+    vga.row = sync_pulses.row
+    vga.is_active_area = sync_pulses.is_active_area
+}

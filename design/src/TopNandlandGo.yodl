@@ -1,5 +1,6 @@
 import CPU
 import RAM
+import PPU
 import Segments
 import ResetConditioner
 
@@ -10,10 +11,16 @@ module Top(
     leds: uint<4>,
     seg1: uint<7>,
     seg2: uint<7>,
+    vga_hsync: bool,
+    vga_vsync: bool,
+    vga_red: uint<3>,
+    vga_green: uint<3>,
+    vga_blue: uint<3>,
 ) {
     let rst = ResetConditioner::ResetConditioner<Cycles: 64>(clk, d: orr buttons).q
     let ram = RAM::RAM(clk)
     let cpu = CPU::CPU(clk, rst)
+    let ppu = PPU::PPU(pixel_clk: clk, rst)
 
     ram.write_enable = cpu.ram_write_enable
     ram.addr = cpu.ram_address
@@ -39,4 +46,10 @@ module Top(
     seg1 = Segments::Decoder(char: display.val[7:4]).segs
     seg2 = Segments::Decoder(char: display.val[3:0]).segs
     leds = display.sel
+
+    vga_hsync = ppu.vga.hsync
+    vga_vsync = ppu.vga.vsync
+    vga_red = ppu.vga.color.r
+    vga_green = ppu.vga.color.g
+    vga_blue = ppu.vga.color.b
 }
