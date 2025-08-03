@@ -1,15 +1,15 @@
 import VGA
 
-// tiles: 16px by 16px
-// resolution: 640x480px (40x30 tiles)
+// tiles: 8x8px
+// resolution: 640x480px (80x60 tiles)
 // sprite count: 64
 // color palette: 16 colors (4 bits per pixel)
 // hardware interrupts: 1 (VBlank)
 // DMA: To be investigated
 
-const TILES_X = 40
-const TILES_Y = 30
-const TILE_SIZE = 16
+const TILES_X = 80
+const TILES_Y = 60
+const TILE_SIZE = 8
 const PATTERN_TABLE_SIZE = 256
 
 type VGASignals = {
@@ -31,27 +31,31 @@ module PPU(
 ) -> (
     vga: VGASignals,
 ) {
-    let vga_count_enable = Reg<bool>(clk: pixel_clk, rst)
-    let row_shift_reg = Reg<uint<16>>(clk: pixel_clk, rst)
+    let sync_pulses = VGA::SyncPulses(pixel_clk, count_enable: true)
+    let row_shift_reg = Reg<uint<8>>(clk: pixel_clk, rst)
+    let nametable_addr: uint<$clog2(TILES_X * TILES_Y)>
 
     // 1 byte per tile (index into pattern table)
-    // let name_table = Memory<
-    //     T: uint<8>,
-    //     Depth: TILES_X * TILES_Y,
-    //     ReadPorts: 1,
-    //     WritePorts: 1,
-    //     ReadLatency: 1,
-    //     WriteLatency: 1,
-    // > (
-    //     read: [],
-    //     write: [],
-    // )
+    let name_table = Memory<
+        T: uint<8>,
+        Depth: TILES_X * TILES_Y,
+        ReadPorts: 1,
+        WritePorts: 0,
+        ReadLatency: 1,
+        WriteLatency: 1,
+    > (
+        read: [{ clk: pixel_clk, en: sync_pulses.is_active_area, addr: nametable_addr }],
+    )
 
-    let sync_pulses = VGA::SyncPulses(pixel_clk, count_enable: true)
-    let name_table_index = Reg<uint<8>>(clk: pixel_clk, rst)
-    let y = sync_pulses.row[3:0] // 4 bits for row within tile
-    let x = sync_pulses.col[3:0]
-    let pattern_table_addr: uint<13> = (name_table_index.q shl 5) + (y shl 1) + x[3]
+    $readmemh("resources/nametable.hex", name_table)
+
+    let y = sync_pulses.row[2:0] // 4 bits for row within tile
+    let x = sync_pulses.col[2:0]
+    let tile_x = sync_pulses.col[9:3]
+    let tile_y = sync_pulses.row[9:3]
+    let next_tile_x = tile_x == (TILES_X - 1) ? 0 : tile_x + 1
+    nametable_addr = (tile_y * TILES_X) + next_tile_x
+    let pattern_table_addr: uint<13> = (name_table.q[0] shl 3) + y
 
     let pattern_table = Memory<
         T: uint<8>,
@@ -64,28 +68,19 @@ module PPU(
         read: [{ clk: pixel_clk, en: true, addr: pattern_table_addr }],
     )
 
-    $readmemh("font.hex", pattern_table)
+    $readmemh("resources/font.hex", pattern_table)
 
-    if not vga_count_enable.q {
-        // prefetch the first 8 pixels
-        row_shift_reg.d = {pattern_table.q[0], 8'0}
-        vga_count_enable.d = true
-        name_table_index.d = 8'd40
-    } else if sync_pulses.is_active_area {
+    if sync_pulses.is_active_area {
         if x[2:0] == 3'd7 {
-            // load next 8 pixels from the pattern table
-            row_shift_reg.d = {row_shift_reg.q[14:7], pattern_table.q[0]}
+            row_shift_reg.d = pattern_table.q[0] // load next 8 pixels from the pattern table
         } else {
-            // shift the row shift register to the left
-            row_shift_reg.d = {row_shift_reg.q[14:0], 1'0}
+            row_shift_reg.d = {1'0, row_shift_reg.q[7:1]} // shift the row register to the right
         }
     }
 
-    // $printf("counter: %d, Row Shift Reg: %b\n", tile_counter.q, row_shift_reg.q)
-
-    let pixel = row_shift_reg.q[15]
+    let pixel = row_shift_reg.q[0]
     vga.color = if sync_pulses.is_active_area and pixel {
-        { r: 3'd7, g: 3'd0, b: 3'd7 } // foreground color
+        { r: 3'd1, g: 3'd5, b: 3'd4 } // foreground color
     } else {
         { r: 3'd0, g: 3'd0, b: 3'd0 } // background color
     }
