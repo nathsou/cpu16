@@ -279,13 +279,21 @@ fn ppu() -> Vec<u16> {
     let message = "Yodl is a simple and modern behavioural Hardware Description Language (HDL) which acts as a lightweight abstraction layer over the FIRRTL intermediate representation to describe digital circuits.";
 
     asm.init_sp()
-        .setw(R1, 0xFFF0, TMP) // R1 = PPU_ADDR
-        .store(Z, R1, 0) // PPU_ADDR = 0
+        .setw(R1, 0xFFF0, TMP) // R1 = PPU_CTRL
+        .set(TMP, 128)
+        .store(TMP, R1, 0) // PPU_CTRL = 128 (disable background rendering)
+        .inc(R1) // R1 = PPU_ADDR
+        .set(R2, 1)
+        .set(TMP, 15)
+        .shl(R2, R2, TMP) // R2 = 0x8000
+        .store(R2, R1, 0) // PPU_ADDR = 0x8000 (start address of nametable)
         .inc(R1); // R1 = PPU_DATA
 
     for byte in message.bytes() {
         asm.set(R2, byte as u16).store(R2, R1, 0); // PPU_DATA = byte
     }
+
+    asm.dec(R1).dec(R1).store(Z, R1, 0); // PPU_CTRL = 0 (enable background rendering)
 
     asm.halt().assemble()
 }

@@ -11,7 +11,8 @@ const TILES_X = 80
 const TILES_Y = 60
 const TILE_SIZE = 8
 const PATTERN_TABLE_SIZE = 256
-const NAMETABLE_ADDR_WIDTH = $clog2(TILES_X * TILES_Y)
+const NAMETABLE_BANKS = 1
+const NAMETABLE_ADDR_WIDTH = $clog2(TILES_X * TILES_Y * NAMETABLE_BANKS)
 
 type VGASignals = {
     hsync: bool,
@@ -39,19 +40,29 @@ module PPU(
     let sync_pulses = VGA::SyncPulses(pixel_clk, count_enable: true)
     let row_shift_reg = Reg<uint<8>>(clk: pixel_clk, rst)
     let nametable_addr: uint<NAMETABLE_ADDR_WIDTH>
-    let ppu_addr_reg = Reg<uint<NAMETABLE_ADDR_WIDTH>>(clk, rst)
+    let ppu_ctrl_reg = Reg<uint<8>>(clk, rst)
+    let ppu_addr_reg = Reg<uint<16>>(clk, rst)
     let ppu_data = 8'h0
     let nametable_write_enable = false
+    let pattern_table_write_enable = false
+    let enable_bg_rendering = not ppu_ctrl_reg.q[7]
 
+    // memory map:
+    // 0x0000 - 0x1FFF: Pattern Table
+    // 0x8000 - 0x92BF: Nametable 1
     if write_enable {
         match addr[3:0] {
             4'h0 => {
-                ppu_addr_reg.d = write_data[NAMETABLE_ADDR_WIDTH - 1:0]
+                ppu_ctrl_reg.d = write_data[7:0]
             }
             4'h1 => {
+                ppu_addr_reg.d = write_data
+            }
+            4'h2 => {
                 ppu_data = write_data[7:0]
                 ppu_addr_reg.d = ppu_addr_reg.q + 1
-                nametable_write_enable = true
+                pattern_table_write_enable = not ppu_addr_reg.q[15]
+                nametable_write_enable = ppu_addr_reg.q[15]
             }
         }
     }
@@ -66,7 +77,7 @@ module PPU(
         WriteLatency: 1,
     > (
         read: [{ clk: pixel_clk, en: sync_pulses.is_active_area, addr: nametable_addr }],
-        write: [{ clk: clk, en: nametable_write_enable, addr: ppu_addr_reg.q, data: ppu_data, mask: true }],
+        write: [{ clk: clk, en: nametable_write_enable, addr: ppu_addr_reg.q[12:0], data: ppu_data, mask: true }],
     )
 
     let y = sync_pulses.row[2:0] // 4 bits for row within tile
@@ -81,11 +92,12 @@ module PPU(
         T: uint<8>,
         Depth: PATTERN_TABLE_SIZE * 32,
         ReadPorts: 1,
-        WritePorts: 0,
+        WritePorts: 1,
         ReadLatency: 1,
         WriteLatency: 1,
     >(
         read: [{ clk: pixel_clk, en: true, addr: pattern_table_addr }],
+        write: [{ clk: clk, en: pattern_table_write_enable, addr: ppu_addr_reg.q[12:0], data: ppu_data, mask: true }],
     )
 
     $readmemh("resources/font.hex", pattern_table)
@@ -99,7 +111,7 @@ module PPU(
     }
 
     let pixel = row_shift_reg.q[0]
-    vga.color = if sync_pulses.is_active_area and pixel {
+    vga.color = if enable_bg_rendering and sync_pulses.is_active_area and pixel {
         { r: 3'd1, g: 3'd5, b: 3'd4 } // foreground color
     } else {
         { r: 3'd0, g: 3'd0, b: 3'd0 } // background color
