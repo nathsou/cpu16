@@ -1,0 +1,40 @@
+import CPU
+import RAM
+import PPU
+import MMIO
+import ResetConditioner
+
+module SOC(
+  clk: clock,
+  pixel_clk: clock,
+  rst: bool,
+) -> (
+  vga: PPU::VGASignals,
+  output: uint<32>,
+) {
+    let ram = RAM::RAM(clk)
+    let cpu = CPU::CPU(clk, rst)
+    let ppu = PPU::PPU(clk, pixel_clk, rst)
+    let mmio = MMIO::MMIO(
+      clk,
+      rst,
+      addr: cpu.ram_address,
+      write_enable: cpu.ram_write_enable,
+      write_data: cpu.ram_write_data,
+      ram_read_data: ram.read_data,
+    )
+
+    ram.write_enable = mmio.ram.write_enable
+    ram.addr = mmio.ram.addr
+    ram.write_data = mmio.ram.write_data
+    ram.read_enable = mmio.ram.read_enable
+
+    ppu.write_enable = mmio.ppu.write_enable
+    ppu.addr = mmio.ppu.addr
+    ppu.write_data = mmio.ppu.write_data
+
+    cpu.ram_read_data = mmio.cpu.read_data
+
+    output = cpu.display_reg
+    vga = ppu.vga
+}

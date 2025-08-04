@@ -269,6 +269,27 @@ fn itoa() -> Vec<u16> {
     asm.assemble()
 }
 
+fn ppu() -> Vec<u16> {
+    use Reg::*;
+
+    let mut asm = Assembler::new();
+
+    asm.setw(R1, 0xFFF0, TMP).store(Z, R1, 0).store(Z, R1, 1);
+
+    let message = "Yodl is a simple and modern behavioural Hardware Description Language (HDL) which acts as a lightweight abstraction layer over the FIRRTL intermediate representation to describe digital circuits.";
+
+    asm.init_sp()
+        .setw(R1, 0xFFF0, TMP) // R1 = PPU_ADDR
+        .store(Z, R1, 0) // PPU_ADDR = 0
+        .inc(R1); // R1 = PPU_DATA
+
+    for byte in message.bytes() {
+        asm.set(R2, byte as u16).store(R2, R1, 0); // PPU_DATA = byte
+    }
+
+    asm.halt().assemble()
+}
+
 #[test]
 fn test_add() {
     let mut cpu = CPU::from(&add(), START_PC);
@@ -489,8 +510,8 @@ fn read_bin_file(bin_path: &str) -> std::io::Result<[u16; 65536]> {
 }
 
 fn main() {
-    let prog = euler1();
-    dump_hex(&prog, "euler1.hex");
+    let prog = ppu();
+    dump_hex(&prog, "ppu.hex");
     // let prog = read_bin_file("count.bin").expect("failed to read bin file");
 
     let mut cpu = CPU::from(&prog, START_PC);

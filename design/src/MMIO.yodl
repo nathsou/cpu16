@@ -1,0 +1,29 @@
+
+// Memory Mapped IO Controller
+
+module MMIO(
+  clk: clock,
+  rst: bool,
+  addr: uint<16>,
+  write_enable: bool,
+  write_data: uint<16>,
+  ram_read_data: uint<16>,
+) -> (
+  ram: { addr: uint<16>, write_data: uint<16>, read_enable: bool, write_enable: bool },
+  ppu: { addr: uint<16>, write_data: uint<16>, write_enable: bool },
+  cpu: { read_data: uint<16> },
+) {
+  ram.addr = addr
+  ppu.addr = addr
+
+  ram.write_data = write_data
+  ppu.write_data = write_data
+
+  // PPU registers: 0xFFF0 to 0xFFFF
+  let is_ppu_write_addr = addr[15:4] == 12'hFFF
+
+  ram.read_enable = true
+  ram.write_enable = write_enable and (not is_ppu_write_addr)
+  ppu.write_enable = write_enable and is_ppu_write_addr
+  cpu.read_data = ram_read_data
+}

@@ -1,4 +1,4 @@
-import PPU
+import SOC
 
 module TopSim(
     clk: clock,
@@ -11,11 +11,11 @@ module TopSim(
     g: uint<3>,
     b: uint<3>,
 ) {
-    let ppu = PPU::PPU(pixel_clk: clk, rst)
-    is_active_area = ppu.vga.is_active_area
-    screen_x = ppu.vga.col
-    screen_y = ppu.vga.row
-    r = ppu.vga.color.r
-    g = ppu.vga.color.g
-    b = ppu.vga.color.b
+    let soc = SOC::SOC(clk, pixel_clk: clk, rst: rst)
+    is_active_area = soc.vga.is_active_area
+    screen_x = soc.vga.col
+    screen_y = soc.vga.row
+    r = soc.vga.color.r
+    g = soc.vga.color.g
+    b = soc.vga.color.b
 }
