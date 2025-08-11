@@ -1,9 +1,9 @@
-pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt]!Error {
+pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt] raise Error {
   let lexer = Lexer::new(source)
   let tokens = []
 
   while true {
-    let token = lexer.next!()
+    let token = lexer.next()
 
     match token {
       Some(t) => {
@@ -16,17 +16,17 @@ pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt]!Error
   }
 
   let parser = Parser::new(tokens)
-  let decls = parser.parse_decls!()
+  let decls = parser.parse_decls()
   let type_checker = TypeChecker::new()
 
   for decl in decls {
-    let _ = type_checker.type_decl!(decl)
+    let _ = type_checker.type_decl(decl)
   }
 
   let tac_builder = TACBuilder::new()
   
   for decl in decls {
-    tac_builder.lower_decl!(decl)
+    tac_builder.lower_decl(decl)
   }
 
   if verbose {
@@ -41,7 +41,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt]!Error
   let env = Env::new()
 
   for tac in tac_builder.tac {
-    let _ = ir_builder.lower_expr!(tac, env)
+    let _ = ir_builder.lower_expr(tac, env)
   }
 
   if verbose {
@@ -55,7 +55,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt]!Error
   let lir_builder = LIRBuilder::from(ir_builder)
   
   for inst in ir_builder.insts {
-    let _ = lir_builder.lower_ir!(inst)
+    let _ = lir_builder.lower_ir(inst)
   }
 
   if verbose {
@@ -68,7 +68,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt]!Error
 
   lir_builder.remove_labels()
   lir_builder.allocate()
-  let insts = lir_builder.lower_lir!()
+  let insts = lir_builder.lower_lir()
 
   if verbose {
     println("\nAllocated LIR:")

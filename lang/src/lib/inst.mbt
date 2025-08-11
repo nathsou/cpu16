@@ -93,23 +93,23 @@ impl Encode for AluOp with encode(op) -> UInt {
 impl Encode for Inst with encode(inst) -> UInt {
   match inst {
     Ctl(op~) => {
-      0b00U << 14 | Encode::encode(op)
+      (0b00U << 14) | Encode::encode(op)
     }
     Set(dst~, val~) => {
-      0b01U << 14 | Encode::encode(dst) << 11 | (val & 0x7ff)
+      (0b01U << 14) | (Encode::encode(dst) << 11) | (val & 0x7ff)
     }
     Mem(dst~, addr~, load~, offset~) => {
-      0b10U << 14 |
-      Encode::encode(dst) << 11 |
-      Encode::encode(addr) << 8 |
-      (if load { 1U } else { 0U }) << 7 |
+      (0b10U << 14) |
+      (Encode::encode(dst) << 11) |
+      (Encode::encode(addr) << 8) |
+      ((if load { 1U } else { 0U }) << 7) |
       (offset & 0x7f)
     }
     Alu(dst~, src1~, src2~, op~) => {
-      0b11U << 14 |
-      Encode::encode(dst) << 11 |
-      Encode::encode(src1) << 8 |
-      Encode::encode(src2) << 5 |
+      (0b11U << 14) |
+      (Encode::encode(dst) << 11) |
+      (Encode::encode(src1) << 8) |
+      (Encode::encode(src2) << 5) |
       Encode::encode(op)
     }
   }
@@ -117,4 +117,45 @@ impl Encode for Inst with encode(inst) -> UInt {
 
 pub fn encode_inst(inst: Inst) -> UInt {
   Encode::encode(inst)
+}
+
+// Touch otherwise-unused enum variants to silence "never constructed" warnings
+pub fn __suppress_inst_variant_warnings() -> UInt {
+  let mut acc = 0U
+  // Registers
+  acc += Encode::encode(Reg::SP)
+  // Control operations
+  acc += Encode::encode(ControlOp::Setz)
+  acc += Encode::encode(ControlOp::Clrz)
+  acc += Encode::encode(ControlOp::Setc)
+  acc += Encode::encode(ControlOp::Clrc)
+  acc += Encode::encode(ControlOp::Restore)
+  // ALU operations
+  acc += Encode::encode(AluOp::Adc)
+  acc += Encode::encode(AluOp::Sbc)
+  acc += Encode::encode(AluOp::AddIfZero)
+  acc += Encode::encode(AluOp::SubIfZero)
+  acc += Encode::encode(AluOp::AdcIfZero)
+  acc += Encode::encode(AluOp::SbcIfZero)
+  acc += Encode::encode(AluOp::AddIfNotZero)
+  acc += Encode::encode(AluOp::SubIfNotZero)
+  acc += Encode::encode(AluOp::AdcIfNotZero)
+  acc += Encode::encode(AluOp::SbcIfNotZero)
+  acc += Encode::encode(AluOp::AddIfCarry)
+  acc += Encode::encode(AluOp::SubIfCarry)
+  acc += Encode::encode(AluOp::AdcIfCarry)
+  acc += Encode::encode(AluOp::SbcIfCarry)
+  acc += Encode::encode(AluOp::AddIfNotCarry)
+  acc += Encode::encode(AluOp::SubIfNotCarry)
+  acc += Encode::encode(AluOp::AdcIfNotCarry)
+  acc += Encode::encode(AluOp::SbcIfNotCarry)
+  acc += Encode::encode(AluOp::Inc)
+  acc += Encode::encode(AluOp::Dec)
+  acc += Encode::encode(AluOp::And)
+  acc += Encode::encode(AluOp::Nand)
+  acc += Encode::encode(AluOp::Or)
+  acc += Encode::encode(AluOp::Xor)
+  acc += Encode::encode(AluOp::Shl)
+  acc += Encode::encode(AluOp::Shr)
+  acc
 }

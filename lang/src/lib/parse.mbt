@@ -11,7 +11,7 @@ pub fn Parser::new(tokens: Array[Token]) -> Parser {
     }
 }
 
-type! ParserError String derive (Show)
+suberror ParserError String derive (Show)
 
 fn Parser::peek(self: Parser) -> Option[Token] {
     if self.index < self.tokens.length() {
@@ -25,7 +25,7 @@ fn advance(self: Parser) -> Unit {
     self.index += 1
 }
 
-fn expect(self: Parser, expected: Token) -> Unit!ParserError {
+fn expect(self: Parser, expected: Token) -> Unit raise ParserError {
     match self.peek() {
         Some(token) => {
             if token == expected {
@@ -56,7 +56,7 @@ fn Parser::consumes(self: Parser, expected: Token) -> Bool {
     }
 }
 
-fn identifier(self: Parser) -> String!ParserError {
+fn identifier(self: Parser) -> String raise ParserError {
     match self.peek() {
         Some(Token::Identifier(ident)) => {
             self.advance()
@@ -68,7 +68,7 @@ fn identifier(self: Parser) -> String!ParserError {
     }
 }
 
-fn parse_type(self: Parser) -> Type!ParserError {
+fn parse_type(self: Parser) -> Type raise ParserError {
     match self.peek() {
         Some(Token::U8) => {
             self.advance()
@@ -95,22 +95,22 @@ fn parse_type(self: Parser) -> Type!ParserError {
     }
 }
 
-pub fn parse_expr(self: Parser) -> Expr!ParserError {
-    self.parse_if_expr!()
+pub fn parse_expr(self: Parser) -> Expr raise ParserError {
+    self.parse_if_expr()
 }
 
 // if <expr> { <expr> } (else { <expr> })?
-fn parse_if_expr(self: Parser) -> Expr!ParserError {
+fn parse_if_expr(self: Parser) -> Expr raise ParserError {
     if self.consumes(Token::If) {
-        let cond = self.parse_expr!()
-        self.expect!(Token::Lbrace)
-        let then_expr = self.parse_expr!()
-        self.expect!(Token::Rbrace)
+        let cond = self.parse_expr()
+        self.expect(Token::Lbrace)
+        let then_expr = self.parse_expr()
+        self.expect(Token::Rbrace)
 
         let else_expr = if self.consumes(Token::Else) {
-            self.expect!(Token::Lbrace)
-            let expr = self.parse_expr!()
-            self.expect!(Token::Rbrace)
+            self.expect(Token::Lbrace)
+            let expr = self.parse_expr()
+            self.expect(Token::Rbrace)
             Some(expr)
         } else {
             None
@@ -118,17 +118,17 @@ fn parse_if_expr(self: Parser) -> Expr!ParserError {
 
         Expr::If(cond, then_expr, else_expr)
     } else {
-        self.parse_logical_or!()
+        self.parse_logical_or()
     }
 }
 
 // <logical_and> (|| <logical_and>)*
-fn parse_logical_or(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_logical_and!()
+fn parse_logical_or(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_logical_and()
 
     while true {
         if self.consumes(Token::PipePipe) {
-            let rhs = self.parse_logical_and!()
+            let rhs = self.parse_logical_and()
             lhs = Expr::BinaryOp(lhs, BinaryOp::Or, rhs)
         } else {
             break
@@ -139,12 +139,12 @@ fn parse_logical_or(self: Parser) -> Expr!ParserError {
 }
 
 // <equality> (|| <equality>)*
-fn parse_logical_and(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_equality_expr!()
+fn parse_logical_and(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_equality_expr()
 
     while true {
         if self.consumes(Token::AmpersandAmpersand) {
-            let rhs = self.parse_equality_expr!()
+            let rhs = self.parse_equality_expr()
             lhs = Expr::BinaryOp(lhs, BinaryOp::And, rhs)
         } else {
             break
@@ -155,8 +155,8 @@ fn parse_logical_and(self: Parser) -> Expr!ParserError {
 }
 
 // <comparison> (== | != <comparison>)*
-fn parse_equality_expr(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_comparison_expr!()
+fn parse_equality_expr(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_comparison_expr()
 
     while true {
         let op = match self.peek() {
@@ -166,7 +166,7 @@ fn parse_equality_expr(self: Parser) -> Expr!ParserError {
         }
 
         self.advance()
-        let rhs = self.parse_comparison_expr!()
+        let rhs = self.parse_comparison_expr()
         lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
@@ -174,8 +174,8 @@ fn parse_equality_expr(self: Parser) -> Expr!ParserError {
 }
 
 // <additive> ((< | > | <= | >=) <additive>)*
-fn parse_comparison_expr(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_additive_expr!()
+fn parse_comparison_expr(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_additive_expr()
 
     while true {
         let op = match self.peek() {
@@ -187,7 +187,7 @@ fn parse_comparison_expr(self: Parser) -> Expr!ParserError {
         }
 
         self.advance()
-        let rhs = self.parse_additive_expr!()
+        let rhs = self.parse_additive_expr()
         lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
@@ -195,8 +195,8 @@ fn parse_comparison_expr(self: Parser) -> Expr!ParserError {
 }
 
 // <unary> ((+ | -) <unary>)*
-fn parse_additive_expr(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_multiplicative_expr!()
+fn parse_additive_expr(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_multiplicative_expr()
 
     while true {
         let op = match self.peek() {
@@ -206,7 +206,7 @@ fn parse_additive_expr(self: Parser) -> Expr!ParserError {
         }
 
         self.advance()
-        let rhs = self.parse_multiplicative_expr!()
+        let rhs = self.parse_multiplicative_expr()
         lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
@@ -214,19 +214,20 @@ fn parse_additive_expr(self: Parser) -> Expr!ParserError {
 }
 
 // <additive> ((* | / | %) <additive>)*
-fn parse_multiplicative_expr(self: Parser) -> Expr!ParserError {
-    let mut lhs = self.parse_unary_expr!()
+fn parse_multiplicative_expr(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_unary_expr()
 
     while true {
         let op = match self.peek() {
             Some(Token::Star) => BinaryOp::Mul
             Some(Token::Slash) => BinaryOp::Div
             Some(Token::Percent) => BinaryOp::Mod
+            Some(Token::Caret) => BinaryOp::Xor
             _ => break
         }
 
         self.advance()
-        let rhs = self.parse_unary_expr!()
+        let rhs = self.parse_unary_expr()
         lhs = Expr::BinaryOp(lhs, op, rhs)
     }
 
@@ -234,19 +235,19 @@ fn parse_multiplicative_expr(self: Parser) -> Expr!ParserError {
 }
 
 // !<unary> | <primary>
-fn parse_unary_expr(self: Parser) -> Expr!ParserError {
+fn parse_unary_expr(self: Parser) -> Expr raise ParserError {
     if self.consumes(Token::Bang) {
-        let expr = self.parse_unary_expr!()
+        let expr = self.parse_unary_expr()
         Expr::UnaryOp(UnaryOp::Not, expr)
     } else {
-        self.parse_call_expr!()
+        self.parse_call_expr()
     }
 }
 
 // parameters ::= <expr> (',' <expr>)*
 // <primary> ('(' <parameters>? ')')?
-fn parse_call_expr(self: Parser) -> Expr!ParserError {
-    let lhs = self.parse_primary_expr!()
+fn parse_call_expr(self: Parser) -> Expr raise ParserError {
+    let lhs = self.parse_primary_expr()
 
     if self.consumes(Token::Lparen) {
         let params = []
@@ -256,11 +257,11 @@ fn parse_call_expr(self: Parser) -> Expr!ParserError {
         }
 
         while not(self.consumes(Token::Rparen)) {
-            let param = self.parse_expr!()
+            let param = self.parse_expr()
             params.push(param)
 
             if not(self.consumes(Token::Comma)) {
-                self.expect!(Token::Rparen)
+                self.expect(Token::Rparen)
                 break
             }
         }
@@ -272,12 +273,12 @@ fn parse_call_expr(self: Parser) -> Expr!ParserError {
 }
 
 // '(' <expr> ')' | <integer>
-fn parse_primary_expr(self: Parser) -> Expr!ParserError {
+fn parse_primary_expr(self: Parser) -> Expr raise ParserError {
     match self.peek() {
         Some(Token::Lparen) => {
-            self.expect!(Token::Lparen)
-            let expr = self.parse_expr!()
-            self.expect!(Token::Rparen)
+            self.expect(Token::Lparen)
+            let expr = self.parse_expr()
+            self.expect(Token::Rparen)
             expr
         }
         Some(Token::Integer(n, kind)) => {
@@ -305,36 +306,36 @@ fn parse_primary_expr(self: Parser) -> Expr!ParserError {
     }
 }
 
-pub fn parse_stmt(self: Parser) -> Stmt!ParserError {
+pub fn parse_stmt(self: Parser) -> Stmt raise ParserError {
     match self.peek() {
         Some(Token::Let) => {
             self.advance()
-            self.parse_let_stmt!(mutable=false)
+            self.parse_let_stmt(mutable=false)
         }
         Some(Token::Var) => {
             self.advance()
-            self.parse_let_stmt!(mutable=true)
+            self.parse_let_stmt(mutable=true)
         }
         Some(Token::While) => {
             self.advance()
-            self.parse_while_stmt!()
+            self.parse_while_stmt()
         }
         Some(Token::Return) => {
             self.advance()
-            self.parse_return_stmt!()
+            self.parse_return_stmt()
         }
-        _ => self.parse_assignment_stmt!()
+        _ => self.parse_assignment_stmt()
     }
 }
 
-fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
-    let lhs = self.parse_expr!()
+fn parse_assignment_stmt(self: Parser) -> Stmt raise ParserError {
+    let lhs = self.parse_expr()
     
     match self.peek() {
         Some(Token::Equal) => {
             self.advance()
-            let rhs = self.parse_expr!()
-            self.expect!(Token::Semicolon)
+            let rhs = self.parse_expr()
+            self.expect(Token::Semicolon)
             Stmt::Assign(lhs~, rhs~)
         }
         Some(Token::Semicolon) => {
@@ -347,94 +348,94 @@ fn parse_assignment_stmt(self: Parser) -> Stmt!ParserError {
     }
 }
 
-fn parse_let_stmt(self: Parser, mutable~: Bool) -> Stmt!ParserError {
-    let name = self.identifier!()
-    self.expect!(Token::Equal)
-    let value = self.parse_expr!()
-    self.expect!(Token::Semicolon)
+fn parse_let_stmt(self: Parser, mutable~: Bool) -> Stmt raise ParserError {
+    let name = self.identifier()
+    self.expect(Token::Equal)
+    let value = self.parse_expr()
+    self.expect(Token::Semicolon)
     Stmt::Let(name~, mutable~, value~)
 }
 
-fn parse_while_stmt(self: Parser) -> Stmt!ParserError {
-    let cond = self.parse_expr!()
-    self.expect!(Token::Lbrace)
+fn parse_while_stmt(self: Parser) -> Stmt raise ParserError {
+    let cond = self.parse_expr()
+    self.expect(Token::Lbrace)
 
     let body = []
     while self.peek() != Some(Token::Rbrace) {
-        let stmt = self.parse_stmt!()
+        let stmt = self.parse_stmt()
         body.push(stmt)
     }
     
-    self.expect!(Token::Rbrace)
+    self.expect(Token::Rbrace)
     Stmt::While(cond~, body~)
 }
 
-fn parse_return_stmt(self: Parser) -> Stmt!ParserError {
+fn parse_return_stmt(self: Parser) -> Stmt raise ParserError {
     let value = if self.consumes(Token::Semicolon) {
         None
     } else {
-        let expr = self.parse_expr!()
-        self.expect!(Token::Semicolon)
+        let expr = self.parse_expr()
+        self.expect(Token::Semicolon)
         Some(expr)
     }
 
     Stmt::Return(value~)
 }
 
-pub fn parse_decl(self: Parser) -> Decl!ParserError {
+pub fn parse_decl(self: Parser) -> Decl raise ParserError {
     match self.peek() {
         Some(Token::Fn) => {
             self.advance()
-            self.parse_fn_decl!()
+            self.parse_fn_decl()
         }
         _ => {
-            Decl::Stmt(self.parse_stmt!())
+            Decl::Stmt(self.parse_stmt())
         }
     }
 }
 
-fn parse_fn_decl(self: Parser) -> Decl!ParserError {
-    let name = self.identifier!()
-    self.expect!(Token::Lparen)
+fn parse_fn_decl(self: Parser) -> Decl raise ParserError {
+    let name = self.identifier()
+    self.expect(Token::Lparen)
     let parameters = []
 
     while true {
-        let param_name = self.identifier!()
-        self.expect!(Token::Colon)
-        let argType = self.parse_type!()
-        parameters.push({ name: param_name, ty: argType })
+        let param_name = self.identifier()
+        self.expect(Token::Colon)
+        let arg_type = self.parse_type()
+        parameters.push({ name: param_name, ty: arg_type })
 
         if not(self.consumes(Token::Comma)) {
             break
         }
     }
 
-    self.expect!(Token::Rparen)
+    self.expect(Token::Rparen)
 
     let returnType = if self.consumes(Token::Colon) {
-        self.parse_type!()
+        self.parse_type()
     } else {
         Type::Unit
     }
 
-    self.expect!(Token::Lbrace)
+    self.expect(Token::Lbrace)
     let body = []
 
     while self.peek() != Some(Token::Rbrace) {
-        let stmt = self.parse_stmt!()
+        let stmt = self.parse_stmt()
         body.push(stmt)
     }
 
-    self.expect!(Token::Rbrace)
+    self.expect(Token::Rbrace)
 
     Decl::Func(name~, parameters~, return_type=returnType, body~)
 }
 
-pub fn parse_decls(self: Parser) -> Array[Decl]!ParserError {
+pub fn parse_decls(self: Parser) -> Array[Decl] raise ParserError {
     let decls = []
 
     while self.index < self.tokens.length() {
-        decls.push(self.parse_decl!())
+        decls.push(self.parse_decl())
     }
 
     decls

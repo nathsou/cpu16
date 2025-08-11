@@ -59,7 +59,7 @@ pub fn Lexer::new(input: String) -> Lexer {
 
 fn peek(self: Lexer) -> Option[Char] {
     if self.index < self.input.length() {
-        Some(self.input[self.index])
+        self.input[self.index].to_char()
     } else {
         None
     }
@@ -95,7 +95,7 @@ fn parse_integer(self: Lexer) -> Int {
     let mut value = 0
     
     for i = self.index; i < self.input.length(); i = i + 1 {
-        let c = self.input[i]
+        let c = self.input[i].to_char().unwrap()
 
         if is_decimal_digit(c) {
             value = value * 10 + parse_digit(c)
@@ -130,7 +130,7 @@ fn parse_identifier(self: Lexer) -> String {
     identifier
 }
 
-type! LexerError String derive (Show)
+suberror LexerError String derive (Show)
 
 fn matches(self: Lexer, char: Char) -> Bool {
     match self.peek() {
@@ -148,10 +148,10 @@ fn consumes(self: Lexer, char: Char) -> Bool {
     }
 }
 
-pub fn next(self: Lexer) -> Option[Token]!LexerError {
+pub fn next(self: Lexer) -> Option[Token] raise LexerError {
     // skip whitespaces
     for i = self.index; i < self.input.length(); i = i + 1  {
-        let c = self.input[i]
+        let c = self.input[i].to_char().unwrap()
 
         if is_whitespace(c) {
             self.index += 1
@@ -164,7 +164,7 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
         return None
     }
 
-    let c = self.input[self.index]
+    let c = self.input[self.index].to_char().unwrap()
 
     match c {
         '(' => {
@@ -277,7 +277,28 @@ pub fn next(self: Lexer) -> Option[Token]!LexerError {
         _ => {
             if is_decimal_digit(c) {
                 let value = self.parse_integer()
-                Some(Token::Integer(value, IntKind::U16))
+                // Optional integer kind suffix: u8 (defaults to u16)
+                let saved_index = self.index
+                let kind = if self.consumes('u') {
+                    if self.consumes('8') {
+                        IntKind::U8
+                    } else if self.consumes('1') {
+                        if self.consumes('6') {
+                            IntKind::U16
+                        } else {
+                            // rollback if not a proper suffix
+                            self.index = saved_index
+                            IntKind::U16
+                        }
+                    } else {
+                        // rollback if not a proper suffix
+                        self.index = saved_index
+                        IntKind::U16
+                    }
+                } else {
+                    IntKind::U16
+                }
+                Some(Token::Integer(value, kind))
             } else if is_identifier_start(c) {
                 let identifier = self.parse_identifier()
 
