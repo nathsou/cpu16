@@ -100,6 +100,7 @@ module PPU(
         write: [{ clk: clk, en: pattern_table_write_enable, addr: ppu_addr_reg.q[12:0], data: ppu_data, mask: true }],
     )
 
+    // TODO: Fill pattern table from the CPU
     $readmemh("resources/font.hex", pattern_table)
 
     if sync_pulses.is_active_area {
