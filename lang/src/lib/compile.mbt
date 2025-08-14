@@ -1,4 +1,4 @@
-pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt] raise Error {
+pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise Error {
   let lexer = Lexer::new(source)
   let tokens = []
 
@@ -78,12 +78,11 @@ pub fn compile(source: String, verbose~: Bool = false) -> FixedArray[UInt] raise
     }
   }
 
-  let prog = FixedArray::make(65536, 0U)
-  // let start_addr = 0x8000
+  let prog = @buffer.new()
 
-  // for i, inst in insts {
-  //   prog[start_addr + i] = encode_inst(inst)
-  // }
+  for inst in insts {
+    prog.write_byte(encode_inst(inst).to_byte())
+  }
 
-  prog
+  prog.to_bytes()
 }
