@@ -23,7 +23,7 @@ struct VariableAllocation {
 pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
     match self {
         Loc::Var(v) => {
-            match alloc.reg_alloc[v] {
+            match alloc.reg_alloc.get(v) {
                 Some(reg) => Loc::Reg(match reg {
                     0 => Reg::R1
                     1 => Reg::R2
@@ -32,7 +32,7 @@ pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
                     4 => Reg::R5
                     _ => abort("invalid register")
                 })
-                None => match alloc.mem_alloc[v] {
+                None => match alloc.mem_alloc.get(v) {
                     Some(mem) => Loc::Mem(offset=mem)
                     None => Loc::Var(v)
                 }
@@ -79,7 +79,7 @@ pub struct LIRBuilder {
     mut next_var_id: IRVarId
 }
 
-pub type! LIRBuilderError String derive (Show)
+suberror LIRBuilderError String derive (Show)
 
 pub fn LIRBuilder::from(ir_builder: IRBuilder) -> LIRBuilder {
     {
@@ -90,7 +90,8 @@ pub fn LIRBuilder::from(ir_builder: IRBuilder) -> LIRBuilder {
 
 fn next_var_id(self: LIRBuilder) -> IRVarId {
     let var_id = self.next_var_id
-    self.next_var_id += 1U
+    // Increment without relying on Add trait for IRVarId
+    self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
@@ -102,7 +103,7 @@ fn emit_move(self: LIRBuilder, dst: Loc, src: Loc) -> Unit {
     self.emit(LIR::Alu(dst=dst, src1=src, src2=Loc::Reg(Reg::Z), op=AluOp::Add))
 }
 
-pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit!LIRBuilderError {
+pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
     match ir {
         IR::Set(dst~, val~) => {
             let val_uint = val.reinterpret_as_uint()
@@ -195,14 +196,14 @@ pub fn liveness_intervals(self: LIRBuilder) -> Array[LivenessInterval] {
         let vars = self.insts[i].variables()
 
         for j = 0; j < vars.length(); j = j + 1 {
-            let var = vars[j]
+            let v = vars[j]
 
-            match intervals[var] {
+            match intervals.get(v) {
                 Some((start, _)) => {
-                    intervals[var] = (start, i)
+                    intervals[v] = (start, i)
                 }
                 None => {
-                    intervals[var] = (i, i)
+                    intervals[v] = (i, i)
                 }
             }
         }
@@ -222,11 +223,11 @@ priv struct SortedArray[T] {
     lss: (T, T) -> Bool
 }
 
-fn SortedArray::new[T](lss: (T, T) -> Bool) -> SortedArray[T] {
+fn[T] SortedArray::new(lss: (T, T) -> Bool) -> SortedArray[T] {
     { values: [], lss }
 }
 
-fn remove[T: Eq](self: SortedArray[T], value: T) -> Unit {
+fn[T: Eq] remove(self: SortedArray[T], value: T) -> Unit {
     match self.values.search_by(fn (x) { x == value }) {
         Some(idx) => {
             self.values.swap(idx, self.values.length() - 1)
@@ -236,7 +237,7 @@ fn remove[T: Eq](self: SortedArray[T], value: T) -> Unit {
     }
 }
 
-fn insert[T: Eq](self: SortedArray[T], value: T) -> Unit {
+fn[T] insert(self: SortedArray[T], value: T) -> Unit {
     match self.values.search_by(fn (x) { (self.lss)(x, value) }) {
         Some(idx) => {
             self.values.insert(idx, value)
@@ -271,7 +272,7 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
             let interval = active.values[i]
             if interval.end < expired_interval.start {
                 active.remove(interval)
-                free_regs.push(reg_alloc[interval.var_id].unwrap())
+                free_regs.push(reg_alloc.get(interval.var_id).unwrap())
             }
         }
     }
@@ -281,7 +282,7 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
         let new_mem_loc = mem_alloc.size()
         
         if spill_candidate.end > interval.end {
-            reg_alloc[interval.var_id] = reg_alloc[spill_candidate.var_id].unwrap() 
+            reg_alloc[interval.var_id] = reg_alloc.get(spill_candidate.var_id).unwrap() 
             mem_alloc[spill_candidate.var_id] = new_mem_loc
             active.remove(spill_candidate)
         } else {
@@ -458,16 +459,16 @@ pub fn allocate(self: LIRBuilder, regs_count~: Int = 5) -> Unit {
     }
 }
 
-type! InstLoweringError {
+suberror InstLoweringError {
     UnexpectedJmp
     UnexpectedLabel
     InvalidLoc(Loc)
 } derive (Show)
 
-pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
+pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     let insts = []
 
-    fn get_reg(loc: Loc) -> Reg!InstLoweringError {
+    fn get_reg(loc: Loc) -> Reg raise InstLoweringError {
         match loc {
             Loc::Reg(reg) => reg
             Loc::Mem(offset=_) => {
@@ -484,21 +485,21 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst]!InstLoweringError {
                 insts.push(Inst::Ctl(op=op))
             }
             LIR::Set(dst~, val~) => {
-                insts.push(Inst::Set(dst=get_reg!(dst), val=val))
+                insts.push(Inst::Set(dst=get_reg(dst), val=val))
             }
             LIR::Mem(dst~, addr~, load~, offset~) => {
                 insts.push(Inst::Mem(
-                    dst=get_reg!(dst),
-                    addr=get_reg!(addr),
+                    dst=get_reg(dst),
+                    addr=get_reg(addr),
                     load=load,
                     offset=offset,
                 ))
             }
             LIR::Alu(dst~, src1~, src2~, op~) => {
                 insts.push(Inst::Alu(
-                    dst=get_reg!(dst),
-                    src1=get_reg!(src1),
-                    src2=get_reg!(src2),
+                    dst=get_reg(dst),
+                    src1=get_reg(src1),
+                    src2=get_reg(src2),
                     op=op,
                 ))
             }

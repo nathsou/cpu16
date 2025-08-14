@@ -4,25 +4,25 @@ pub struct Env[K, T] {
     bindings: Map[K, T]
 }
 
-pub fn Env::new[K, T]() -> Env[K, T] {
+pub fn[K, T] Env::new() -> Env[K, T] {
     {
         parent: None,
         bindings: Map::new(),
     }
 }
 
-pub fn Env::child[K, T](self: Env[K, T]) -> Env[K, T] {
+pub fn[K, T] Env::child(self: Env[K, T]) -> Env[K, T] {
     {
         parent: Some(self),
         bindings: Map::new(),
     }
 }
-pub fn declare[K: Eq + Hash, T](self: Env[K, T], name: K, value: T) -> Unit {
+pub fn[K: Eq + Hash, T] declare(self: Env[K, T], name: K, value: T) -> Unit {
     self.bindings[name] = value
 }
 
-pub fn lookup[K: Eq + Hash, T](self: Env[K, T], name: K) -> Option[T] {
-    match self.bindings[name] {
+pub fn[K: Eq + Hash, T] lookup(self: Env[K, T], name: K) -> Option[T] {
+    match self.bindings.get(name) {
         Some(value) => Some(value)
         None => {
             match self.parent {

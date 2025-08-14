@@ -1,8 +1,8 @@
 
-pub type IRVarId UInt derive (Show, Eq, Hash)
+pub struct IRVarId(UInt) derive (Show, Eq, Hash)
 
 pub fn IRVarId::op_add(self: IRVarId, other: IRVarId) -> IRVarId {
-    self._ + other._
+    self.inner() + other.inner()
 }
 
 pub enum IR {
@@ -40,15 +40,16 @@ pub fn IRBuilder::emit(self: IRBuilder, inst: IR) -> Unit {
     self.insts.push(inst)
 }
 
-type! IRBuilderError String derive (Show)
+suberror IRBuilderError String derive (Show)
 
 fn next_var(self: IRBuilder) -> IRVarId {
     let var_id = self.next_var_id
-    self.next_var_id += 1U
+    // Increment without relying on Add trait for IRVarId
+    self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
-pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, IRVarId]) -> IRVarId!IRBuilderError {
+pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, IRVarId]) -> IRVarId raise IRBuilderError {
     match value {
         TACValue::Const(c) => {
             match c {
@@ -88,11 +89,11 @@ fn get_or_declare(self: IRBuilder, env: Env[TACId, IRVarId], target: TACId) -> I
 
 let unit_var_id: IRVarId = 0U
 
-pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId]) -> IRVarId!IRBuilderError {
+pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId]) -> IRVarId raise IRBuilderError {
     match expr {
         TAC::Assign(target~, src~) => {
             let dst_id = self.get_or_declare(env, target)
-            let src_id = self.lower_value!(src, env)
+            let src_id = self.lower_value(src, env)
             self.emit(IR::Move(dst=dst_id, src=src_id))
             dst_id
         }
@@ -101,7 +102,7 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId
 
             match op {
                 UnaryOp::Not => {
-                    let arg_id = self.lower_value!(arg, env)
+                    let arg_id = self.lower_value(arg, env)
                     self.emit(IR::Not(dst~, src=arg_id))
                 }
             }
@@ -111,8 +112,8 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId
         }
         TAC::Binary(target~, lhs~, op~, rhs~) => {
             let dst = self.next_var()
-            let lhs_id = self.lower_value!(lhs, env)
-            let rhs_id = self.lower_value!(rhs, env)
+            let lhs_id = self.lower_value(lhs, env)
+            let rhs_id = self.lower_value(rhs, env)
 
             match op {
                 TACBinaryOp::Add => self.emit(IR::Add(dst~, src1=lhs_id, src2=rhs_id))
@@ -130,13 +131,13 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId
         }
         TAC::Store(dst~, src~, offset=_) => {
             let dst_id = self.get_or_declare(env, dst)
-            let src_id = self.lower_value!(src, env)
+            let src_id = self.lower_value(src, env)
             self.emit(IR::Store(dst=dst_id, src=src_id))
             dst_id
         }
         TAC::Load(target~, addr~, offset=_) => {
             let target_id = self.get_or_declare(env, target)
-            let addr_id = self.lower_value!(addr, env)
+            let addr_id = self.lower_value(addr, env)
             self.emit(IR::Load(dst=target_id, src=addr_id))
             target_id
         }
@@ -145,8 +146,8 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, IRVarId
             unit_var_id
         }
         TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
-            let lhs_id = self.lower_value!(lhs, env)
-            let rhs_id = self.lower_value!(rhs, env)
+            let lhs_id = self.lower_value(lhs, env)
+            let rhs_id = self.lower_value(rhs, env)
             self.emit(IR::JumpIf(label~, cond=cond, lhs=lhs_id, rhs=rhs_id))
             unit_var_id
         }

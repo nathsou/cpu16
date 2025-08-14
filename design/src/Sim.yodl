@@ -1,0 +1,21 @@
+import SOC
+
+module TopSim(
+    clk: clock,
+    rst: bool,
+) -> (
+    is_active_area: bool,
+    screen_x: uint<10>,
+    screen_y: uint<10>,
+    r: uint<3>,
+    g: uint<3>,
+    b: uint<3>,
+) {
+    let soc = SOC::SOC(clk, pixel_clk: clk, rst: rst)
+    is_active_area = soc.vga.is_active_area
+    screen_x = soc.vga.col
+    screen_y = soc.vga.row
+    r = soc.vga.color.r
+    g = soc.vga.color.g
+    b = soc.vga.color.b
+}

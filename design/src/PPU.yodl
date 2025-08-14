@@ -1,10 +1,126 @@
+import VGA
 
-// tiles: 16px by 16px
-// resolution: 640x480px (40x30 tiles)
-// background tables: 2 (1 active, 1 for updates) manually swapped
-// sprite tables: 2 (1 active, 1 for updates) manually swapped
+// tiles: 8x8px
+// resolution: 640x480px (80x60 tiles)
 // sprite count: 64
 // color palette: 16 colors (4 bits per pixel)
 // hardware interrupts: 1 (VBlank)
 // DMA: To be investigated
 
+const TILES_X = 80
+const TILES_Y = 60
+const TILE_SIZE = 8
+const PATTERN_TABLE_SIZE = 256
+const NAMETABLE_BANKS = 1
+const NAMETABLE_ADDR_WIDTH = $clog2(TILES_X * TILES_Y * NAMETABLE_BANKS)
+
+type VGASignals = {
+    hsync: bool,
+    vsync: bool,
+    col: uint<10>,
+    row: uint<10>,
+    is_active_area: bool,
+    color: {
+        r: uint<3>,
+        g: uint<3>,
+        b: uint<3>,
+    },
+}
+
+module PPU(
+    clk: clock,
+    pixel_clk: clock,
+    rst: bool,
+    addr: uint<16>,
+    write_enable: bool,
+    write_data: uint<16>,
+) -> (
+    vga: VGASignals,
+) {
+    let sync_pulses = VGA::SyncPulses(pixel_clk, count_enable: true)
+    let row_shift_reg = Reg<uint<8>>(clk: pixel_clk, rst)
+    let nametable_addr: uint<NAMETABLE_ADDR_WIDTH>
+    let ppu_ctrl_reg = Reg<uint<8>>(clk, rst)
+    let ppu_addr_reg = Reg<uint<16>>(clk, rst)
+    let ppu_data = 8'h0
+    let nametable_write_enable = false
+    let pattern_table_write_enable = false
+    let enable_bg_rendering = not ppu_ctrl_reg.q[7]
+
+    // memory map:
+    // 0x0000 - 0x1FFF: Pattern Table
+    // 0x8000 - 0x92BF: Nametable 1
+    if write_enable {
+        match addr[3:0] {
+            4'h0 => {
+                ppu_ctrl_reg.d = write_data[7:0]
+            }
+            4'h1 => {
+                ppu_addr_reg.d = write_data
+            }
+            4'h2 => {
+                ppu_data = write_data[7:0]
+                ppu_addr_reg.d = ppu_addr_reg.q + 1
+                pattern_table_write_enable = not ppu_addr_reg.q[15]
+                nametable_write_enable = ppu_addr_reg.q[15]
+            }
+        }
+    }
+
+    // 1 byte per tile (index into pattern table)
+    let name_table = Memory<
+        T: uint<8>,
+        Depth: TILES_X * TILES_Y,
+        ReadPorts: 1,
+        WritePorts: 1,
+        ReadLatency: 1,
+        WriteLatency: 1,
+    > (
+        read: [{ clk: pixel_clk, en: sync_pulses.is_active_area, addr: nametable_addr }],
+        write: [{ clk: clk, en: nametable_write_enable, addr: ppu_addr_reg.q[12:0], data: ppu_data, mask: true }],
+    )
+
+    let y = sync_pulses.row[2:0] // 4 bits for row within tile
+    let x = sync_pulses.col[2:0]
+    let tile_x = sync_pulses.col[9:3]
+    let tile_y = sync_pulses.row[9:3]
+    let next_tile_x = tile_x == (TILES_X - 1) ? 0 : tile_x + 1
+    nametable_addr = (tile_y * TILES_X) + next_tile_x
+    let pattern_table_addr: uint<13> = (name_table.q[0] shl 3) + y
+
+    let pattern_table = Memory<
+        T: uint<8>,
+        Depth: PATTERN_TABLE_SIZE * 32,
+        ReadPorts: 1,
+        WritePorts: 1,
+        ReadLatency: 1,
+        WriteLatency: 1,
+    >(
+        read: [{ clk: pixel_clk, en: true, addr: pattern_table_addr }],
+        write: [{ clk: clk, en: pattern_table_write_enable, addr: ppu_addr_reg.q[12:0], data: ppu_data, mask: true }],
+    )
+
+    // TODO: Fill pattern table from the CPU
+    $readmemh("resources/font.hex", pattern_table)
+
+    if sync_pulses.is_active_area {
+        if x[2:0] == 3'd7 {
+            row_shift_reg.d = pattern_table.q[0] // load next 8 pixels from the pattern table
+        } else {
+            row_shift_reg.d = {1'0, row_shift_reg.q[7:1]} // shift the row register to the right
+        }
+    }
+
+    let pixel = row_shift_reg.q[0]
+    vga.color = if enable_bg_rendering and sync_pulses.is_active_area and pixel {
+        { r: 3'd1, g: 3'd5, b: 3'd4 } // foreground color
+    } else {
+        { r: 3'd0, g: 3'd0, b: 3'd0 } // background color
+    }
+
+    vga.hsync = sync_pulses.hsync
+    vga.vsync = sync_pulses.vsync
+    vga.col = sync_pulses.col
+    vga.row = sync_pulses.row
+    vga.is_active_area = sync_pulses.is_active_area
+}

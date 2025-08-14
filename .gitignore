@@ -13,5 +13,6 @@ sim/*.hex
 sim/verilator/*.fir
 sim/verilator/*.sv
 sim/verilator/*.hex
+sim/verilator/resources/
 .DS_Store
 .vscode/

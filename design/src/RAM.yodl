@@ -1,8 +1,9 @@
 
 module RAM(
     clk: clock,
-    write_enable: bool,
     addr: uint<16>,
+    read_enable: bool,
+    write_enable: bool,
     write_data: uint<16>,
 ) -> (
     read_data: uint<16>,
@@ -15,11 +16,11 @@ module RAM(
         ReadLatency: 1,
         WriteLatency: 1,
     >(
-        read: [{ clk: clk, en: true, addr: addr[9:0] }],
+        read: [{ clk: clk, en: read_enable, addr: addr[9:0] }],
         write: [{ clk: clk, en: write_enable, addr: addr[9:0], data: write_data, mask: true }],
     )
 
-    $readmemh("prog.hex", mem)
+    $readmemh("resources/progs/ppu.hex", mem)
 
     read_data = mem.q[0]
 }

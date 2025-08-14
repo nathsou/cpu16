@@ -51,9 +51,9 @@ fn TypeChecker::declare(self: TypeChecker, name: String, info: VarInfo) -> Unit 
     self.get_top_env_exn().declare(name, info)
 }
 
-type! TypeError String derive (Show)
+suberror TypeError String derive (Show)
 
-pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
+pub fn type_expr(self: TypeChecker, expr: Expr) -> Type raise TypeError {
     match expr {
         Expr::Const(c) => match c {
             Const::Integer(_, kind) => match kind {
@@ -69,7 +69,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
         }
         Expr::UnaryOp(op, rhs) => {
-            let rhs_ty = self.type_expr!(rhs)
+            let rhs_ty = self.type_expr(rhs)
 
             match op {
                 UnaryOp::Not => {
@@ -82,8 +82,8 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
         }
         Expr::BinaryOp(lhs, op, rhs) => {
-            let lhs_ty = self.type_expr!(lhs)
-            let rhs_ty = self.type_expr!(rhs)
+            let lhs_ty = self.type_expr(lhs)
+            let rhs_ty = self.type_expr(rhs)
 
             match op {
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
@@ -112,13 +112,13 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
             }
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let cond_ty = self.type_expr!(cond)
-            let then_ty = self.type_expr!(then_expr)
+            let cond_ty = self.type_expr(cond)
+            let then_ty = self.type_expr(then_expr)
 
             if cond_ty == Type::Bool {
                 match else_expr {
                     Some(else_expr) => {
-                        let else_ty = self.type_expr!(else_expr)
+                        let else_ty = self.type_expr(else_expr)
 
                         if then_ty == else_ty {
                             then_ty
@@ -141,7 +141,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
                 Some({ parameters, return_type }) => {
                     if args.length() == parameters.length() {
                         for i, param in parameters {
-                            let arg_ty = self.type_expr!(args[i])
+                            let arg_ty = self.type_expr(args[i])
 
                             if arg_ty != param.ty {
                                 let param_ty = param.ty
@@ -163,14 +163,14 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type!TypeError {
     }
 }
 
-pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
+pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit raise TypeError {
     match stmt {
         Stmt::Let(name~, mutable~, value~) => {
-            let valTy = self.type_expr!(value)
+            let valTy = self.type_expr(value)
             self.declare(name, { ty: valTy, mutable })
         }
         Stmt::Semi(expr) => {
-            let _ = self.type_expr!(expr)
+            let _ = self.type_expr(expr)
         }
         Stmt::Assign(lhs~, rhs~) => {
             match lhs {
@@ -178,7 +178,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
                     match self.lookup(name) {
                         Some({ ty, mutable }) => {
                             if mutable {
-                                let rhsTy = self.type_expr!(rhs)
+                                                                 let rhsTy = self.type_expr(rhs)
 
                                 if ty != rhsTy {
                                     raise TypeError("Incompatible types in assignment for \{name}: '\{ty}' and '\{rhsTy}'")
@@ -194,14 +194,14 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
             }
         }
         Stmt::While(cond~, body~) => {
-            let condTy = self.type_expr!(cond)
+            let condTy = self.type_expr(cond)
 
             if condTy != Type::Bool {
                 raise TypeError("Expected boolean condition in while loop")
             }
 
             for stmt in body {
-                self.type_stmt!(stmt)
+                self.type_stmt(stmt)
             }
         }
         Stmt::Return(value~) => {
@@ -212,7 +212,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
 
             match value {
                 Some(expr) => {
-                    let actual_ret_ty = self.type_expr!(expr)
+                    let actual_ret_ty = self.type_expr(expr)
 
                     if expected_ret_ty != actual_ret_ty {
                         raise TypeError("Incompatible return type: expected '\{expected_ret_ty}' but got '\{actual_ret_ty}'")
@@ -226,7 +226,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit!TypeError {
     }
 }
 
-pub fn type_decl(self: TypeChecker, decl: Decl) -> Unit!TypeError {
+pub fn type_decl(self: TypeChecker, decl: Decl) -> Unit raise TypeError {
     match decl {
         Decl::Func(name~, parameters~, return_type~, body~) => {
             self.functions.declare(name, { parameters, return_type })
@@ -238,14 +238,14 @@ pub fn type_decl(self: TypeChecker, decl: Decl) -> Unit!TypeError {
             }
 
             for stmt in body {
-                self.type_stmt!(stmt)
+                self.type_stmt(stmt)
             }
             
             let _ = self.fun_stack.unsafe_pop()
             let _ = self.env_stack.unsafe_pop()
         }
         Decl::Stmt(stmt) => {
-            self.type_stmt!(stmt)
+            self.type_stmt(stmt)
         }
     }
 }
