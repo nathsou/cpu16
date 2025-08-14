@@ -1,21 +1,21 @@
 
-extern "js" fn write_file(file_path: String, contents: FixedArray[UInt]) -> Unit =
-  #|(file_path, contents) => {
-  #|  Bun.write(file_path, new Uint16Array(contents));
-  #|}
-
 fn main {
-    let prog =
-      #|if 3 + 7 == 10 {
-      #|  if 2 + 1 == 4 { 1621 } else { 1998 }
-      #|} else {
-      #|  4 + 5 + (if 1 + 2 == 3 { 1 } else { 8 })
-      #|}
-
     try {
-      let compiled = @lib.compile(prog, verbose=true)
-      write_file("out.bin", compiled)
+      match @sys.get_cli_args() {
+        [_, source_file] => {
+          let prog = @fs.read_file_to_string(source_file, encoding="utf8")
+          let _ = @lib.compile(prog, verbose=true)
+        }
+        [_, source_file, output_file] => {
+          let prog = @fs.read_file_to_string(source_file, encoding="utf8")
+          let compiled = @lib.compile(prog, verbose=true)
+          @fs.write_bytes_to_file(output_file, compiled)
+        }
+        _ => {
+          println("Usage: lang <source_file.txt> <output_file.bin>")
+        }
+      }
     } catch {
-      _ => { println("Error") }
+      error => { println(error) }
     }
 }
