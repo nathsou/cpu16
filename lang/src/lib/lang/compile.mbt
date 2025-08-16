@@ -34,11 +34,11 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         println("\nIR:")
 
         for inst in ir_builder.insts {
-            println(IR::to_string(inst))
+            println(@asm.IR::to_string(inst))
         }
     }
 
-    let lir_builder = LIRBuilder::from(ir_builder)
+    let lir_builder = @asm.LIRBuilder::new(ir_builder.next_var_id)
 
     for inst in ir_builder.insts {
         let _ = lir_builder.lower_ir(inst)
@@ -48,7 +48,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         println("\nLIR:")
 
         for inst in lir_builder.insts {
-            println(LIR::to_string(inst))
+            println(@asm.LIR::to_string(inst))
         }
     }
 

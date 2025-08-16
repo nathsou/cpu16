@@ -1,7 +1,6 @@
 // Three Address Code IR
 
 pub struct TACId(UInt) derive (Eq, Hash)
-pub struct TACLabel(UInt) derive (Eq, Hash, Show)
 
 pub impl Show for TACId with output(self, logger) {
     logger.write_string("%" + self.inner().to_string())
@@ -17,42 +16,20 @@ pub enum TACBinaryOp {
     And; Or; Xor
 } derive (Show)
 
-pub enum TACCond {
-    Equ; Neq; Lss; Leq; Gtr; Geq
-} derive (Show)
-
-pub fn negate(self: TACCond) -> TACCond {
-    match self {
-        TACCond::Equ => TACCond::Neq
-        TACCond::Neq => TACCond::Equ
-        TACCond::Lss => TACCond::Geq
-        TACCond::Leq => TACCond::Gtr
-        TACCond::Gtr => TACCond::Leq
-        TACCond::Geq => TACCond::Lss
-    }
-}
-
 pub enum TAC {
     Assign(target~: TACId, src~: TACValue)
     Unary(target~: TACId, op~: UnaryOp, arg~: TACValue)
     Binary(target~: TACId, lhs~: TACValue, op~: TACBinaryOp, rhs~: TACValue)
     Store(dst~: TACId, src~: TACValue, offset~: UInt)
     Load(target~: TACId, addr~: TACValue, offset~: UInt)
-    Jump(label~: TACLabel)
-    JumpIf(label~: TACLabel, cond~: TACCond, lhs~: TACValue, rhs~: TACValue)
-    Label(label~: TACLabel)
+    Jump(label~: @asm.LabelId)
+    JumpIf(label~: @asm.LabelId, cond~: @asm.JumpCond, lhs~: TACValue, rhs~: TACValue)
+    Label(label~: @asm.LabelId)
     Func(name~: String, parameters~: Array[FunctionArgument], return_type~: Type, body~: Array[TAC])
     GetLocal(target~: TACId, index~: UInt)
     SetLocal(index~: UInt, src~: TACValue)
     Return(value~: Option[TACValue])
     Call(target~: TACId, name~: String, parameters~: Array[TACValue])
-}
-
-// Touch rarely-used TAC variants to avoid "never constructed" warnings during checks
-pub fn __suppress_tac_unused_variants() -> Unit {
-    let _ = TAC::Store(dst=0U, src=TACValue::Const(Const::Integer(0, IntKind::U16)), offset=0U)
-    let _ = TAC::Load(target=0U, addr=TACValue::Const(Const::Integer(0, IntKind::U16)), offset=0U)
-    let _ = TAC::SetLocal(index=0U, src=TACValue::Const(Const::Integer(0, IntKind::U16)))
 }
 
 pub impl Show for TACValue with output(self, logger) {
@@ -124,8 +101,8 @@ pub impl Show for TAC with output(self, logger) {
 pub struct TACBuilder {
     tac: Array[TAC]
     env: Env[String, TACId]
-    functions: Env[String, TACLabel]
-    mut next_label_id: TACLabel
+    functions: Env[String, @asm.LabelId]
+    mut next_label_id: @asm.LabelId
 }
 
 pub fn TACBuilder::new() -> TACBuilder {
@@ -154,7 +131,7 @@ fn next_var_() -> TACId {
     var_id
 }
 
-fn next_label(self: TACBuilder) -> TACLabel {
+fn next_label(self: TACBuilder) -> @asm.LabelId {
     let label_id = self.next_label_id
     self.next_label_id = self.next_label_id.inner() + 1U
     label_id
@@ -178,15 +155,15 @@ fn emit_binary_op(self: TACBuilder, target: TACId, lhs: TACValue, op: TACBinaryO
 
 // removed unused emit_store / emit_load helpers
 
-fn def_label(self: TACBuilder, label: TACLabel) -> Unit {
+fn def_label(self: TACBuilder, label: @asm.LabelId) -> Unit {
     self.emit(TAC::Label(label~))
 }
 
-fn emit_jump_if(self: TACBuilder, label: TACLabel, cond: TACCond, lhs: TACValue, rhs: TACValue) -> Unit {
+fn emit_jump_if(self: TACBuilder, label: @asm.LabelId, cond: @asm.JumpCond, lhs: TACValue, rhs: TACValue) -> Unit {
     self.emit(TAC::JumpIf(label~, cond~, lhs~, rhs~))
 }
 
-fn emit_jump(self: TACBuilder, label: TACLabel) -> Unit {
+fn emit_jump(self: TACBuilder, label: @asm.LabelId) -> Unit {
     self.emit(TAC::Jump(label~))
 }
 
@@ -202,16 +179,16 @@ fn emit_return(self: TACBuilder, value: Option[TACValue]) -> Unit {
 
 suberror TACLoweringError String derive (Show)
 
-fn temp_get_comparison_cond(cond: Expr) -> (TACCond, Expr, Expr) raise TACLoweringError {
+fn temp_get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TACLoweringError {
         let (cond_op, cond_lhs, cond_rhs) = match cond {
         Expr::BinaryOp(lhs, op, rhs) => {
             match op {
-                BinaryOp::Equ => (TACCond::Equ, lhs, rhs)
-                BinaryOp::Neq => (TACCond::Neq, lhs, rhs)
-                BinaryOp::Lss => (TACCond::Lss, lhs, rhs)
-                BinaryOp::Leq => (TACCond::Leq, lhs, rhs)
-                BinaryOp::Gtr => (TACCond::Gtr, lhs, rhs)
-                BinaryOp::Geq => (TACCond::Geq, lhs, rhs)
+                BinaryOp::Equ => (@asm.JumpCond::Equ, lhs, rhs)
+                BinaryOp::Neq => (@asm.JumpCond::Neq, lhs, rhs)
+                BinaryOp::Lss => (@asm.JumpCond::Lss, lhs, rhs)
+                BinaryOp::Leq => (@asm.JumpCond::Leq, lhs, rhs)
+                BinaryOp::Gtr => (@asm.JumpCond::Gtr, lhs, rhs)
+                BinaryOp::Geq => (@asm.JumpCond::Geq, lhs, rhs)
                 _ => {
                     println("expected comparison operator in condition")
                     raise TACLoweringError("expected comparison operator in condition")
