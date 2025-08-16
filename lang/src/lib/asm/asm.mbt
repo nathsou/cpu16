@@ -1,7 +1,8 @@
 
 pub fn assemble(source: String, verbose~: Bool) -> Bytes raise {
     let tokens = @lex.collect(source.to_lower(), next_token)
-    let insts = parse(tokens)
+    let lir_insts = parse(tokens)
+    let insts = LIRBuilder::lower(lir_insts, IRVarId(0))
 
     if verbose {
         println("Tokens:")
@@ -10,7 +11,13 @@ pub fn assemble(source: String, verbose~: Bool) -> Bytes raise {
             println(token)
         }
 
-        println("\nInstructions:")
+        println("\nLIR:")
+
+        for inst in lir_insts {
+            println(inst)
+        }
+
+        println("\nASM:")
 
         for inst in insts {
             println(inst)

@@ -83,6 +83,13 @@ pub fn LIRBuilder::new(next_var_id: IRVarId) -> LIRBuilder {
     }
 }
 
+pub fn LIRBuilder::from(insts: Array[LIR], next_var_id: IRVarId) -> LIRBuilder {
+    {
+        insts,
+        next_var_id,
+    }
+}
+
 fn next_var_id(self: LIRBuilder) -> IRVarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
@@ -510,4 +517,11 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     insts.push(Inst::Ctl(op=ControlOp::Halt))
 
     insts
+}
+
+pub fn LIRBuilder::lower(insts: Array[LIR], next_var_id: IRVarId) -> Array[Inst] raise InstLoweringError {
+    let builder = LIRBuilder::from(insts, next_var_id)
+    builder.remove_labels()
+    builder.allocate()
+    builder.lower_lir()
 }

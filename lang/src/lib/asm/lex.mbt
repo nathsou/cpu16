@@ -3,8 +3,14 @@ pub enum Token {
     Ctl; Set; Mem; Alu
     Reg(Reg)
     Const(value~: UInt16, base~: UInt)
+    LabelDef(String)
     Label(String)
     Comment(String)
+    Add; Sub; Adc; Sbc
+    Inc; Dec; Inc2; Dec2
+    And; Nand; Or; Xor
+    Not; Not2
+    Shl; Shr
 } derive (Show, Eq)
 
 pub suberror AsmLexerError String derive (Show)
@@ -68,20 +74,41 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
             'a'..='z' | '_' => {
                 let identifier = lexer.parse_identifier()
 
+                if lexer.peek() == Some(':') {
+                    lexer.index += 1
+                    return Some(LabelDef(identifier))
+                }
+
                 Some(match identifier {
-                    "ctl" => Token::Ctl
-                    "set" => Token::Set
-                    "mem" => Token::Mem
-                    "alu" => Token::Alu
-                    "r0" | "z" => Token::Reg(Reg::Z)
-                    "r1" => Token::Reg(Reg::R1)
-                    "r2" => Token::Reg(Reg::R2)
-                    "r3" => Token::Reg(Reg::R3)
-                    "r4" => Token::Reg(Reg::R4)
-                    "r5" | "tmp" => Token::Reg(Reg::R5)
-                    "r6" | "sp" => Token::Reg(Reg::SP)
-                    "r7" | "pc" => Token::Reg(Reg::PC)
-                    _ => Token::Label(identifier)
+                    "ctl" => Ctl
+                    "set" => Set
+                    "mem" => Mem
+                    "alu" => Alu
+                    "r0" | "z" => Reg(Reg::Z)
+                    "r1" => Reg(Reg::R1)
+                    "r2" => Reg(Reg::R2)
+                    "r3" => Reg(Reg::R3)
+                    "r4" => Reg(Reg::R4)
+                    "r5" | "tmp" => Reg(Reg::R5)
+                    "r6" | "sp" => Reg(Reg::SP)
+                    "r7" | "pc" => Reg(Reg::PC)
+                    "add" => Add
+                    "sub" => Sub
+                    "adc" => Adc
+                    "sbc" => Sbc
+                    "inc" => Inc
+                    "dec" => Dec
+                    "inc2" => Inc2
+                    "dec2" => Dec2
+                    "and" => And
+                    "nand" => Nand
+                    "or" => Or
+                    "xor" => Xor
+                    "not" => Not
+                    "not2" => Not2
+                    "shl" => Shl
+                    "shr" => Shr
+                    _ => Label(identifier)
                 })
             }
             ';' => {
