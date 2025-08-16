@@ -518,8 +518,9 @@ fn read_bin_file(bin_path: &str) -> std::io::Result<[u16; 65536]> {
 }
 
 fn main() {
-    let prog = ppu();
-    dump_hex(&prog, "ppu.hex");
+    let prog = add();
+    // dump_hex(&prog, "ppu.hex");
+    dump_bin(&prog, "add.bin");
     // let prog = read_bin_file("count.bin").expect("failed to read bin file");
 
     let mut cpu = CPU::from(&prog, START_PC);

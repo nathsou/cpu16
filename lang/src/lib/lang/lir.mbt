@@ -2,7 +2,7 @@
 // Raw instructions with variables instead of registers (before register allocation)
 
 pub enum Loc {
-    Reg(Reg)
+    Reg(@asm.Reg)
     Var(IRVarId)
     Mem(offset~: Int)
     Label(TACLabel)
@@ -25,11 +25,11 @@ pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
         Loc::Var(v) => {
             match alloc.reg_alloc.get(v) {
                 Some(reg) => Loc::Reg(match reg {
-                    0 => Reg::R1
-                    1 => Reg::R2
-                    2 => Reg::R3
-                    3 => Reg::R4
-                    4 => Reg::R5
+                    0 => @asm.Reg::R1
+                    1 => @asm.Reg::R2
+                    2 => @asm.Reg::R3
+                    3 => @asm.Reg::R4
+                    4 => @asm.Reg::R5
                     _ => abort("invalid register")
                 })
                 None => match alloc.mem_alloc.get(v) {
@@ -47,10 +47,10 @@ pub enum LIRCond {
 } derive (Show)
 
 pub enum LIR {
-    Ctl(op~: ControlOp)
+    Ctl(op~: @asm.ControlOp)
     Set(dst~: Loc, val~: UInt)
     Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt)
-    Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: AluOp)
+    Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: @asm.AluOp)
     Jmp(dst~: Loc, cond~: Option[LIRCond])
     Label(TACLabel)
 } derive (Show)
@@ -100,7 +100,7 @@ fn LIRBuilder::emit(self: LIRBuilder, inst: LIR) -> Unit {
 }
 
 fn emit_move(self: LIRBuilder, dst: Loc, src: Loc) -> Unit {
-    self.emit(LIR::Alu(dst=dst, src1=src, src2=Loc::Reg(Reg::Z), op=AluOp::Add))
+    self.emit(LIR::Alu(dst=dst, src1=src, src2=Loc::Reg(@asm.Reg::Z), op=@asm.AluOp::Add))
 }
 
 pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
@@ -124,10 +124,10 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
             self.emit_move(Loc::Var(dst), Loc::Var(src))
         }
         IR::Add(dst~, src1~, src2~) => {
-            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=AluOp::Add))
+            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=@asm.AluOp::Add))
         }
         IR::Sub(dst~, src1~, src2~) => {
-            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=AluOp::Sub))
+            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=@asm.AluOp::Sub))
         }
         IR::Mul(..) => {
             raise LIRBuilderError("TODO: implement Mul")
@@ -156,28 +156,28 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
         IR::JumpIf(label~, cond~, lhs~, rhs~) => {
             match cond {
                 TACCond::Equ => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfZero)))
                 }
                 TACCond::Neq => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotZero)))
                 }
                 TACCond::Lss => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotCarry)))
                 }
                 TACCond::Gtr => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfCarry)))
                 }
                 TACCond::Geq => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotCarry)))
                 }
                 TACCond::Leq => {
                     // reverse lhs and rhs
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
+                    self.emit(LIR::Alu(dst=Loc::Reg(@asm.Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=@asm.AluOp::Sub))
                     self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfCarry)))
                 }
             }
@@ -320,27 +320,27 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
                 let is_backward_jump = visited_labels.contains(label)
                 let op = if is_backward_jump {
                     match cond {
-                        Some(LIRCond::IfZero) => AluOp::SubIfZero
-                        Some(LIRCond::IfNotZero) => AluOp::SubIfNotZero
-                        Some(LIRCond::IfCarry) => AluOp::SubIfCarry
-                        Some(LIRCond::IfNotCarry) => AluOp::SubIfNotCarry
-                        None => AluOp::Sub
+                        Some(LIRCond::IfZero) => @asm.AluOp::SubIfZero
+                        Some(LIRCond::IfNotZero) => @asm.AluOp::SubIfNotZero
+                        Some(LIRCond::IfCarry) => @asm.AluOp::SubIfCarry
+                        Some(LIRCond::IfNotCarry) => @asm.AluOp::SubIfNotCarry
+                        None => @asm.AluOp::Sub
                     }
                 } else {
                     match cond {
-                        Some(LIRCond::IfZero) => AluOp::AddIfZero
-                        Some(LIRCond::IfNotZero) => AluOp::AddIfNotZero
-                        Some(LIRCond::IfCarry) => AluOp::AddIfCarry
-                        Some(LIRCond::IfNotCarry) => AluOp::AddIfNotCarry
-                        None => AluOp::Add
+                        Some(LIRCond::IfZero) => @asm.AluOp::AddIfZero
+                        Some(LIRCond::IfNotZero) => @asm.AluOp::AddIfNotZero
+                        Some(LIRCond::IfCarry) => @asm.AluOp::AddIfCarry
+                        Some(LIRCond::IfNotCarry) => @asm.AluOp::AddIfNotCarry
+                        None => @asm.AluOp::Add
                     }
                 }
 
                 jump_offsets_to_fix[without_jumps.length()] = label
                 without_jumps.push(LIR::Set(dst=Loc::Var(jmp_offset_var_id), val=0U)) // placeholder
                 without_jumps.push(LIR::Alu(
-                    dst=Loc::Reg(Reg::PC),
-                    src1=Loc::Reg(Reg::PC),
+                    dst=Loc::Reg(@asm.Reg::PC),
+                    src1=Loc::Reg(@asm.Reg::PC),
                     src2=Loc::Var(jmp_offset_var_id),
                     op~,
                 ))
@@ -465,10 +465,10 @@ suberror InstLoweringError {
     InvalidLoc(Loc)
 } derive (Show)
 
-pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
+pub fn lower_lir(self: LIRBuilder) -> Array[@asm.Inst] raise InstLoweringError {
     let insts = []
 
-    fn get_reg(loc: Loc) -> Reg raise InstLoweringError {
+    fn get_reg(loc: Loc) -> @asm.Reg raise InstLoweringError {
         match loc {
             Loc::Reg(reg) => reg
             Loc::Mem(offset=_) => {
@@ -482,13 +482,13 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     for inst in self.insts {
         match inst {
             LIR::Ctl(op~) => {
-                insts.push(Inst::Ctl(op=op))
+                insts.push(@asm.Inst::Ctl(op=op))
             }
             LIR::Set(dst~, val~) => {
-                insts.push(Inst::Set(dst=get_reg(dst), val=val))
+                insts.push(@asm.Inst::Set(dst=get_reg(dst), val=val))
             }
             LIR::Mem(dst~, addr~, load~, offset~) => {
-                insts.push(Inst::Mem(
+                insts.push(@asm.Inst::Mem(
                     dst=get_reg(dst),
                     addr=get_reg(addr),
                     load=load,
@@ -496,7 +496,7 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
                 ))
             }
             LIR::Alu(dst~, src1~, src2~, op~) => {
-                insts.push(Inst::Alu(
+                insts.push(@asm.Inst::Alu(
                     dst=get_reg(dst),
                     src1=get_reg(src1),
                     src2=get_reg(src2),
@@ -513,7 +513,7 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     }
 
     // halt
-    insts.push(Inst::Ctl(op=ControlOp::Halt))
+    insts.push(@asm.Inst::Ctl(op=@asm.ControlOp::Halt))
 
     insts
 }

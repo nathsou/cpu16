@@ -1,4 +1,9 @@
 {
+    "is-main": false,
+    "import": [
+        "nathsou/cpu16-lang/lib/lex",
+        "nathsou/cpu16-lang/lib/asm"
+    ],
     "link": {
         "js": {
             "exports": [

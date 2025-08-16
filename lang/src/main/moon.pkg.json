@@ -1,7 +1,8 @@
 {
   "is-main": true,
   "import": [
-    "nathsou/cpu16-lang/lib",
+    "nathsou/cpu16-lang/lib/lang",
+    "nathsou/cpu16-lang/lib/asm",
     "moonbitlang/x/fs",
     "moonbitlang/x/sys"
   ]

@@ -7,8 +7,6 @@ pub impl Show for TACId with output(self, logger) {
     logger.write_string("%" + self.inner().to_string())
 }
 
-
-
 pub enum TACValue {
     Const(Const)
     Variable(TACId)

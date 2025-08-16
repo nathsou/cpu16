@@ -13,7 +13,7 @@ pub fn Parser::new(tokens: Array[Token]) -> Parser {
 
 suberror ParserError String derive (Show)
 
-fn Parser::peek(self: Parser) -> Option[Token] {
+fn Parser::peek(self: Parser) -> Token? {
     if self.index < self.tokens.length() {
         Some(self.tokens[self.index])
     } else {

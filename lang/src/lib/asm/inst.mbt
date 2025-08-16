@@ -1,9 +1,9 @@
 
-pub enum Reg {
+pub(all) enum Reg {
   Z; R1; R2; R3; R4; R5; SP; PC
 } derive (Show, Eq)
 
-pub enum ControlOp {
+pub(all) enum ControlOp {
     Halt
     Setz
     Clrz
@@ -12,7 +12,7 @@ pub enum ControlOp {
     Restore
 } derive (Show, Eq)
 
-pub enum AluOp {
+pub(all) enum AluOp {
   Add; Sub; Adc; Sbc;
   AddIfZero; SubIfZero; AdcIfZero; SbcIfZero;
   AddIfNotZero; SubIfNotZero; AdcIfNotZero; SbcIfNotZero;
@@ -22,7 +22,7 @@ pub enum AluOp {
   And; Nand; Or; Xor; Shl; Shr
 } derive (Show, Eq)
 
-pub enum Inst {
+pub(all) enum Inst {
   Ctl(op~: ControlOp)
   Set(dst~: Reg, val~: UInt)
   Mem(dst~: Reg, addr~: Reg, load~: Bool, offset~: UInt)
@@ -31,6 +31,10 @@ pub enum Inst {
 
 pub trait Encode {
   encode(Self) -> UInt
+}
+
+pub trait Decode {
+  decode(UInt) -> Self?
 }
 
 impl Encode for Reg with encode(reg) -> UInt {
@@ -43,6 +47,18 @@ impl Encode for Reg with encode(reg) -> UInt {
     R5 => 5
     SP => 6
     PC => 7
+  }
+}
+
+impl Decode for ControlOp with decode(op) -> ControlOp? {
+  match op {
+    0 => Some(ControlOp::Halt)
+    1 => Some(ControlOp::Setz)
+    2 => Some(ControlOp::Clrz)
+    3 => Some(ControlOp::Setc)
+    4 => Some(ControlOp::Clrc)
+    5 => Some(ControlOp::Restore)
+    _ => None
   }
 }
 
@@ -90,6 +106,40 @@ impl Encode for AluOp with encode(op) -> UInt {
   }
 }
 
+impl Decode for AluOp with decode(op) -> AluOp? {
+  match op {
+    0b00000 => Some(AluOp::Add)
+    0b00001 => Some(AluOp::Sub)
+    0b00010 => Some(AluOp::Adc)
+    0b00011 => Some(AluOp::Sbc)
+    0b00100 => Some(AluOp::AddIfZero)
+    0b00101 => Some(AluOp::SubIfZero)
+    0b00110 => Some(AluOp::AdcIfZero)
+    0b00111 => Some(AluOp::SbcIfZero)
+    0b01000 => Some(AluOp::AddIfNotZero)
+    0b01001 => Some(AluOp::SubIfNotZero)
+    0b01010 => Some(AluOp::AdcIfNotZero)
+    0b01011 => Some(AluOp::SbcIfNotZero)
+    0b01100 => Some(AluOp::AddIfCarry)
+    0b01101 => Some(AluOp::SubIfCarry)
+    0b01110 => Some(AluOp::AdcIfCarry)
+    0b01111 => Some(AluOp::SbcIfCarry)
+    0b10000 => Some(AluOp::AddIfNotCarry)
+    0b10001 => Some(AluOp::SubIfNotCarry)
+    0b10010 => Some(AluOp::AdcIfNotCarry)
+    0b10011 => Some(AluOp::SbcIfNotCarry)
+    0b10100 => Some(AluOp::Inc)
+    0b10101 => Some(AluOp::Dec)
+    0b10110 => Some(AluOp::And)
+    0b10111 => Some(AluOp::Nand)
+    0b11000 => Some(AluOp::Or)
+    0b11001 => Some(AluOp::Xor)
+    0b11010 => Some(AluOp::Shl)
+    0b11011 => Some(AluOp::Shr)
+    _ => None
+  }
+}
+
 impl Encode for Inst with encode(inst) -> UInt {
   match inst {
     Ctl(op~) => {
@@ -117,45 +167,4 @@ impl Encode for Inst with encode(inst) -> UInt {
 
 pub fn encode_inst(inst: Inst) -> UInt {
   Encode::encode(inst)
-}
-
-// Touch otherwise-unused enum variants to silence "never constructed" warnings
-pub fn __suppress_inst_variant_warnings() -> UInt {
-  let mut acc = 0U
-  // Registers
-  acc += Encode::encode(Reg::SP)
-  // Control operations
-  acc += Encode::encode(ControlOp::Setz)
-  acc += Encode::encode(ControlOp::Clrz)
-  acc += Encode::encode(ControlOp::Setc)
-  acc += Encode::encode(ControlOp::Clrc)
-  acc += Encode::encode(ControlOp::Restore)
-  // ALU operations
-  acc += Encode::encode(AluOp::Adc)
-  acc += Encode::encode(AluOp::Sbc)
-  acc += Encode::encode(AluOp::AddIfZero)
-  acc += Encode::encode(AluOp::SubIfZero)
-  acc += Encode::encode(AluOp::AdcIfZero)
-  acc += Encode::encode(AluOp::SbcIfZero)
-  acc += Encode::encode(AluOp::AddIfNotZero)
-  acc += Encode::encode(AluOp::SubIfNotZero)
-  acc += Encode::encode(AluOp::AdcIfNotZero)
-  acc += Encode::encode(AluOp::SbcIfNotZero)
-  acc += Encode::encode(AluOp::AddIfCarry)
-  acc += Encode::encode(AluOp::SubIfCarry)
-  acc += Encode::encode(AluOp::AdcIfCarry)
-  acc += Encode::encode(AluOp::SbcIfCarry)
-  acc += Encode::encode(AluOp::AddIfNotCarry)
-  acc += Encode::encode(AluOp::SubIfNotCarry)
-  acc += Encode::encode(AluOp::AdcIfNotCarry)
-  acc += Encode::encode(AluOp::SbcIfNotCarry)
-  acc += Encode::encode(AluOp::Inc)
-  acc += Encode::encode(AluOp::Dec)
-  acc += Encode::encode(AluOp::And)
-  acc += Encode::encode(AluOp::Nand)
-  acc += Encode::encode(AluOp::Or)
-  acc += Encode::encode(AluOp::Xor)
-  acc += Encode::encode(AluOp::Shl)
-  acc += Encode::encode(AluOp::Shr)
-  acc
 }
