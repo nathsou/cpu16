@@ -1,16 +1,20 @@
 
 pub enum Token {
-    Ctl; Set; Mem; Alu
     Reg(Reg)
     Const(value~: UInt16, base~: UInt)
     LabelDef(String)
     Label(String)
     Comment(String)
-    Add; Sub; Adc; Sbc
+    Ctl; Set; Mem; Alu
+    Halt; Setz; Clrz; Setc; Clrc
+    Load; Store
+    Add; Sub; Adc; Sbc; Move
     Inc; Dec; Inc2; Dec2
     And; Nand; Or; Xor
     Not; Not2
     Shl; Shr
+    Jmp; Jeq; Jne; Jlt; Jgt; Jle; Jge
+    Jpc; Jpnc; Jpz; Jpnz
 } derive (Show, Eq)
 
 pub suberror AsmLexerError String derive (Show)
@@ -108,6 +112,25 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "not2" => Not2
                     "shl" => Shl
                     "shr" => Shr
+                    "jmp" => Jmp
+                    "jeq" => Jeq
+                    "jne" => Jne
+                    "jlt" => Jlt
+                    "jgt" => Jgt
+                    "jle" => Jle
+                    "jge" => Jge
+                    "jpc" => Jpc
+                    "jpnc" => Jpnc
+                    "jpz" => Jpz
+                    "jpnz" => Jpnz
+                    "halt" => Halt
+                    "setz" => Setz
+                    "clrz" => Clrz
+                    "setc" => Setc
+                    "clrc" => Clrc
+                    "load" => Load
+                    "store" => Store
+                    "move" => Move
                     _ => Label(identifier)
                 })
             }

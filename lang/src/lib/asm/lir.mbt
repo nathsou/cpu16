@@ -51,7 +51,7 @@ pub enum LIR {
     Set(dst~: Loc, val~: UInt)
     Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt)
     Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: AluOp)
-    Jmp(dst~: Loc, cond~: Option[LIRCond])
+    Jmp(dst~: Loc, cond~: LIRCond?)
     Label(LabelId)
 } derive (Show)
 
@@ -313,7 +313,7 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
     { reg_alloc, mem_alloc }
 }
 
-pub fn remove_labels(self: LIRBuilder) -> Unit {
+pub fn remove_labels(self: LIRBuilder) -> Unit raise InstLoweringError {
     let without_jumps: Array[LIR] = []
     let jump_offsets_to_fix: Map[Int, LabelId] = Map::new()
     let visited_labels: Map[LabelId, Unit] = Map::new()
@@ -361,7 +361,7 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
     }
 
     // Compute relative offset of a label
-    fn compute_relative_offset(index: Int, label: LabelId) -> UInt {
+    fn compute_relative_offset(index: Int, label: LabelId) -> UInt raise InstLoweringError {
         let max_offset = @cmp.maximum(index, without_jumps.length() - index)
 
         let mut delta_forward = 0U
@@ -401,7 +401,7 @@ pub fn remove_labels(self: LIRBuilder) -> Unit {
             }
         }
 
-        abort("label not found")
+        raise InstLoweringError::MissingLabel(label)
     }
 
     // Fix jump offsets
@@ -464,6 +464,7 @@ suberror InstLoweringError {
     UnexpectedJmp
     UnexpectedLabel
     InvalidLoc(Loc)
+    MissingLabel(LabelId)
 } derive (Show)
 
 pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {

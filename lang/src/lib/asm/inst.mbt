@@ -9,7 +9,6 @@ pub(all) enum ControlOp {
     Clrz
     Setc
     Clrc
-    Restore
 } derive (Show, Eq)
 
 pub(all) enum AluOp {
@@ -57,7 +56,6 @@ impl Decode for ControlOp with decode(op) -> ControlOp? {
     2 => Some(ControlOp::Clrz)
     3 => Some(ControlOp::Setc)
     4 => Some(ControlOp::Clrc)
-    5 => Some(ControlOp::Restore)
     _ => None
   }
 }
@@ -69,7 +67,6 @@ impl Encode for ControlOp with encode(op) -> UInt {
     Clrz => 2
     Setc => 3
     Clrc => 4
-    Restore => 5
   }
 }
 

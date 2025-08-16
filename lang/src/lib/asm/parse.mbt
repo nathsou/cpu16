@@ -87,7 +87,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             self.advance()
 
             match ControlOp::decode(self.expect_const().to_uint()) {
-              Some(op) => Some(PseudoInst::LIR(LIR::Ctl(op~)))
+              Some(op) => Some(LIR(Ctl(op~)))
               None => raise ParserError("Invalid control operation code")
             }
         }
@@ -95,7 +95,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             self.advance()
             let dst = self.expect_loc()
             let val = self.expect_const().to_uint()
-            Some(PseudoInst::LIR(LIR::Set(dst~, val~)))
+            Some(LIR(Set(dst~, val~)))
         }
         Some(Mem) => {
             self.advance()
@@ -103,7 +103,22 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             let addr = self.expect_loc()
             let load = self.expect_const() == 1
             let offset = self.expect_const().to_uint()
-            Some(PseudoInst::LIR(LIR::Mem(dst~, addr~, load~, offset~)))
+            Some(LIR(Mem(dst~, addr~, load~, offset~)))
+        }
+        Some(Load) => {
+            self.advance()
+            let (dst, addr) = self.expect_ll()
+            Some(Load(dst~, addr~))
+        }
+        Some(Store) => {
+            self.advance()
+            let (dst, src) = self.expect_ll()
+            Some(Store(dst~, src~))
+        }
+        Some(Move) => {
+            self.advance()
+            let (dst, src) = self.expect_ll()
+            Some(Move(dst~, src~))
         }
         Some(Alu) => {
             self.advance()
@@ -113,13 +128,14 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             let op_code = self.expect_const().to_uint()
 
             match AluOp::decode(op_code) {
-                Some(op) => Some(PseudoInst::LIR(LIR::Alu(dst~, src1~, src2~, op~)))
+                Some(op) => Some(LIR(Alu(dst~, src1~, src2~, op~)))
                 None => raise ParserError("Invalid ALU operation code")
             }
         }
-        Some(LabelDef(_)) => {
+        Some(LabelDef(label)) => {
             self.advance()
-            self.parse_inst() // skip label definition
+            let label_id = self.label_ids.get(label).unwrap()
+            Some(LIR(Label(label_id)))
         }
         Some(Label(label)) => {
             if !self.label_ids.contains(label) {
@@ -131,52 +147,127 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
         Some(Add) => {
             self.advance()
             let (dst, src1, src2) = self.expect_lll()
-            Some(PseudoInst::Add(dst~, src1~, src2~))
+            Some(Add(dst~, src1~, src2~))
         }
         Some(Sub) => {
             self.advance()
             let (dst, src1, src2) = self.expect_lll()
-            Some(PseudoInst::Sub(dst~, src1~, src2~))
+            Some(Sub(dst~, src1~, src2~))
         }
         Some(Inc) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(PseudoInst::Inc(dst~))
+            Some(Inc(dst~))
         }
         Some(Dec) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(PseudoInst::Dec(dst~))
+            Some(Dec(dst~))
         }
         Some(Inc2) => {
             self.advance()
             let (dst, src) = self.expect_ll()
-            Some(PseudoInst::Inc2(dst~, src~))
+            Some(Inc2(dst~, src~))
         }
         Some(Dec2) => {
             self.advance()
             let (dst, src) = self.expect_ll()
-            Some(PseudoInst::Dec2(dst~, src~))
+            Some(Dec2(dst~, src~))
         }
         Some(Not) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(PseudoInst::Not(dst~))
+            Some(Not(dst~))
         }
         Some(Not2) => {
             self.advance()
             let (dst, src) = self.expect_ll()
-            Some(PseudoInst::Not2(dst~, src~))
+            Some(Not2(dst~, src~))
         }
         Some(Shl) => {
             self.advance()
             let (dst, src, amt) = self.expect_lll()
-            Some(PseudoInst::Shl(dst~, src~, amt~))
+            Some(Shl(dst~, src~, amt~))
         }
         Some(Shr) => {
             self.advance()
             let (dst, src, amt) = self.expect_lll()
-            Some(PseudoInst::Shr(dst~, src~, amt~))
+            Some(Shr(dst~, src~, amt~))
+        }
+        Some(Halt) => {
+            self.advance()
+            Some(Halt)
+        }
+        Some(Setz) => {
+            self.advance()
+            Some(Setz)
+        }
+        Some(Clrz) => {
+            self.advance()
+            Some(Clrz)
+        }
+        Some(Setc) => {
+            self.advance()
+            Some(Setc)
+        }
+        Some(Clrc) => {
+            self.advance()
+            Some(Clrc)
+        }
+        Some(Jmp) => {
+            self.advance()
+            let dst = self.expect_loc()
+            Some(Jmp(dst~))
+        }
+        Some(Jeq) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jeq(dst~, src1~, src2~))
+        }
+        Some(Jne) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jne(dst~, src1~, src2~))
+        }
+        Some(Jlt) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jlt(dst~, src1~, src2~))
+        }
+        Some(Jgt) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jgt(dst~, src1~, src2~))
+        }
+        Some(Jle) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jle(dst~, src1~, src2~))
+        }
+        Some(Jge) => {
+            self.advance()
+            let (dst, src1, src2) = self.expect_lll()
+            Some(Jge(dst~, src1~, src2~))
+        }
+        Some(Jpc) => {
+            self.advance()
+            let dst = self.expect_loc()
+            Some(Jpc(dst~))
+        }
+        Some(Jpnc) => {
+            self.advance()
+            let dst = self.expect_loc()
+            Some(Jpnc(dst~))
+        }
+        Some(Jpz) => {
+            self.advance()
+            let dst = self.expect_loc()
+            Some(Jpz(dst~))
+        }
+        Some(Jpnz) => {
+            self.advance()
+            let dst = self.expect_loc()
+            Some(Jpnz(dst~))
         }
         _ => None
     }
