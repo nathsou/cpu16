@@ -8,7 +8,7 @@ pub enum Token {
     Ctl; Set; Mem; Alu
     Halt; Setz; Clrz; Setc; Clrc
     Load; Store
-    Add; Sub; Adc; Sbc; Move
+    Add; Sub; Adc; Sbc; Move; Cmp
     Inc; Dec; Inc2; Dec2
     And; Nand; Or; Xor
     Not; Not2
@@ -131,6 +131,7 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "load" => Load
                     "store" => Store
                     "move" => Move
+                    "cmp" => Cmp
                     _ => Label(identifier)
                 })
             }

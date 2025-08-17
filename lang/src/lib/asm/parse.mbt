@@ -120,6 +120,11 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             let (dst, src) = self.expect_ll()
             Some(Move(dst~, src~))
         }
+        Some(Cmp) => {
+            self.advance()
+            let (src1, src2) = self.expect_ll()
+            Some(Cmp(src1~, src2~))
+        }
         Some(Alu) => {
             self.advance()
             let dst = self.expect_loc()

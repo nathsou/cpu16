@@ -6,6 +6,7 @@ pub(all) enum PseudoInst {
     Load(dst~: Loc, addr~: Loc)
     Store(dst~: Loc, src~: Loc)
     Move(dst~: Loc, src~: Loc)
+    Cmp(src1~: Loc, src2~: Loc)
     Add(dst~: Loc, src1~: Loc, src2~: Loc)
     Sub(dst~: Loc, src1~: Loc, src2~: Loc)
     Adc(dst~: Loc, src1~: Loc, src2~: Loc)
@@ -39,7 +40,25 @@ pub(all) enum PseudoInst {
 
 pub fn lower(self: PseudoInst) -> Array[LIR] {
   match self {
-    LIR(lir) => [lir]
+    LIR(lir) => match lir {
+      Set(dst~, val~) => {
+        if val > 0x7ff {
+          // TODO: Find the optimal set of instructions for a given `val`
+          let high = (val >> 8) & 0xff
+          let low = val & 0xff
+          [
+            Set(dst~, val=high),
+            Set(dst=Reg(R5), val=8),
+            Alu(dst~, src1=dst, src2=Reg(R5), op=Shl),
+            Set(dst=Reg(R5), val=low),
+            Alu(dst~, src1=dst, src2=Reg(R5), op=Or),
+          ]
+        } else {
+          [lir]
+        }
+      }
+      _ => [lir]
+    }
     Halt => [Ctl(op=Halt)]
     Setz => [Ctl(op=Setz)]
     Clrz => [Ctl(op=Clrz)]
@@ -49,6 +68,7 @@ pub fn lower(self: PseudoInst) -> Array[LIR] {
     Load(dst~, addr~) => [Mem(dst~, addr~, load=true, offset=0)]
     Store(dst~, src~) => [Mem(dst=src, addr=dst, load=false, offset=0)]
     Move(dst~, src~) => [Alu(dst~, src1=src, src2=Reg(Z), op=Add)]
+    Cmp(src1~, src2~) => [Alu(dst=Reg(Z), src1~, src2~, op=Sub)]
     Add(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Add)]
     Sub(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Sub)]
     And(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=And)]
