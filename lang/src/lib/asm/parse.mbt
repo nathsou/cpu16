@@ -149,6 +149,12 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
 
             raise ParserError("Unexpected label: '\{label}'")
         }
+        Some(Setw) => {
+            self.advance()
+            let dst = self.expect_loc()
+            let val = self.expect_const()
+            Some(Setw(dst~, val~))
+        }
         Some(Add) => {
             self.advance()
             let (dst, src1, src2) = self.expect_lll()

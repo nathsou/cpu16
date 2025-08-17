@@ -6,6 +6,7 @@ pub enum Token {
     Label(String)
     Comment(String)
     Ctl; Set; Mem; Alu
+    Setw
     Halt; Setz; Clrz; Setc; Clrc
     Load; Store
     Add; Sub; Adc; Sbc; Move; Cmp
@@ -93,9 +94,10 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "r2" => Reg(Reg::R2)
                     "r3" => Reg(Reg::R3)
                     "r4" => Reg(Reg::R4)
-                    "r5" | "tmp" => Reg(Reg::R5)
+                    "r5" | "tmp" => Reg(Reg::TMP)
                     "r6" | "sp" => Reg(Reg::SP)
                     "r7" | "pc" => Reg(Reg::PC)
+                    "setw" => Setw
                     "add" => Add
                     "sub" => Sub
                     "adc" => Adc

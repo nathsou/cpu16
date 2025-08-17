@@ -7,6 +7,7 @@ pub(all) enum PseudoInst {
     Store(dst~: Loc, src~: Loc)
     Move(dst~: Loc, src~: Loc)
     Cmp(src1~: Loc, src2~: Loc)
+    Setw(dst~: Loc, val~: UInt16)
     Add(dst~: Loc, src1~: Loc, src2~: Loc)
     Sub(dst~: Loc, src1~: Loc, src2~: Loc)
     Adc(dst~: Loc, src1~: Loc, src2~: Loc)
@@ -38,32 +39,62 @@ pub(all) enum PseudoInst {
     LIR(LIR)
 } derive (Show)
 
-pub fn lower(self: PseudoInst) -> Array[LIR] {
+pub suberror PseudoLoweringError String derive (Show)
+
+pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
   match self {
-    LIR(lir) => match lir {
-      Set(dst~, val~) => {
-        if val > 0x7ff {
-          // TODO: Find the optimal set of instructions for a given `val`
-          let high = (val >> 8) & 0xff
-          let low = val & 0xff
-          [
-            Set(dst~, val=high),
-            Set(dst=Reg(R5), val=8),
-            Alu(dst~, src1=dst, src2=Reg(R5), op=Shl),
-            Set(dst=Reg(R5), val=low),
-            Alu(dst~, src1=dst, src2=Reg(R5), op=Or),
-          ]
-        } else {
-          [lir]
-        }
-      }
-      _ => [lir]
+    LIR(Set(dst=_, val~)) if val > 0x7ff => {
+      raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
     }
+    LIR(lir) => [lir]
     Halt => [Ctl(op=Halt)]
     Setz => [Ctl(op=Setz)]
     Clrz => [Ctl(op=Clrz)]
     Setc => [Ctl(op=Setc)]
     Clrc => [Ctl(op=Clrc)]
+    Setw(dst~, val~) => {
+        let val_uint = val.to_uint()
+
+        // A fun little puzzle would be to find the optimal way (min instructions) to get to `val`
+        if val <= 0x7ff {
+            [Set(dst~, val~)]
+        } else if val == 0xffff {
+            [Alu(dst~, src1=Reg(Z), src2=Reg(Z), op=Dec)]
+        } else if val >= (0xffff - 0x7ff) {
+            let sub_val = (0x1000).to_uint16() - val
+
+            [
+                Set(dst=Reg(TMP), val=sub_val),
+                Alu(dst~, src1=Reg(Z), src2=Reg(TMP), op=Sub),
+            ]
+        } else {
+            // Check if `val` can be represented as a left shift of an 11-bit value
+            {
+                let shl_amount = val_uint.ctz()
+                let shl_core = val_uint >> shl_amount
+                
+                if shl_core <= 0x7ff {
+                    return [
+                        Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
+                        Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
+                        Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+                    ]
+                }
+            }
+
+            // Fallback to a general strategy
+            let high = (val >> 8) & 0xff
+            let low = val & 0xff
+
+            [
+                Set(dst~, val=high),
+                Set(dst=Reg(TMP), val=8),
+                Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+                Set(dst=Reg(TMP), val=low),
+                Alu(dst~, src1=dst, src2=Reg(TMP), op=Or),
+            ]
+        }
+    }
     // TODO: Support offsets
     Load(dst~, addr~) => [Mem(dst~, addr~, load=true, offset=0)]
     Store(dst~, src~) => [Mem(dst=src, addr=dst, load=false, offset=0)]

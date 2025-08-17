@@ -29,7 +29,7 @@ pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
                     1 => Reg::R2
                     2 => Reg::R3
                     3 => Reg::R4
-                    4 => Reg::R5
+                    4 => Reg::TMP
                     _ => abort("invalid register")
                 })
                 None => match alloc.mem_alloc.get(v) {
@@ -331,7 +331,7 @@ pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit r
     for inst in self.insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                let jmp_offset_loc = if automatic_jump_temp_reg { Var(self.next_var_id()) } else { Reg(R5) }
+                let jmp_offset_loc = if automatic_jump_temp_reg { Var(self.next_var_id()) } else { Reg(TMP) }
                 let is_backward_jump = visited_labels.contains(label)
                 let op = if is_backward_jump {
                     match cond {

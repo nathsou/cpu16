@@ -1,6 +1,6 @@
 # CPU 16
 
-Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https://github.com/nathsou/yodl) design.
+Simple load-store 16-bit CPU ISA, along with an assembler, compiler, simulator and [Yodl](https://github.com/nathsou/yodl) design.
 
 <img src="res/cpu16.png" alt="CPU16 Running on an Alchitry Au" width="400">
 
@@ -22,7 +22,7 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https:/
 | R2       | General purpose register                       | 2     |
 | R3       | General purpose register                       | 3     |
 | R4       | General purpose register                       | 4     |
-| R5       | General purpose register                       | 5     |
+| TMP      | Temporary register                             | 5     |
 | SP       | Stack pointer                                  | 6     |
 | PC       | Program counter                                | 7     |
 
@@ -61,6 +61,6 @@ Simple load-store 16-bit CPU ISA, along with a Rust simulator and [Yodl](https:/
 ### Nexys A7 (Xilinx Artix 7 XC7A100T)
 
 1. Install [Vivado](https://alchitry.com/tutorials/setup/vivado/)
-2. Run `make build-vivado` in the desing/ directory
+2. Run `make build-vivado` in the design/ directory
 3. The bitstream will be in design/build/cpu16_Top.bin
 4. Run openFPGALoader or any other compatible tool to program the FPGA

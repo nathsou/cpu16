@@ -39,7 +39,7 @@ fn write_reg(self: CPU, reg: @asm.Reg, value: UInt16) -> Unit {
         R2 => self.regs[2] = value
         R3 => self.regs[3] = value
         R4 => self.regs[4] = value
-        R5 => self.regs[5] = value
+        TMP => self.regs[5] = value
         SP => self.regs[6] = value
         PC => self.next_pc = value
     }
@@ -52,7 +52,7 @@ fn read_reg(self: CPU, reg: @asm.Reg) -> UInt16 {
         R2 => self.regs[2]
         R3 => self.regs[3]
         R4 => self.regs[4]
-        R5 => self.regs[5]
+        TMP => self.regs[5]
         SP => self.regs[6]
         PC => self.regs[7]
     }
