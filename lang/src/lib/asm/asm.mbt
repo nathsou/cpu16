@@ -1,23 +1,24 @@
 
 pub fn assemble(source: String, verbose~: Bool) -> Bytes raise {
     let tokens = @lex.collect(source.to_lower(), next_token)
-    let lir_insts = parse(tokens)
-    let insts = LIRBuilder::lower(lir_insts, IRVarId(0))
+    let pseudo_insts = parse(tokens)
+    let lir_insts = pseudo_insts.map(PseudoInst::lower).flatten()
+    let insts = LIRBuilder::lower(lir_insts, next_var_id=VarId(0), automatic_jump_temp_reg=false)
 
     if verbose {
-        println("Tokens:")
+        println("[Pseudo]")
 
-        for token in tokens {
-            println(token)
+        for inst in pseudo_insts {
+            println(inst)
         }
 
-        println("\nLIR:")
+        println("\n[LIR]")
 
         for inst in lir_insts {
             println(inst)
         }
 
-        println("\nASM:")
+        println("\n[ASM]")
 
         for inst in insts {
             println(inst)

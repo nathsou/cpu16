@@ -35,7 +35,7 @@ pub(all) enum PseudoInst {
     Jpnz(dst~: Loc) // Jump on zero clear
 
     LIR(LIR)
-}
+} derive (Show)
 
 pub fn lower(self: PseudoInst) -> Array[LIR] {
   match self {
@@ -65,34 +65,34 @@ pub fn lower(self: PseudoInst) -> Array[LIR] {
     Shr(dst~, src~, amt~) => [Alu(dst~, src1=src, src2=amt, op=Shr)]
     Not(dst~) => [Alu(dst~, src1=dst, src2=dst, op=Nand)]
     Not2(dst~, src~) => [Alu(dst~, src1=src, src2=src, op=Nand)]
-    Jmp(dst~) => [Jmp(dst~, cond=None)]
+    Jmp(dst~) => [Jmp(dst~, cond=Always)]
     Jeq(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfZero)),
+      Jmp(dst~, cond=IfZero),
     ]
     Jne(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfNotZero)),
+      Jmp(dst~, cond=IfNotZero),
     ]
     Jlt(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfNotCarry)),
+      Jmp(dst~, cond=IfNotCarry),
     ]
     Jgt(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfCarry)),
+      Jmp(dst~, cond=IfCarry),
     ]
     Jle(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfNotCarry)),
+      Jmp(dst~, cond=IfNotCarry),
     ]
     Jge(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=Some(IfCarry)),
+      Jmp(dst~, cond=IfCarry),
     ]
-    Jpc(dst~) => [Jmp(dst~, cond=Some(IfCarry))]
-    Jpnc(dst~) => [Jmp(dst~, cond=Some(IfNotCarry))]
-    Jpz(dst~) => [Jmp(dst~, cond=Some(IfZero))]
-    Jpnz(dst~) => [Jmp(dst~, cond=Some(IfNotZero))]
+    Jpc(dst~) => [Jmp(dst~, cond=IfCarry)]
+    Jpnc(dst~) => [Jmp(dst~, cond=IfNotCarry)]
+    Jpz(dst~) => [Jmp(dst~, cond=IfZero)]
+    Jpnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
   }
 }

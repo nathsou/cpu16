@@ -94,7 +94,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
         Some(Set) => {
             self.advance()
             let dst = self.expect_loc()
-            let val = self.expect_const().to_uint()
+            let val = self.expect_const()
             Some(LIR(Set(dst~, val~)))
         }
         Some(Mem) => {
@@ -102,7 +102,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             let dst = self.expect_loc()
             let addr = self.expect_loc()
             let load = self.expect_const() == 1
-            let offset = self.expect_const().to_uint()
+            let offset = self.expect_const()
             Some(LIR(Mem(dst~, addr~, load~, offset~)))
         }
         Some(Load) => {
@@ -273,7 +273,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
     }
 }
 
-pub fn parse(tokens: Array[Token]) -> Array[LIR] raise ParserError {
+pub fn parse(tokens: Array[Token]) -> Array[PseudoInst] raise ParserError {
     // collect label definitions
     let label_ids = {
         let mapping: Map[String, LabelId] = {}
@@ -306,5 +306,5 @@ pub fn parse(tokens: Array[Token]) -> Array[LIR] raise ParserError {
         }
     }
 
-    pseudo_insts.map(PseudoInst::lower).flatten()
+    pseudo_insts
 }

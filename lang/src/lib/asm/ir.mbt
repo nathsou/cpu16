@@ -1,7 +1,7 @@
 
-pub(all) struct IRVarId(UInt) derive (Show, Eq, Hash)
+pub(all) struct VarId(UInt) derive (Show, Eq, Hash)
 
-pub fn IRVarId::op_add(self: IRVarId, other: IRVarId) -> IRVarId {
+pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
     self.inner() + other.inner()
 }
 
@@ -23,20 +23,20 @@ pub fn negate(self: JumpCond) -> JumpCond {
 }
 
 pub(all) enum IR {
-    Set(dst~: IRVarId, val~: Int)
-    Load(dst~: IRVarId, src~: IRVarId)
-    Store(dst~: IRVarId, src~: IRVarId)
-    Move(dst~: IRVarId, src~: IRVarId)
-    Add(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Sub(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Mul(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Div(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Mod(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Not(dst~: IRVarId, src~: IRVarId)
-    And(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Or(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
-    Xor(dst~: IRVarId, src1~: IRVarId, src2~: IRVarId)
+    Set(dst~: VarId, val~: Int)
+    Load(dst~: VarId, src~: VarId)
+    Store(dst~: VarId, src~: VarId)
+    Move(dst~: VarId, src~: VarId)
+    Add(dst~: VarId, src1~: VarId, src2~: VarId)
+    Sub(dst~: VarId, src1~: VarId, src2~: VarId)
+    Mul(dst~: VarId, src1~: VarId, src2~: VarId)
+    Div(dst~: VarId, src1~: VarId, src2~: VarId)
+    Mod(dst~: VarId, src1~: VarId, src2~: VarId)
+    Not(dst~: VarId, src~: VarId)
+    And(dst~: VarId, src1~: VarId, src2~: VarId)
+    Or(dst~: VarId, src1~: VarId, src2~: VarId)
+    Xor(dst~: VarId, src1~: VarId, src2~: VarId)
     Jump(label~: LabelId)
-    JumpIf(label~: LabelId, cond~: JumpCond, lhs~: IRVarId, rhs~: IRVarId)
+    JumpIf(label~: LabelId, cond~: JumpCond, lhs~: VarId, rhs~: VarId)
     Label(LabelId)
 } derive (Show)

@@ -23,8 +23,8 @@ pub(all) enum AluOp {
 
 pub(all) enum Inst {
   Ctl(op~: ControlOp)
-  Set(dst~: Reg, val~: UInt)
-  Mem(dst~: Reg, addr~: Reg, load~: Bool, offset~: UInt)
+  Set(dst~: Reg, val~: UInt16)
+  Mem(dst~: Reg, addr~: Reg, load~: Bool, offset~: UInt16)
   Alu(dst~: Reg, src1~: Reg, src2~: Reg, op~: AluOp)
 } derive (Show)
 
@@ -49,13 +49,16 @@ impl Encode for Reg with encode(reg) -> UInt {
   }
 }
 
-impl Decode for ControlOp with decode(op) -> ControlOp? {
-  match op {
-    0 => Some(ControlOp::Halt)
-    1 => Some(ControlOp::Setz)
-    2 => Some(ControlOp::Clrz)
-    3 => Some(ControlOp::Setc)
-    4 => Some(ControlOp::Clrc)
+impl Decode for Reg with decode(reg) -> Reg? {
+  match reg {
+    0 => Some(Reg::Z)
+    1 => Some(Reg::R1)
+    2 => Some(Reg::R2)
+    3 => Some(Reg::R3)
+    4 => Some(Reg::R4)
+    5 => Some(Reg::R5)
+    6 => Some(Reg::SP)
+    7 => Some(Reg::PC)
     _ => None
   }
 }
@@ -67,6 +70,17 @@ impl Encode for ControlOp with encode(op) -> UInt {
     Clrz => 2
     Setc => 3
     Clrc => 4
+  }
+}
+
+impl Decode for ControlOp with decode(op) -> ControlOp? {
+  match op {
+    0 => Some(ControlOp::Halt)
+    1 => Some(ControlOp::Setz)
+    2 => Some(ControlOp::Clrz)
+    3 => Some(ControlOp::Setc)
+    4 => Some(ControlOp::Clrc)
+    _ => None
   }
 }
 
@@ -137,20 +151,20 @@ impl Decode for AluOp with decode(op) -> AluOp? {
   }
 }
 
-impl Encode for Inst with encode(inst) -> UInt {
+pub impl Encode for Inst with encode(inst) -> UInt {
   match inst {
     Ctl(op~) => {
       (0b00U << 14) | Encode::encode(op)
     }
     Set(dst~, val~) => {
-      (0b01U << 14) | (Encode::encode(dst) << 11) | (val & 0x7ff)
+      (0b01U << 14) | (Encode::encode(dst) << 11) | (val.to_uint() & 0x7ff)
     }
     Mem(dst~, addr~, load~, offset~) => {
       (0b10U << 14) |
       (Encode::encode(dst) << 11) |
       (Encode::encode(addr) << 8) |
       ((if load { 1U } else { 0U }) << 7) |
-      (offset & 0x7f)
+      (offset.to_uint() & 0x7f)
     }
     Alu(dst~, src1~, src2~, op~) => {
       (0b11U << 14) |
@@ -162,6 +176,41 @@ impl Encode for Inst with encode(inst) -> UInt {
   }
 }
 
-pub fn encode_inst(inst: Inst) -> UInt {
-  Encode::encode(inst)
+pub impl Decode for Inst with decode(word) -> Inst? {
+  let op = (word >> 14) & 0b11U
+
+  match op {
+    0b00U => {
+      let ctl_op = ControlOp::decode(word & 0x3ffU)
+      ctl_op.map(op => Inst::Ctl(op~))
+    }
+    0b01U => {
+      let dst = Reg::decode((word >> 11) & 0b111U)
+      let val = (word & 0x7ffU).reinterpret_as_int().to_uint16()
+      dst.map(dst => Inst::Set(dst~, val~))
+    }
+    0b10U => {
+      let dst = Reg::decode((word >> 11) & 0b111U)
+      let addr = Reg::decode((word >> 8) & 0b111U)
+      let load = ((word >> 7) & 0b1U) == 1U
+      let offset = (word & 0x7fU).reinterpret_as_int().to_uint16()
+      
+      match (dst, addr) {
+        (Some(dst), Some(addr)) => Some(Inst::Mem(dst~, addr~, load~, offset~))
+        _ => None
+      }
+    }
+    0b11U => {
+      let dst = Reg::decode((word >> 11) & 0b111U)
+      let src1 = Reg::decode((word >> 8) & 0b111U)
+      let src2 = Reg::decode((word >> 5) & 0b111U)
+      let alu_op = AluOp::decode(word & 0b11111U)
+      
+      match (dst, src1, src2, alu_op) {
+        (Some(dst), Some(src1), Some(src2), Some(op)) => Some(Inst::Alu(dst~, src1~, src2~, op~))
+        _ => None
+      }
+    }
+    _ => None
+  }
 }

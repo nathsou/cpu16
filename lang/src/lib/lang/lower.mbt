@@ -1,6 +1,6 @@
 
 pub struct IRBuilder {
-    mut next_var_id: @asm.IRVarId
+    mut next_var_id: @asm.VarId
     insts: Array[@asm.IR]
 }
 
@@ -17,14 +17,14 @@ pub fn IRBuilder::emit(self: IRBuilder, inst: @asm.IR) -> Unit {
 
 suberror IRBuilderError String derive (Show)
 
-fn next_var(self: IRBuilder) -> @asm.IRVarId {
+fn next_var(self: IRBuilder) -> @asm.VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
-pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, @asm.IRVarId]) -> @asm.IRVarId raise IRBuilderError {
+pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match value {
         TACValue::Const(c) => {
             match c {
@@ -51,7 +51,7 @@ pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, @asm.IRVarI
     }
 }
 
-fn get_or_declare(self: IRBuilder, env: Env[TACId, @asm.IRVarId], target: TACId) -> @asm.IRVarId {
+fn get_or_declare(self: IRBuilder, env: Env[TACId, @asm.VarId], target: TACId) -> @asm.VarId {
     match env.lookup(target) {
         Some(dst) => dst
         None => {
@@ -62,9 +62,9 @@ fn get_or_declare(self: IRBuilder, env: Env[TACId, @asm.IRVarId], target: TACId)
     }
 }
 
-let unit_var_id: @asm.IRVarId = 0U
+let unit_var_id: @asm.VarId = 0U
 
-pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.IRVarId]) -> @asm.IRVarId raise IRBuilderError {
+pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match expr {
         TAC::Assign(target~, src~) => {
             let dst_id = self.get_or_declare(env, target)

@@ -3,6 +3,7 @@
   "import": [
     "nathsou/cpu16-lang/lib/lang",
     "nathsou/cpu16-lang/lib/asm",
+    "nathsou/cpu16-lang/lib/sim",
     "moonbitlang/x/fs",
     "moonbitlang/x/sys"
   ]

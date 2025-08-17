@@ -16,7 +16,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     }
 
     if verbose {
-        println("TAC:")
+        println("[TAC]")
 
         for tac in tac_builder.tac {
             println(TAC::to_string(tac))
@@ -31,7 +31,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     }
 
     if verbose {
-        println("\nIR:")
+        println("\n[IR]")
 
         for inst in ir_builder.insts {
             println(@asm.IR::to_string(inst))
@@ -45,19 +45,19 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     }
 
     if verbose {
-        println("\nLIR:")
+        println("\n[LIR]")
 
         for inst in lir_builder.insts {
             println(@asm.LIR::to_string(inst))
         }
     }
 
-    lir_builder.remove_labels()
+    lir_builder.remove_labels(automatic_jump_temp_reg=true)
     lir_builder.allocate()
     let insts = lir_builder.lower_lir()
 
     if verbose {
-        println("\nAllocated LIR:")
+        println("\n[Allocated LIR]")
 
         for inst in insts {
             println(@asm.Inst::to_string(inst))
@@ -67,7 +67,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     let prog = @buffer.new()
 
     for inst in insts {
-        prog.write_byte(@asm.encode_inst(inst).to_byte())
+        prog.write_byte(@asm.Inst::encode(inst).to_byte())
     }
 
     prog.to_bytes()

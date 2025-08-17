@@ -3,12 +3,12 @@
 
 pub enum Loc {
     Reg(Reg)
-    Var(IRVarId)
+    Var(VarId)
     Mem(offset~: Int)
     Label(LabelId)
 } derive (Show)
 
-pub fn variables(self: Loc) -> Array[IRVarId] {
+pub fn variables(self: Loc) -> Array[VarId] {
     match self {
         Loc::Var(v) => [v]
         _ => []
@@ -16,8 +16,8 @@ pub fn variables(self: Loc) -> Array[IRVarId] {
 }
 
 struct VariableAllocation {
-    reg_alloc: Map[IRVarId, Int]
-    mem_alloc: Map[IRVarId, Int]
+    reg_alloc: Map[VarId, Int]
+    mem_alloc: Map[VarId, Int]
 }
 
 pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
@@ -43,19 +43,29 @@ pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
 }
 
 pub enum LIRCond {
-    IfZero; IfNotZero; IfCarry; IfNotCarry
+    Always; IfZero; IfNotZero; IfCarry; IfNotCarry
 } derive (Show)
+
+pub fn LIRCond::from(cond: UInt) -> LIRCond {
+    match cond {
+        1 => IfZero
+        2 => IfNotZero
+        3 => IfCarry
+        4 => IfNotCarry
+        _ => Always
+    }
+}
 
 pub enum LIR {
     Ctl(op~: ControlOp)
-    Set(dst~: Loc, val~: UInt)
-    Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt)
+    Set(dst~: Loc, val~: UInt16)
+    Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt16)
     Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: AluOp)
-    Jmp(dst~: Loc, cond~: LIRCond?)
+    Jmp(dst~: Loc, cond~: LIRCond)
     Label(LabelId)
 } derive (Show)
 
-pub fn LIR::variables(self: LIR) -> Array[IRVarId] {
+pub fn LIR::variables(self: LIR) -> Array[VarId] {
     let vars = match self {
         LIR::Ctl(_) => []
         LIR::Set(dst~, val=_) => dst.variables()
@@ -71,26 +81,26 @@ pub fn LIR::variables(self: LIR) -> Array[IRVarId] {
 
 pub struct LIRBuilder {
     mut insts: Array[LIR]
-    mut next_var_id: IRVarId
+    mut next_var_id: VarId
 }
 
 suberror LIRBuilderError String derive (Show)
 
-pub fn LIRBuilder::new(next_var_id: IRVarId) -> LIRBuilder {
+pub fn LIRBuilder::new(next_var_id: VarId) -> LIRBuilder {
     {
         insts: [],
         next_var_id,
     }
 }
 
-pub fn LIRBuilder::from(insts: Array[LIR], next_var_id: IRVarId) -> LIRBuilder {
+pub fn LIRBuilder::from(insts: Array[LIR], next_var_id: VarId) -> LIRBuilder {
     {
         insts,
         next_var_id,
     }
 }
 
-fn next_var_id(self: LIRBuilder) -> IRVarId {
+fn next_var_id(self: LIRBuilder) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
@@ -114,13 +124,13 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
                 raise LIRBuilderError("TODO: implement large constant lowering")
             }
 
-            self.emit(LIR::Set(dst=Loc::Var(dst), val=val_uint))
+            self.emit(LIR::Set(dst=Loc::Var(dst), val=val_uint.reinterpret_as_int().to_uint16()))
         }
         IR::Load(dst~, src~) => {
-            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=true, offset=0U))
+            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=true, offset=0))
         }
         IR::Store(dst~, src~) => {
-            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=false, offset=0U))
+            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=false, offset=0))
         }
         IR::Move(dst~, src~) => {
             self.emit_move(Loc::Var(dst), Loc::Var(src))
@@ -153,34 +163,34 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
             raise LIRBuilderError("TODO: implement Xor")
         }
         IR::Jump(label~) => {
-            self.emit(LIR::Jmp(dst=Loc::Label(label), cond=None))
+            self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Always))
         }
         IR::JumpIf(label~, cond~, lhs~, rhs~) => {
             match cond {
                 JumpCond::Equ => {
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfZero)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfZero))
                 }
                 JumpCond::Neq => {
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotZero)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotZero))
                 }
                 JumpCond::Lss => {
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotCarry)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotCarry))
                 }
                 JumpCond::Gtr => {
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfCarry)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfCarry))
                 }
                 JumpCond::Geq => {
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfNotCarry)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotCarry))
                 }
                 JumpCond::Leq => {
                     // reverse lhs and rhs
                     self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Some(LIRCond::IfCarry)))
+                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfCarry))
                 }
             }
         }
@@ -192,7 +202,7 @@ pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
 
 // TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
 pub fn liveness_intervals(self: LIRBuilder) -> Array[LivenessInterval] {
-    let intervals: Map[IRVarId, (Int, Int)] = Map::new()
+    let intervals: Map[VarId, (Int, Int)] = Map::new()
 
     for i = 0; i < self.insts.length(); i = i + 1 {
         let vars = self.insts[i].variables()
@@ -250,7 +260,7 @@ fn[T: Compare] insert(self: SortedArray[T], value: T) -> Unit {
 }
 
 struct LivenessInterval {
-    var_id: IRVarId
+    var_id: VarId
     start: Int
     end: Int
 } derive (Eq)
@@ -263,8 +273,8 @@ impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessI
 // TODO: Graph coloring register allocation
 pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocation {
     let intervals = self.liveness_intervals()
-    let reg_alloc: Map[IRVarId, Int] = Map::new()
-    let mem_alloc: Map[IRVarId, Int] = Map::new()
+    let reg_alloc: Map[VarId, Int] = Map::new()
+    let mem_alloc: Map[VarId, Int] = Map::new()
     let active: SortedArray[LivenessInterval] = SortedArray::new()
     let free_regs: Array[Int] = []
 
@@ -313,7 +323,7 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
     { reg_alloc, mem_alloc }
 }
 
-pub fn remove_labels(self: LIRBuilder) -> Unit raise InstLoweringError {
+pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit raise InstLoweringError {
     let without_jumps: Array[LIR] = []
     let jump_offsets_to_fix: Map[Int, LabelId] = Map::new()
     let visited_labels: Map[LabelId, Unit] = Map::new()
@@ -321,32 +331,32 @@ pub fn remove_labels(self: LIRBuilder) -> Unit raise InstLoweringError {
     for inst in self.insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                let jmp_offset_var_id = self.next_var_id()
+                let jmp_offset_loc = if automatic_jump_temp_reg { Var(self.next_var_id()) } else { Reg(R5) }
                 let is_backward_jump = visited_labels.contains(label)
                 let op = if is_backward_jump {
                     match cond {
-                        Some(LIRCond::IfZero) => AluOp::SubIfZero
-                        Some(LIRCond::IfNotZero) => AluOp::SubIfNotZero
-                        Some(LIRCond::IfCarry) => AluOp::SubIfCarry
-                        Some(LIRCond::IfNotCarry) => AluOp::SubIfNotCarry
-                        None => AluOp::Sub
+                        Always => AluOp::Sub
+                        IfZero => AluOp::SubIfZero
+                        IfNotZero => AluOp::SubIfNotZero
+                        IfCarry => AluOp::SubIfCarry
+                        IfNotCarry => AluOp::SubIfNotCarry
                     }
                 } else {
                     match cond {
-                        Some(LIRCond::IfZero) => AluOp::AddIfZero
-                        Some(LIRCond::IfNotZero) => AluOp::AddIfNotZero
-                        Some(LIRCond::IfCarry) => AluOp::AddIfCarry
-                        Some(LIRCond::IfNotCarry) => AluOp::AddIfNotCarry
-                        None => AluOp::Add
+                        Always => AluOp::Add
+                        IfZero => AluOp::AddIfZero
+                        IfNotZero => AluOp::AddIfNotZero
+                        IfCarry => AluOp::AddIfCarry
+                        IfNotCarry => AluOp::AddIfNotCarry
                     }
                 }
 
                 jump_offsets_to_fix[without_jumps.length()] = label
-                without_jumps.push(LIR::Set(dst=Loc::Var(jmp_offset_var_id), val=0U)) // placeholder
+                without_jumps.push(LIR::Set(dst=jmp_offset_loc, val=0)) // placeholder
                 without_jumps.push(LIR::Alu(
                     dst=Loc::Reg(Reg::PC),
                     src1=Loc::Reg(Reg::PC),
-                    src2=Loc::Var(jmp_offset_var_id),
+                    src2=jmp_offset_loc,
                     op~,
                 ))
             }
@@ -409,9 +419,13 @@ pub fn remove_labels(self: LIRBuilder) -> Unit raise InstLoweringError {
         let offset = compute_relative_offset(index, label)
         let inst = without_jumps[index]
 
+        if offset > 0xFFFF {
+            raise InstLoweringError::UnexpectedJmp
+        }
+
         match inst {
-            LIR::Set(dst=Loc::Var(var_id), val=_) => {
-                without_jumps[index] = LIR::Set(dst=Loc::Var(var_id), val=offset)
+            LIR::Set(dst~, val=_) => {
+                without_jumps[index] = LIR::Set(dst~, val=offset.reinterpret_as_int().to_uint16())
             }
             _ => {
                 abort("unexpected instruction during jump offset fixing")
@@ -437,23 +451,23 @@ pub fn allocate(self: LIRBuilder, regs_count~: Int = 5) -> Unit {
 
     for i = 0; i < self.insts.length(); i = i + 1 {
         self.insts[i] = match self.insts[i] {
-            LIR::Ctl(op~) => LIR::Ctl(op=op)
+            LIR::Ctl(op~) => LIR::Ctl(op~)
             LIR::Set(dst~, val~) => LIR::Set(dst=dst.substitute_var(alloc), val=val)
             LIR::Mem(dst~, addr~, load~, offset~) => LIR::Mem(
                 dst=dst.substitute_var(alloc),
                 addr=addr.substitute_var(alloc),
-                load=load,
-                offset=offset,
+                load~,
+                offset~,
             )
             LIR::Alu(dst~, src1~, src2~, op~) => LIR::Alu(
                 dst=dst.substitute_var(alloc),
                 src1=src1.substitute_var(alloc),
                 src2=src2.substitute_var(alloc),
-                op=op,
+                op~,
             )
             LIR::Jmp(dst~, cond~) => LIR::Jmp(
                 dst=dst.substitute_var(alloc),
-                cond=cond,
+                cond~,
             )
             LIR::Label(_) => self.insts[i]
         }
@@ -487,14 +501,14 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
                 insts.push(Inst::Ctl(op=op))
             }
             LIR::Set(dst~, val~) => {
-                insts.push(Inst::Set(dst=get_reg(dst), val=val))
+                insts.push(Inst::Set(dst=get_reg(dst), val~))
             }
             LIR::Mem(dst~, addr~, load~, offset~) => {
                 insts.push(Inst::Mem(
                     dst=get_reg(dst),
                     addr=get_reg(addr),
-                    load=load,
-                    offset=offset,
+                    load~,
+                    offset~,
                 ))
             }
             LIR::Alu(dst~, src1~, src2~, op~) => {
@@ -502,7 +516,7 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
                     dst=get_reg(dst),
                     src1=get_reg(src1),
                     src2=get_reg(src2),
-                    op=op,
+                    op~,
                 ))
             }
             LIR::Jmp(..) => {
@@ -515,14 +529,16 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     }
 
     // halt
-    insts.push(Inst::Ctl(op=ControlOp::Halt))
+    insts.push(Ctl(op=Halt))
 
     insts
 }
 
-pub fn LIRBuilder::lower(insts: Array[LIR], next_var_id: IRVarId) -> Array[Inst] raise InstLoweringError {
+pub fn LIRBuilder::lower(insts: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> Array[Inst] raise InstLoweringError {
     let builder = LIRBuilder::from(insts, next_var_id)
-    builder.remove_labels()
-    builder.allocate()
+    builder
+        ..remove_labels(automatic_jump_temp_reg~)
+        ..allocate()
+
     builder.lower_lir()
 }

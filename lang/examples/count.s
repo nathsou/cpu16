@@ -1,5 +1,5 @@
 set r1 0
-set r2 9
+set r2 0xf
 
 loop:
   inc r1
