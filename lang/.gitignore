@@ -1,3 +1,4 @@
 target/
 .mooncakes/
 out.bin
+examples/out/

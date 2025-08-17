@@ -134,52 +134,7 @@ pub fn step(self: CPU) -> Unit {
     self.regs[7] = self.next_pc
 }
 
-
-pub fn log_n(n: Double, base: Double) -> Double {
-    let d = match base {
-        2 => 1.0
-        8 => 3.0
-        10 => 3.321928094887362
-        16 => 4.0
-        _ => @math.log2(base)
-    }
-
-    @math.log2(n) / d
-}
-
-pub fn show_digit(digit : UInt16) -> Char {
-    match digit {
-        0 => '0'
-        1 => '1'
-        2 => '2'
-        3 => '3'
-        4 => '4'
-        5 => '5'
-        6 => '6'
-        7 => '7'
-        8 => '8'
-        9 => '9'
-        10 => 'a'
-        11 => 'b'
-        12 => 'c'
-        13 => 'd'
-        14 => 'e'
-        15 => 'f'
-        _ => '?'
-    }
-}
-
-pub fn log_b_2(base: UInt16) -> Double {
-    match base {
-        2 => 1.0
-        8 => 0.3333333333333333
-        10 => 0.3010299956639812
-        16 => 0.25
-        _ => 1.0 / @math.log2(base.to_uint().to_double())
-    }
-}
-
-pub fn show_nat(n: UInt16, base~: UInt16, width~: Int? = None) -> String {
+pub fn show_nat(n: UInt16, base~: UInt16, digits~: Int? = None) -> String {
     let builder = StringBuilder::new()
 
     if n == 0 {
@@ -188,31 +143,33 @@ pub fn show_nat(n: UInt16, base~: UInt16, width~: Int? = None) -> String {
         let mut n = n
 
         while n > 0 {
-            let digit = n % base
-            n /= base
-            builder.write_char(show_digit(digit))
+            let div = n / base
+            let digit = n - (div * base)
+            n = div
+            builder.write_char(match digit {
+                0 => '0'; 1 => '1'; 2 => '2'; 3 => '3'; 4 => '4'; 5 => '5'; 6 => '6'; 7 => '7'; 8 => '8'; 9 => '9'
+                10 => 'a'; 11 => 'b'; 12 => 'c'; 13 => 'd'; 14 => 'e'; 15 => 'f'
+                _ => '?'
+            })
         }
     }
 
     let res = builder.to_string().rev()
     
-    match width {
-        Some(width) => {
-            let required_digits = @math.ceil(log_b_2(base) * width.to_double()).to_int()
-            res.pad_start(required_digits, '0')
-        }
+    match digits {
+        Some(digits) => res.pad_start(digits, '0')
         None => res
     }
 }
 
 pub impl Show for CPU with output(self, logger) {
-    logger.write_string("r1: \{show_nat(self.regs[1], base=16, width=Some(16))} ")
-    logger.write_string("r2: \{show_nat(self.regs[2], base=16, width=Some(16))} ")
-    logger.write_string("r3: \{show_nat(self.regs[3], base=16, width=Some(16))} ")
-    logger.write_string("r4: \{show_nat(self.regs[4], base=16, width=Some(16))} ")
-    logger.write_string("r5: \{show_nat(self.regs[5], base=16, width=Some(16))} ")
-    logger.write_string("sp: \{show_nat(self.regs[6], base=16, width=Some(16))} ")
-    logger.write_string("pc: \{show_nat(self.regs[7], base=16, width=Some(16))} ")
+    logger.write_string("r1: \{show_nat(self.regs[1], base=16, digits=Some(4))} ")
+    logger.write_string("r2: \{show_nat(self.regs[2], base=16, digits=Some(4))} ")
+    logger.write_string("r3: \{show_nat(self.regs[3], base=16, digits=Some(4))} ")
+    logger.write_string("r4: \{show_nat(self.regs[4], base=16, digits=Some(4))} ")
+    logger.write_string("r5: \{show_nat(self.regs[5], base=16, digits=Some(4))} ")
+    logger.write_string("sp: \{show_nat(self.regs[6], base=16, digits=Some(4))} ")
+    logger.write_string("pc: \{show_nat(self.regs[7], base=16, digits=Some(4))} ")
 
     logger.write_string("h: \{self.halted.to_uint()} ")
     logger.write_string("c: \{self.carry.to_uint()} ")
