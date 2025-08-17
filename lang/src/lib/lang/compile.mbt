@@ -64,11 +64,13 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let prog = @buffer.new()
+    let buffer = @buffer.new(size_hint=insts.length() * 2)
 
     for inst in insts {
-        prog.write_byte(@asm.Inst::encode(inst).to_byte())
+        let encoded = inst.encode()
+        buffer.write_byte(encoded.to_byte())
+        buffer.write_byte((encoded >> 8).to_byte())
     }
 
-    prog.to_bytes()
+    buffer.to_bytes()
 }

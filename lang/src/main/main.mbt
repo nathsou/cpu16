@@ -5,6 +5,8 @@ enum Command {
     Run(source_file~: String)
 }
 
+suberror CommandError String derive (Show)
+
 fn run_command(command: Command, verbose~: Bool) -> Unit raise {
     match command {
         Asm(source_file~, output_file~) => {
@@ -30,7 +32,22 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
             }
         }
         Run(source_file~) => {
-            let prog = @fs.read_file_to_bytes(source_file)
+            let prog = match source_file {
+                [.., ..".bin"] => @fs.read_file_to_bytes(source_file)
+                [.., ..".s"] => {
+                    let source = @fs.read_file_to_string(source_file, encoding="utf8")
+                    @asm.assemble(source, verbose=false)
+                }
+                // TODO: Find language name and define file extension, for now use .txt
+                [.., ..".txt"] => {
+                    let source = @fs.read_file_to_string(source_file, encoding="utf8")
+                    @lang.compile(source, verbose=false)
+                }
+                _ => {
+                    raise CommandError("Unsupported file extension: \{source_file}, expected .bin, .s, or .txt")
+                }
+            }
+
             let cpu = @sim.CPU::from(prog, 0x0000)
 
             while !cpu.halted {
