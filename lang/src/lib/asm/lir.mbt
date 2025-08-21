@@ -324,122 +324,91 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
 }
 
 pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit raise InstLoweringError {
-    let without_jumps: Array[LIR] = []
-    let jump_offsets_to_fix: Map[Int, LabelId] = Map::new()
-    let visited_labels: Map[LabelId, Unit] = Map::new()
+    let without_labels: Array[LIR] = []
+    let label_pos: Map[LabelId, Int] = {}
+    let jump_info_by_set_index: Map[Int, (LabelId, LIRCond)] = {}
+
+    // Execution index increments only for non-label instructions and equals physical index
+    let mut exec_index = 0
 
     for inst in self.insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
                 let jmp_offset_loc = if automatic_jump_temp_reg { Var(self.next_var_id()) } else { Reg(TMP) }
-                let is_backward_jump = visited_labels.contains(label)
-                let op = if is_backward_jump {
-                    match cond {
-                        Always => AluOp::Sub
-                        IfZero => AluOp::SubIfZero
-                        IfNotZero => AluOp::SubIfNotZero
-                        IfCarry => AluOp::SubIfCarry
-                        IfNotCarry => AluOp::SubIfNotCarry
-                    }
-                } else {
-                    match cond {
-                        Always => AluOp::Add
-                        IfZero => AluOp::AddIfZero
-                        IfNotZero => AluOp::AddIfNotZero
-                        IfCarry => AluOp::AddIfCarry
-                        IfNotCarry => AluOp::AddIfNotCarry
-                    }
-                }
 
-                jump_offsets_to_fix[without_jumps.length()] = label
-                without_jumps.push(LIR::Set(dst=jmp_offset_loc, val=0)) // placeholder
-                without_jumps.push(LIR::Alu(
+                // record where to patch (index of the Set)
+                let set_index = without_labels.length()
+                jump_info_by_set_index[set_index] = (label, cond)
+
+                // emit placeholder SET and placeholder ALU (op fixed later)
+                without_labels.push(LIR::Set(dst=jmp_offset_loc, val=0))
+                without_labels.push(LIR::Alu(
                     dst=Loc::Reg(Reg::PC),
                     src1=Loc::Reg(Reg::PC),
                     src2=jmp_offset_loc,
-                    op~,
+                    op=AluOp::Add, // placeholder; fixed in second pass
                 ))
+
+                exec_index += 2
             }
             LIR::Label(label) => {
-                visited_labels[label] = ()
-                without_jumps.push(inst)
+                // label points to the next non-label instruction
+                label_pos[label] = exec_index
+                // do not emit label into final stream
             }
             _ => {
-                without_jumps.push(inst)
+                without_labels.push(inst)
+                exec_index += 1
             }
         }
     }
 
-    // Compute relative offset of a label
-    fn compute_relative_offset(index: Int, label: LabelId) -> UInt raise InstLoweringError {
-        let max_offset = @cmp.maximum(index, without_jumps.length() - index)
+    // Second pass: fix jump immediates and ALU ops
+    for set_index, info in jump_info_by_set_index {
+        let (label, cond) = info
+        // ALU executes right after SET
+        let alu_exec_index = set_index + 1
 
-        let mut delta_forward = 0U
-        let mut delta_backward = 0U
-
-        for i = 0; i < max_offset; i = i + 1 {
-            if index + i < without_jumps.length() {
-                let inst_forward = without_jumps[index + i]
-
-                match inst_forward {
-                    LIR::Label(l) => {
-                        if l == label {
-                            return delta_forward
-                        }
-                    }
-                    _ => {
-                        // Skip labels
-                        delta_forward += 1
-                    }
-                }
-            }
-
-            if index - i >= 0 {
-                let inst_backward = without_jumps[index - i]
-
-                match inst_backward {
-                    LIR::Label(l) => {
-                        if l == label {
-                            return delta_backward
-                        }
-                    }
-                    _ => {
-                        // Skip labels
-                        delta_backward += 1
-                    }
-                }
-            }
+        let target_pos = match label_pos.get(label) {
+            Some(pos) => pos
+            None => raise MissingLabel(label)
         }
 
-        raise InstLoweringError::MissingLabel(label)
-    }
+        let delta = target_pos - alu_exec_index
+        let is_forward = delta >= 0
+        let abs_delta = if is_forward { delta } else { -delta }
 
-    // Fix jump offsets
-    for index, label in jump_offsets_to_fix {
-        let offset = compute_relative_offset(index, label)
-        let inst = without_jumps[index]
-
-        if offset > 0xFFFF {
-            raise InstLoweringError::UnexpectedJmp
+        // Range check against Inst::Set 11-bit immediate (0..0x7ff)
+        if abs_delta > 0x7FF {
+            // TODO: support long jumps
+            raise JumpOutOfBounds
         }
 
-        match inst {
+        // Patch SET immediate
+        match without_labels[set_index] {
             LIR::Set(dst~, val=_) => {
-                without_jumps[index] = LIR::Set(dst~, val=offset.reinterpret_as_int().to_uint16())
+                without_labels[set_index] = LIR::Set(dst~, val=abs_delta.to_uint16())
             }
-            _ => {
-                abort("unexpected instruction during jump offset fixing")
-            }
+            _ => abort("unexpected instruction during jump SET fixup")
         }
-    }
 
-    // Remove labels
-    let without_labels: Array[LIR] = []
+        // Patch ALU op based on direction and condition
+        let alu_index = set_index + 1
+        match without_labels[alu_index] {
+            LIR::Alu(dst~, src1~, src2~, op=_) => {
+                let new_op: AluOp = match cond {
+                    Always => if is_forward { Add } else { Sub }
+                    IfZero => if is_forward { AddIfZero } else { SubIfZero }
+                    IfNotZero => if is_forward { AddIfNotZero } else { SubIfNotZero }
+                    IfCarry => if is_forward { AddIfCarry } else { SubIfCarry }
+                    IfNotCarry => if is_forward { AddIfNotCarry } else { SubIfNotCarry }
+                }
 
-    for inst in without_jumps {
-        match inst {
-            LIR::Label(_) => ()
-            _ => without_labels.push(inst)
+                without_labels[alu_index] = LIR::Alu(
+                    dst~, src1~, src2~, op=new_op,
+                )
+            }
+            _ => abort("unexpected instruction during jump ALU fixup")
         }
     }
 
@@ -478,6 +447,7 @@ suberror InstLoweringError {
     UnexpectedJmp
     UnexpectedLabel
     InvalidLoc(Loc)
+    JumpOutOfBounds
     MissingLabel(LabelId)
 } derive (Show)
 
