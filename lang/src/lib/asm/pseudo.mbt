@@ -1,40 +1,41 @@
 
 pub(all) enum PseudoInst {
     Halt
-    Setz; Clrz
-    Setc; Clrc
+    Setz; Clrz // Set Zero Flag, Clear Zero Flag
+    Setc; Clrc // Set Carry Flag, Clear Carry Flag
     Load(dst~: Loc, addr~: Loc)
     Store(dst~: Loc, src~: Loc)
     Move(dst~: Loc, src~: Loc)
-    Cmp(src1~: Loc, src2~: Loc)
-    Setw(dst~: Loc, val~: UInt16)
+    Cmp(src1~: Loc, src2~: Loc) // Compare
+    Setw(dst~: Loc, val~: UInt16) // Set Word
     Add(dst~: Loc, src1~: Loc, src2~: Loc)
     Sub(dst~: Loc, src1~: Loc, src2~: Loc)
-    Adc(dst~: Loc, src1~: Loc, src2~: Loc)
-    Sbc(dst~: Loc, src1~: Loc, src2~: Loc)
-    Inc(dst~: Loc)
-    Dec(dst~: Loc)
-    Inc2(dst~: Loc, src~: Loc)
-    Dec2(dst~: Loc, src~: Loc)
+    Adc(dst~: Loc, src1~: Loc, src2~: Loc) // Add with Carry
+    Sbc(dst~: Loc, src1~: Loc, src2~: Loc) // Subtract with Carry
+    Inc(dst~: Loc) // Increment
+    Dec(dst~: Loc) // Decrement
+    Inc2(dst~: Loc, src~: Loc) // dst = src + 1
+    Dec2(dst~: Loc, src~: Loc) // dst = src - 1
     And(dst~: Loc, src1~: Loc, src2~: Loc)
     Nand(dst~: Loc, src1~: Loc, src2~: Loc)
     Or(dst~: Loc, src1~: Loc, src2~: Loc)
     Xor(dst~: Loc, src1~: Loc, src2~: Loc)
-    Shl(dst~: Loc, src~: Loc, amt~: Loc)
-    Shr(dst~: Loc, src~: Loc, amt~: Loc)
+    Shl(dst~: Loc, src~: Loc, amt~: Loc) // Shift Left
+    Shr(dst~: Loc, src~: Loc, amt~: Loc) // Shift Right
     Not(dst~: Loc)
-    Not2(dst~: Loc, src~: Loc)
-    Jmp(dst~: Loc)
-    Jeq(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jne(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jlt(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jgt(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jle(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jge(dst~: Loc, src1~: Loc, src2~: Loc)
-    Jpc(dst~: Loc) // Jump on carry set
-    Jpnc(dst~: Loc) // Jump on carry clear
-    Jpz(dst~: Loc) // Jump on zero set
-    Jpnz(dst~: Loc) // Jump on zero clear
+    Not2(dst~: Loc, src~: Loc) // dst = not src
+    Jmp(dst~: Loc) // Jump
+    Jeq(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Equal
+    Jne(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Not Equal
+    Jlt(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Less Than
+    Jgt(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Greater Than
+    Jle(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Less Than or Equal
+    Jge(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Greater Than or Equal
+    Jc(dst~: Loc) // Jump on carry set
+    Jnc(dst~: Loc) // Jump on carry clear
+    Jz(dst~: Loc) // Jump on zero set
+    Jnz(dst~: Loc) // Jump on zero clear
+    Nop // No Operation
 
     LIR(LIR)
 } derive (Show)
@@ -141,9 +142,10 @@ pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfCarry),
     ]
-    Jpc(dst~) => [Jmp(dst~, cond=IfCarry)]
-    Jpnc(dst~) => [Jmp(dst~, cond=IfNotCarry)]
-    Jpz(dst~) => [Jmp(dst~, cond=IfZero)]
-    Jpnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
+    Jc(dst~) => [Jmp(dst~, cond=IfCarry)]
+    Jnc(dst~) => [Jmp(dst~, cond=IfNotCarry)]
+    Jz(dst~) => [Jmp(dst~, cond=IfZero)]
+    Jnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
+    Nop => [Set(dst=Reg(Z), val=0)]
   }
 }

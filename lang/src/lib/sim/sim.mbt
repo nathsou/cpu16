@@ -10,7 +10,11 @@ pub struct CPU {
 
 pub fn CPU::new(mem: FixedArray[UInt16], start_addr: UInt16) -> CPU {
     {
-        regs: FixedArray::from_array([0, 0, 0, 0, 0, 0, 0, start_addr]),
+        regs: {
+            let regs: FixedArray[UInt16] = FixedArray::make(8, 0)
+            regs[7] = start_addr
+            regs
+        },
         halted: false,
         carry: false,
         zero: false,

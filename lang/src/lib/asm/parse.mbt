@@ -260,25 +260,29 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
             let (dst, src1, src2) = self.expect_lll()
             Some(Jge(dst~, src1~, src2~))
         }
-        Some(Jpc) => {
+        Some(Jc) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(Jpc(dst~))
+            Some(Jc(dst~))
         }
-        Some(Jpnc) => {
+        Some(Jnc) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(Jpnc(dst~))
+            Some(Jnc(dst~))
         }
-        Some(Jpz) => {
+        Some(Jz) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(Jpz(dst~))
+            Some(Jz(dst~))
         }
-        Some(Jpnz) => {
+        Some(Jnz) => {
             self.advance()
             let dst = self.expect_loc()
-            Some(Jpnz(dst~))
+            Some(Jnz(dst~))
+        }
+        Some(Nop) => {
+            self.advance()
+            Some(Nop)
         }
         _ => None
     }

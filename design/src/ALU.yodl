@@ -62,7 +62,7 @@ module ALU(
     if enable {
         q = match op {
             Op::AND  => {1'b0, a and b}
-            Op::NAND => {1'b0, not (a and b)}
+            Op::NAND => {1'b0, a nand b}
             Op::OR   => {1'b0, a or b}
             Op::XOR  => {1'b0, a xor b}
             Op::SHL  => { let shifted: uint<16> = a shl b[3:0]; {1'b0, shifted}; }

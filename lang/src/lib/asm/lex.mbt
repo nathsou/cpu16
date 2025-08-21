@@ -15,7 +15,8 @@ pub enum Token {
     Not; Not2
     Shl; Shr
     Jmp; Jeq; Jne; Jlt; Jgt; Jle; Jge
-    Jpc; Jpnc; Jpz; Jpnz
+    Jc; Jnc; Jz; Jnz
+    Nop
 } derive (Show, Eq)
 
 pub suberror AsmLexerError String derive (Show)
@@ -121,10 +122,10 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "jgt" => Jgt
                     "jle" => Jle
                     "jge" => Jge
-                    "jpc" => Jpc
-                    "jpnc" => Jpnc
-                    "jpz" => Jpz
-                    "jpnz" => Jpnz
+                    "jc" => Jc
+                    "jnc" => Jnc
+                    "jz" => Jz
+                    "jnz" => Jnz
                     "halt" => Halt
                     "setz" => Setz
                     "clrz" => Clrz
@@ -134,6 +135,7 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "store" => Store
                     "move" => Move
                     "cmp" => Cmp
+                    "nop" => Nop
                     _ => Label(identifier)
                 })
             }
