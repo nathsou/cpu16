@@ -79,17 +79,22 @@ pub fn LIR::variables(self: LIR) -> Array[VarId] {
     unique
 }
 
-pub struct VarIdCounter {
+pub(all) struct VarIdCounter {
     mut next_var_id: VarId
+    fixed_temp_reg: Bool
 }
 
 suberror LIRBuilderError String derive (Show)
 
-fn next(self: VarIdCounter) -> VarId {
+fn VarIdCounter::next(self: VarIdCounter) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
+}
+
+fn VarIdCounter::next_tmp_loc(self: VarIdCounter) -> Loc {
+    if self.fixed_temp_reg { Reg(TMP) } else { Var(self.next()) }
 }
 
 pub fn lower_ir_to_pseudo(ir: IR) -> PseudoInst raise LIRBuilderError {
@@ -259,8 +264,7 @@ pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAlloca
     { reg_alloc, mem_alloc }
 }
 
-pub fn replace_labels(insts: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> Array[LIR] raise InstLoweringError {
-    let var_counter: VarIdCounter = { next_var_id, }
+pub fn replace_labels(insts: Array[LIR], var_counter~: VarIdCounter) -> Array[LIR] raise InstLoweringError {
     let without_labels: Array[LIR] = []
     let label_pos: Map[LabelId, Int] = {}
     let jump_info_by_set_index: Map[Int, (LabelId, LIRCond)] = {}
@@ -271,7 +275,7 @@ pub fn replace_labels(insts: Array[LIR], next_var_id~: VarId, automatic_jump_tem
     for inst in insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                let jmp_offset_loc = if automatic_jump_temp_reg { Var(var_counter.next()) } else { Reg(TMP) }
+                let jmp_offset_loc = var_counter.next_tmp_loc()
 
                 // record where to patch (index of the Set)
                 let set_index = without_labels.length()
@@ -447,15 +451,15 @@ pub struct LowerIROutput {
     insts: Array[Inst]
 }
 
-pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst]) -> Array[LIR] raise InstLoweringError {
-    match (try? pseudo.map(PseudoInst::lower)) {
+pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], var_counter~: VarIdCounter) -> Array[LIR] raise InstLoweringError {
+    match (try? pseudo.map(p => p.lower(var_counter))) {
         Err(e) => raise Pseudo(e)
         Ok(lir) => lir.flatten()
     }
 }
 
-pub fn lower_lir_to_insts(lir: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> LowerIROutput raise InstLoweringError {
-    let without_labels = replace_labels(lir, next_var_id~, automatic_jump_temp_reg~)
+pub fn lower_lir_to_insts(lir: Array[LIR], var_counter~: VarIdCounter) -> LowerIROutput raise InstLoweringError {
+    let without_labels = replace_labels(lir, var_counter~)
     let allocated = allocate(without_labels)
     let insts = lower_lir_to_inst(allocated)
 

@@ -38,6 +38,11 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
     
+    let var_counter: @asm.VarIdCounter = {
+        next_var_id: ir_builder.next_var_id,
+        fixed_temp_reg: false, // Use next available general purpose register for temporaries
+    }
+
     let pseudo = ir_builder.insts.map(@asm.lower_ir_to_pseudo)
 
     if verbose {
@@ -47,7 +52,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo)
+    let lir = @asm.lower_pseudo_to_lir(pseudo, var_counter~)
 
     if verbose {
         println("\n[LIR]")
@@ -57,11 +62,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lowered = @asm.lower_lir_to_insts(
-        lir,
-        next_var_id=ir_builder.next_var_id,
-        automatic_jump_temp_reg=true,
-    )
+    let lowered = @asm.lower_lir_to_insts(lir, var_counter~)
 
     if verbose {
         println("\n[Allocated LIR]")

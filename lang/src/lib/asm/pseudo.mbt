@@ -42,7 +42,7 @@ pub(all) enum PseudoInst {
 
 pub suberror PseudoLoweringError String derive (Show)
 
-pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
+pub fn lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -63,10 +63,11 @@ pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
             [Alu(dst~, src1=Reg(Z), src2=Reg(Z), op=Dec)]
         } else if val >= (0xffff - 0x7ff) {
             let sub_val = (0x1000).to_uint16() - val
+            let tmp = var_counter.next_tmp_loc()
 
             [
-                Set(dst=Reg(TMP), val=sub_val),
-                Alu(dst~, src1=Reg(Z), src2=Reg(TMP), op=Sub),
+                Set(dst=tmp, val=sub_val),
+                Alu(dst~, src1=Reg(Z), src2=tmp, op=Sub),
             ]
         } else {
             // Check if `val` can be represented as a left shift of an 11-bit value
@@ -75,10 +76,12 @@ pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
                 let shl_core = val_uint >> shl_amount
                 
                 if shl_core <= 0x7ff {
+                    let tmp = var_counter.next_tmp_loc()
+
                     return [
                         Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
-                        Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
-                        Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+                        Set(dst=tmp, val=shl_amount.to_uint16()),
+                        Alu(dst~, src1=dst, src2=tmp, op=Shl),
                     ]
                 }
             }
@@ -86,13 +89,14 @@ pub fn lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
             // Fallback to a general strategy
             let high = (val >> 8) & 0xff
             let low = val & 0xff
+            let tmp = var_counter.next_tmp_loc()
 
             [
                 Set(dst~, val=high),
-                Set(dst=Reg(TMP), val=8),
-                Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
-                Set(dst=Reg(TMP), val=low),
-                Alu(dst~, src1=dst, src2=Reg(TMP), op=Or),
+                Set(dst=tmp, val=8),
+                Alu(dst~, src1=dst, src2=tmp, op=Shl),
+                Set(dst=tmp, val=low),
+                Alu(dst~, src1=dst, src2=tmp, op=Or),
             ]
         }
     }
