@@ -67,145 +67,81 @@ pub enum LIR {
 
 pub fn LIR::variables(self: LIR) -> Array[VarId] {
     let vars = match self {
-        LIR::Ctl(_) => []
-        LIR::Set(dst~, val=_) => dst.variables()
-        LIR::Mem(dst~, addr~, load=_, offset=_) => dst.variables() + addr.variables()
-        LIR::Alu(dst~, src1~, src2~, op=_) => dst.variables() + src1.variables() + src2.variables()
-        LIR::Jmp(dst~, cond=_) => dst.variables()
-        LIR::Label(_) => []
+        Ctl(_) => []
+        Set(dst~, val=_) => dst.variables()
+        Mem(dst~, addr~, load=_, offset=_) => dst.variables() + addr.variables()
+        Alu(dst~, src1~, src2~, op=_) => dst.variables() + src1.variables() + src2.variables()
+        Jmp(dst~, cond=_) => dst.variables()
+        Label(_) => []
     }
 
     let unique = Set::from_array(vars).to_array()
     unique
 }
 
-pub struct LIRBuilder {
-    mut insts: Array[LIR]
+pub struct VarIdCounter {
     mut next_var_id: VarId
 }
 
 suberror LIRBuilderError String derive (Show)
 
-pub fn LIRBuilder::new(next_var_id: VarId) -> LIRBuilder {
-    {
-        insts: [],
-        next_var_id,
-    }
-}
-
-pub fn LIRBuilder::from(insts: Array[LIR], next_var_id: VarId) -> LIRBuilder {
-    {
-        insts,
-        next_var_id,
-    }
-}
-
-fn next_var_id(self: LIRBuilder) -> VarId {
+fn next(self: VarIdCounter) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
-fn LIRBuilder::emit(self: LIRBuilder, inst: LIR) -> Unit {
-    self.insts.push(inst)
-}
-
-fn emit_move(self: LIRBuilder, dst: Loc, src: Loc) -> Unit {
-    self.emit(LIR::Alu(dst=dst, src1=src, src2=Loc::Reg(Reg::Z), op=AluOp::Add))
-}
-
-pub fn lower_ir(self: LIRBuilder, ir: IR) -> Unit raise LIRBuilderError {
+pub fn lower_ir_to_pseudo(ir: IR) -> PseudoInst raise LIRBuilderError {
     match ir {
-        IR::Set(dst~, val~) => {
-            let val_uint = val.reinterpret_as_uint()
-
-            if val_uint >= 4096 {
-                raise LIRBuilderError("TODO: implement large constant lowering")
-            }
-
-            self.emit(LIR::Set(dst=Loc::Var(dst), val=val_uint.reinterpret_as_int().to_uint16()))
-        }
-        IR::Load(dst~, src~) => {
-            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=true, offset=0))
-        }
-        IR::Store(dst~, src~) => {
-            self.emit(LIR::Mem(dst=Loc::Var(dst), addr=Loc::Var(src), load=false, offset=0))
-        }
-        IR::Move(dst~, src~) => {
-            self.emit_move(Loc::Var(dst), Loc::Var(src))
-        }
-        IR::Add(dst~, src1~, src2~) => {
-            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=AluOp::Add))
-        }
-        IR::Sub(dst~, src1~, src2~) => {
-            self.emit(LIR::Alu(dst=Loc::Var(dst), src1=Loc::Var(src1), src2=Loc::Var(src2), op=AluOp::Sub))
-        }
-        IR::Mul(..) => {
+        Set(dst~, val~) => Setw(dst=Var(dst), val=val.to_uint16())
+        Load(dst~, src~) => Load(dst=Var(dst), addr=Var(src))
+        Store(dst~, src~) => Store(dst=Var(src), src=Var(dst))
+        Move(dst~, src~) => Move(dst=Var(dst), src=Var(src))
+        Add(dst~, src1~, src2~) => Add(dst=Var(dst), src1=Var(src1), src2=Var(src2))
+        Sub(dst~, src1~, src2~) => Sub(dst=Var(dst), src1=Var(src1), src2=Var(src2))
+        Mul(..) => {
             raise LIRBuilderError("TODO: implement Mul")
         }
-        IR::Div(..) => {
+        Div(..) => {
             raise LIRBuilderError("TODO: implement Div")
         }
-        IR::Mod(..) => {
+        Mod(..) => {
             raise LIRBuilderError("TODO: implement Mod")
         }
-        IR::Not(..) => {
+        Not(..) => {
             raise LIRBuilderError("TODO: implement Not")
         }
-        IR::And(..) => {
+        And(..) => {
             raise LIRBuilderError("TODO: implement And")
         }
-        IR::Or(..) => {
+        Or(..) => {
             raise LIRBuilderError("TODO: implement Or")
         }
-        IR::Xor(..) => {
+        Xor(..) => {
             raise LIRBuilderError("TODO: implement Xor")
         }
-        IR::Jump(label~) => {
-            self.emit(LIR::Jmp(dst=Loc::Label(label), cond=Always))
-        }
-        IR::JumpIf(label~, cond~, lhs~, rhs~) => {
+        Jump(label~) => Jmp(dst=Label(label))
+        JumpIf(label~, cond~, lhs~, rhs~) => {
             match cond {
-                JumpCond::Equ => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfZero))
-                }
-                JumpCond::Neq => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotZero))
-                }
-                JumpCond::Lss => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotCarry))
-                }
-                JumpCond::Gtr => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(lhs), src2=Loc::Var(rhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfCarry))
-                }
-                JumpCond::Geq => {
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfNotCarry))
-                }
-                JumpCond::Leq => {
-                    // reverse lhs and rhs
-                    self.emit(LIR::Alu(dst=Loc::Reg(Reg::Z), src1=Loc::Var(rhs), src2=Loc::Var(lhs), op=AluOp::Sub))
-                    self.emit(LIR::Jmp(dst=Loc::Label(label), cond=IfCarry))
-                }
+                Equ => Jeq(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Neq => Jne(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Lss => Jlt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Gtr => Jgt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Geq => Jge(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Leq => Jle(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
             }
         }
-        IR::Label(label) => {
-            self.emit(LIR::Label(label))
-        }
+        Label(label) => LIR(Label(label))
     }
 }
 
 // TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
-pub fn liveness_intervals(self: LIRBuilder) -> Array[LivenessInterval] {
-    let intervals: Map[VarId, (Int, Int)] = Map::new()
+pub fn liveness_intervals(insts: Array[LIR]) -> Array[LivenessInterval] {
+    let intervals: Map[VarId, (Int, Int)] = {}
 
-    for i = 0; i < self.insts.length(); i = i + 1 {
-        let vars = self.insts[i].variables()
+    for i = 0; i < insts.length(); i = i + 1 {
+        let vars = insts[i].variables()
 
         for j = 0; j < vars.length(); j = j + 1 {
             let v = vars[j]
@@ -271,8 +207,8 @@ impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessI
 
 // Linear scan register allocation
 // TODO: Graph coloring register allocation
-pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocation {
-    let intervals = self.liveness_intervals()
+pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAllocation {
+    let intervals = liveness_intervals(insts)
     let reg_alloc: Map[VarId, Int] = Map::new()
     let mem_alloc: Map[VarId, Int] = Map::new()
     let active: SortedArray[LivenessInterval] = SortedArray::new()
@@ -323,7 +259,8 @@ pub fn allocate_registers(self: LIRBuilder, regs_count~: Int) -> VariableAllocat
     { reg_alloc, mem_alloc }
 }
 
-pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit raise InstLoweringError {
+pub fn replace_labels(insts: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> Array[LIR] raise InstLoweringError {
+    let var_counter: VarIdCounter = { next_var_id, }
     let without_labels: Array[LIR] = []
     let label_pos: Map[LabelId, Int] = {}
     let jump_info_by_set_index: Map[Int, (LabelId, LIRCond)] = {}
@@ -331,10 +268,10 @@ pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit r
     // Execution index increments only for non-label instructions and equals physical index
     let mut exec_index = 0
 
-    for inst in self.insts {
+    for inst in insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                let jmp_offset_loc = if automatic_jump_temp_reg { Var(self.next_var_id()) } else { Reg(TMP) }
+                let jmp_offset_loc = if automatic_jump_temp_reg { Var(var_counter.next()) } else { Reg(TMP) }
 
                 // record where to patch (index of the Set)
                 let set_index = without_labels.length()
@@ -412,35 +349,33 @@ pub fn remove_labels(self: LIRBuilder, automatic_jump_temp_reg~: Bool) -> Unit r
         }
     }
 
-    self.insts = without_labels
+    without_labels
 }
 
-pub fn allocate(self: LIRBuilder, regs_count~: Int = 5) -> Unit {
-    let alloc = self.allocate_registers(regs_count~)
+pub fn allocate(insts: Array[LIR], regs_count~: Int = 5) -> Array[LIR] {
+    let alloc = allocate_registers(insts, regs_count~)
 
-    for i = 0; i < self.insts.length(); i = i + 1 {
-        self.insts[i] = match self.insts[i] {
-            LIR::Ctl(op~) => LIR::Ctl(op~)
-            LIR::Set(dst~, val~) => LIR::Set(dst=dst.substitute_var(alloc), val=val)
-            LIR::Mem(dst~, addr~, load~, offset~) => LIR::Mem(
-                dst=dst.substitute_var(alloc),
-                addr=addr.substitute_var(alloc),
-                load~,
-                offset~,
-            )
-            LIR::Alu(dst~, src1~, src2~, op~) => LIR::Alu(
-                dst=dst.substitute_var(alloc),
-                src1=src1.substitute_var(alloc),
-                src2=src2.substitute_var(alloc),
-                op~,
-            )
-            LIR::Jmp(dst~, cond~) => LIR::Jmp(
-                dst=dst.substitute_var(alloc),
-                cond~,
-            )
-            LIR::Label(_) => self.insts[i]
-        }
-    }
+    insts.map(inst => match inst {
+        LIR::Ctl(op~) => LIR::Ctl(op~)
+        LIR::Set(dst~, val~) => LIR::Set(dst=dst.substitute_var(alloc), val=val)
+        LIR::Mem(dst~, addr~, load~, offset~) => LIR::Mem(
+            dst=dst.substitute_var(alloc),
+            addr=addr.substitute_var(alloc),
+            load~,
+            offset~,
+        )
+        LIR::Alu(dst~, src1~, src2~, op~) => LIR::Alu(
+            dst=dst.substitute_var(alloc),
+            src1=src1.substitute_var(alloc),
+            src2=src2.substitute_var(alloc),
+            op~,
+        )
+        LIR::Jmp(dst~, cond~) => LIR::Jmp(
+            dst=dst.substitute_var(alloc),
+            cond~,
+        )
+        LIR::Label(_) => inst
+    })
 }
 
 suberror InstLoweringError {
@@ -449,10 +384,12 @@ suberror InstLoweringError {
     InvalidLoc(Loc)
     JumpOutOfBounds
     MissingLabel(LabelId)
+    Pseudo(PseudoLoweringError)
+    LIR(LIRBuilderError)
 } derive (Show)
 
-pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
-    let insts = []
+pub fn lower_lir_to_inst(insts: Array[LIR]) -> Array[Inst] raise InstLoweringError {
+    let lowered = Array::new(capacity=insts.length())
 
     fn get_reg(loc: Loc) -> Reg raise InstLoweringError {
         match loc {
@@ -465,16 +402,16 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
         }
     }
 
-    for inst in self.insts {
+    for inst in insts {
         match inst {
             LIR::Ctl(op~) => {
-                insts.push(Inst::Ctl(op=op))
+                lowered.push(Inst::Ctl(op=op))
             }
             LIR::Set(dst~, val~) => {
-                insts.push(Inst::Set(dst=get_reg(dst), val~))
+                lowered.push(Inst::Set(dst=get_reg(dst), val~))
             }
             LIR::Mem(dst~, addr~, load~, offset~) => {
-                insts.push(Inst::Mem(
+                lowered.push(Inst::Mem(
                     dst=get_reg(dst),
                     addr=get_reg(addr),
                     load~,
@@ -482,7 +419,7 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
                 ))
             }
             LIR::Alu(dst~, src1~, src2~, op~) => {
-                insts.push(Inst::Alu(
+                lowered.push(Inst::Alu(
                     dst=get_reg(dst),
                     src1=get_reg(src1),
                     src2=get_reg(src2),
@@ -499,16 +436,32 @@ pub fn lower_lir(self: LIRBuilder) -> Array[Inst] raise InstLoweringError {
     }
 
     // halt
-    insts.push(Ctl(op=Halt))
+    lowered.push(Ctl(op=Halt))
 
-    insts
+    lowered
 }
 
-pub fn LIRBuilder::lower(insts: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> Array[Inst] raise InstLoweringError {
-    let builder = LIRBuilder::from(insts, next_var_id)
-    builder
-        ..remove_labels(automatic_jump_temp_reg~)
-        ..allocate()
+pub struct LowerIROutput {
+    without_labels: Array[LIR]
+    allocated: Array[LIR]
+    insts: Array[Inst]
+}
 
-    builder.lower_lir()
+pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst]) -> Array[LIR] raise InstLoweringError {
+    match (try? pseudo.map(PseudoInst::lower)) {
+        Err(e) => raise Pseudo(e)
+        Ok(lir) => lir.flatten()
+    }
+}
+
+pub fn lower_lir_to_insts(lir: Array[LIR], next_var_id~: VarId, automatic_jump_temp_reg~: Bool) -> LowerIROutput raise InstLoweringError {
+    let without_labels = replace_labels(lir, next_var_id~, automatic_jump_temp_reg~)
+    let allocated = allocate(without_labels)
+    let insts = lower_lir_to_inst(allocated)
+
+    {
+        without_labels,
+        allocated,
+        insts,
+    }
 }

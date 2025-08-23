@@ -34,39 +34,46 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         println("\n[IR]")
 
         for inst in ir_builder.insts {
-            println(@asm.IR::to_string(inst))
+            println(inst)
+        }
+    }
+    
+    let pseudo = ir_builder.insts.map(@asm.lower_ir_to_pseudo)
+
+    if verbose {
+        println("\n[Pseudo]")
+        for inst in pseudo {
+            println(inst)
         }
     }
 
-    let lir_builder = @asm.LIRBuilder::new(ir_builder.next_var_id)
-
-    for inst in ir_builder.insts {
-        let _ = lir_builder.lower_ir(inst)
-    }
+    let lir = @asm.lower_pseudo_to_lir(pseudo)
 
     if verbose {
         println("\n[LIR]")
 
-        for inst in lir_builder.insts {
-            println(@asm.LIR::to_string(inst))
+        for inst in lir {
+            println(inst)
         }
     }
 
-    lir_builder.remove_labels(automatic_jump_temp_reg=true)
-    lir_builder.allocate()
-    let insts = lir_builder.lower_lir()
+    let lowered = @asm.lower_lir_to_insts(
+        lir,
+        next_var_id=ir_builder.next_var_id,
+        automatic_jump_temp_reg=true,
+    )
 
     if verbose {
         println("\n[Allocated LIR]")
 
-        for inst in insts {
-            println(@asm.Inst::to_string(inst))
+        for inst in lowered.allocated {
+            println(inst)
         }
     }
 
-    let buffer = @buffer.new(size_hint=insts.length() * 2)
+    let buffer = @buffer.new(size_hint=lowered.insts.length() * 2)
 
-    for inst in insts {
+    for inst in lowered.insts {
         let encoded = inst.encode()
         buffer.write_byte(encoded.to_byte())
         buffer.write_byte((encoded >> 8).to_byte())
