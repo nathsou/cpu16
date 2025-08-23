@@ -35,6 +35,10 @@ pub(all) enum PseudoInst {
     Jnc(dst~: Loc) // Jump on carry clear
     Jz(dst~: Loc) // Jump on zero set
     Jnz(dst~: Loc) // Jump on zero clear
+    Push(val~: Loc) // Push value onto stack
+    Pop(dst~: Loc) // Pop value from stack into dst
+    Call(dst~: Loc) // Call subroutine
+    Ret // Return from subroutine
     Nop // No Operation
 
     LIR(LIR)
@@ -150,6 +154,31 @@ pub fn lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise Ps
     Jnc(dst~) => [Jmp(dst~, cond=IfNotCarry)]
     Jz(dst~) => [Jmp(dst~, cond=IfZero)]
     Jnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
+    Push(val~) => [
+        Store(dst=Reg(SP), src=val),
+        Dec(dst=Reg(SP)),
+    ] |> lower_many(var_counter)
+    Pop(dst~) => [
+        Inc(dst=Reg(SP)),
+        Load(dst~, addr=Reg(SP)),
+    ] |> lower_many(var_counter)
+    Call(dst~) => {
+        let tmp = var_counter.next_tmp_loc()
+
+        [
+            // skip next 5 instructions which are part of the call pseudo-instruction itself
+            LIR(Set(dst=tmp, val=5)),
+            Add(dst=tmp, src1=tmp, src2=Reg(PC)),
+            Push(val=tmp), // 2 instructions
+            // TODO: Handle Jumps to arbitrary locations which might take more than 2 instructions
+            Jmp(dst~), // 2 instructions
+        ] |> lower_many(var_counter)
+    }
+    Ret => [Pop(dst=Reg(PC))] |> lower_many(var_counter)
     Nop => [Set(dst=Reg(Z), val=0)]
   }
+}
+
+pub fn lower_many(insts: Array[PseudoInst], var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
+    insts.map(inst => inst.lower(var_counter)).flatten()
 }

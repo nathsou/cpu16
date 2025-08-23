@@ -16,6 +16,8 @@ pub enum Token {
     Shl; Shr
     Jmp; Jeq; Jne; Jlt; Jgt; Jle; Jge
     Jc; Jnc; Jz; Jnz
+    Push; Pop
+    Call; Ret    
     Nop
 } derive (Show, Eq)
 
@@ -135,6 +137,10 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                     "store" => Store
                     "move" => Move
                     "cmp" => Cmp
+                    "push" => Push
+                    "pop" => Pop
+                    "call" => Call
+                    "ret" => Ret
                     "nop" => Nop
                     _ => Label(identifier)
                 })

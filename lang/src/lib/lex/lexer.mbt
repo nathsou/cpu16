@@ -74,13 +74,13 @@ pub fn parse_integer(self: Lexer) -> UInt {
 }
 
 pub fn parse_identifier(self: Lexer) -> String {
-    let mut identifier = ""
+    let identifier = StringBuilder::new()
 
     while true {
         match self.peek() {
             Some(c) => {
                 if is_alphanumeric(c) {
-                    identifier += c.to_string()
+                    identifier.write_char(c)
                     self.index += 1
                 } else {
                     break
@@ -92,7 +92,7 @@ pub fn parse_identifier(self: Lexer) -> String {
         }
     }
 
-    identifier
+    identifier.to_string()
 }
 
 pub fn matches(self: Lexer, char: Char) -> Bool {
