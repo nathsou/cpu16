@@ -79,7 +79,7 @@ pub fn parse_identifier(self: Lexer) -> String {
     while true {
         match self.peek() {
             Some(c) => {
-                if is_alphanumeric(c) {
+                if is_alphanumeric(c) || c == '_' {
                     identifier.write_char(c)
                     self.index += 1
                 } else {

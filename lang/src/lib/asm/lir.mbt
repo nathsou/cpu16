@@ -1,7 +1,30 @@
 // Lower Intermediate Representation
 // Raw instructions with variables instead of registers (before register allocation) and labels
 
-pub enum Loc {
+pub(all) struct VarId(UInt) derive (Show, Eq, Hash)
+
+pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
+    self.inner() + other.inner()
+}
+
+pub(all) struct LabelId(UInt) derive (Eq, Hash, Show)
+
+pub(all) enum JumpCond {
+    Equ; Neq; Lss; Leq; Gtr; Geq
+} derive (Show)
+
+pub fn JumpCond::negate(self: JumpCond) -> JumpCond {
+    match self {
+        Equ => Neq
+        Neq => Equ
+        Lss => Geq
+        Leq => Gtr
+        Gtr => Leq
+        Geq => Lss
+    }
+}
+
+pub(all) enum Loc {
     Reg(Reg)
     Var(VarId)
     Mem(offset~: Int)
@@ -56,7 +79,7 @@ pub fn LIRCond::from(cond: UInt) -> LIRCond {
     }
 }
 
-pub enum LIR {
+pub(all) enum LIR {
     Ctl(op~: ControlOp)
     Set(dst~: Loc, val~: UInt16)
     Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt16)
@@ -84,8 +107,6 @@ pub(all) struct VarIdCounter {
     fixed_temp_reg: Bool
 }
 
-suberror LIRBuilderError String derive (Show)
-
 fn VarIdCounter::next(self: VarIdCounter) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
@@ -95,50 +116,6 @@ fn VarIdCounter::next(self: VarIdCounter) -> VarId {
 
 fn VarIdCounter::next_tmp_loc(self: VarIdCounter) -> Loc {
     if self.fixed_temp_reg { Reg(TMP) } else { Var(self.next()) }
-}
-
-pub fn lower_ir_to_pseudo(ir: IR) -> PseudoInst raise LIRBuilderError {
-    match ir {
-        Set(dst~, val~) => Setw(dst=Var(dst), val=val.to_uint16())
-        Load(dst~, src~) => Load(dst=Var(dst), addr=Var(src))
-        Store(dst~, src~) => Store(dst=Var(src), src=Var(dst))
-        Move(dst~, src~) => Move(dst=Var(dst), src=Var(src))
-        Add(dst~, src1~, src2~) => Add(dst=Var(dst), src1=Var(src1), src2=Var(src2))
-        Sub(dst~, src1~, src2~) => Sub(dst=Var(dst), src1=Var(src1), src2=Var(src2))
-        Mul(..) => {
-            raise LIRBuilderError("TODO: implement Mul")
-        }
-        Div(..) => {
-            raise LIRBuilderError("TODO: implement Div")
-        }
-        Mod(..) => {
-            raise LIRBuilderError("TODO: implement Mod")
-        }
-        Not(..) => {
-            raise LIRBuilderError("TODO: implement Not")
-        }
-        And(..) => {
-            raise LIRBuilderError("TODO: implement And")
-        }
-        Or(..) => {
-            raise LIRBuilderError("TODO: implement Or")
-        }
-        Xor(..) => {
-            raise LIRBuilderError("TODO: implement Xor")
-        }
-        Jump(label~) => Jmp(dst=Label(label))
-        JumpIf(label~, cond~, lhs~, rhs~) => {
-            match cond {
-                Equ => Jeq(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Neq => Jne(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Lss => Jlt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Gtr => Jgt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Geq => Jge(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Leq => Jle(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-            }
-        }
-        Label(label) => LIR(Label(label))
-    }
 }
 
 // TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
@@ -389,7 +366,6 @@ suberror InstLoweringError {
     JumpOutOfBounds
     MissingLabel(LabelId)
     Pseudo(PseudoLoweringError)
-    LIR(LIRBuilderError)
 } derive (Show)
 
 pub fn lower_lir_to_inst(insts: Array[LIR]) -> Array[Inst] raise InstLoweringError {
@@ -452,9 +428,9 @@ pub struct LowerIROutput {
 }
 
 pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], var_counter~: VarIdCounter) -> Array[LIR] raise InstLoweringError {
-    match (try? pseudo.map(p => p.lower(var_counter))) {
+    match (try? lower_many(pseudo, var_counter)) {
         Err(e) => raise Pseudo(e)
-        Ok(lir) => lir.flatten()
+        Ok(lir) => lir
     }
 }
 

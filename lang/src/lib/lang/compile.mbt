@@ -23,36 +23,26 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let ir_builder = IRBuilder::new()
+    let pseudo_builder = PseudoBuilder::new()
     let env = Env::new()
 
     for tac in tac_builder.tac {
-        let _ = ir_builder.lower_expr(tac, env)
-    }
-
-    if verbose {
-        println("\n[IR]")
-
-        for inst in ir_builder.insts {
-            println(inst)
-        }
+        let _ = pseudo_builder.lower_expr(tac, env)
     }
     
     let var_counter: @asm.VarIdCounter = {
-        next_var_id: ir_builder.next_var_id,
+        next_var_id: pseudo_builder.next_var_id,
         fixed_temp_reg: false, // Use next available general purpose register for temporaries
     }
 
-    let pseudo = ir_builder.insts.map(@asm.lower_ir_to_pseudo)
-
     if verbose {
         println("\n[Pseudo]")
-        for inst in pseudo {
+        for inst in pseudo_builder.insts {
             println(inst)
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo, var_counter~)
+    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.insts, var_counter~)
 
     if verbose {
         println("\n[LIR]")

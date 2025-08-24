@@ -49,6 +49,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
             }
 
             let cpu = @sim.CPU::from(prog, 0x0000)
+            let mut steps = 0U
 
             while !cpu.halted {
                 if verbose {
@@ -56,10 +57,13 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
                 }
 
                 cpu.step()
+                steps += 1
             }
 
             if !verbose {
                 println(cpu)
+            } else {
+                println("steps: \{steps}")
             }
         }
     }

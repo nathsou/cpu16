@@ -46,7 +46,7 @@ pub(all) enum PseudoInst {
 
 pub suberror PseudoLoweringError String derive (Show)
 
-pub fn lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
+pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")

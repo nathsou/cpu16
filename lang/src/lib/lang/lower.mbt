@@ -1,41 +1,41 @@
 
-pub struct IRBuilder {
+pub struct PseudoBuilder {
     mut next_var_id: @asm.VarId
-    insts: Array[@asm.IR]
+    insts: Array[@asm.PseudoInst]
 }
 
-pub fn IRBuilder::new() -> IRBuilder {
+pub fn PseudoBuilder::new() -> PseudoBuilder {
     {
         next_var_id: 1U, // 0 is reserved for unit
         insts: [],
     }
 }
 
-pub fn IRBuilder::emit(self: IRBuilder, inst: @asm.IR) -> Unit {
+pub fn PseudoBuilder::emit(self: PseudoBuilder, inst: @asm.PseudoInst) -> Unit {
     self.insts.push(inst)
 }
 
 suberror IRBuilderError String derive (Show)
 
-fn next_var(self: IRBuilder) -> @asm.VarId {
+fn next_var(self: PseudoBuilder) -> @asm.VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
-pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
+pub fn PseudoBuilder::lower_value(self: PseudoBuilder, value: TACValue, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match value {
         TACValue::Const(c) => {
             match c {
                 Const::Integer(n, _) => {
                     let dst = self.next_var()
-                    self.emit(@asm.IR::Set(dst~, val=n))
+                    self.emit(Setw(dst=Var(dst), val=n.to_uint16()))
                     dst
                 }
                 Const::Boolean(q) => {
                     let dst = self.next_var()
-                    self.emit(@asm.IR::Set(dst~, val=if q { 1 } else { 0 }))
+                    self.emit(Setw(dst=Var(dst), val=if q { 1 } else { 0 }))
                     dst
                 }
             }
@@ -51,7 +51,7 @@ pub fn lower_value(self: IRBuilder, value: TACValue, env: Env[TACId, @asm.VarId]
     }
 }
 
-fn get_or_declare(self: IRBuilder, env: Env[TACId, @asm.VarId], target: TACId) -> @asm.VarId {
+fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[TACId, @asm.VarId], target: TACId) -> @asm.VarId {
     match env.lookup(target) {
         Some(dst) => dst
         None => {
@@ -64,12 +64,12 @@ fn get_or_declare(self: IRBuilder, env: Env[TACId, @asm.VarId], target: TACId) -
 
 let unit_var_id: @asm.VarId = 0U
 
-pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
+pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match expr {
         TAC::Assign(target~, src~) => {
             let dst_id = self.get_or_declare(env, target)
             let src_id = self.lower_value(src, env)
-            self.emit(@asm.IR::Move(dst=dst_id, src=src_id))
+            self.emit(Move(dst=Var(dst_id), src=Var(src_id)))
             dst_id
         }
         TAC::Unary(target~, op~, arg~) => {
@@ -78,7 +78,7 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.Va
             match op {
                 UnaryOp::Not => {
                     let arg_id = self.lower_value(arg, env)
-                    self.emit(@asm.IR::Not(dst~, src=arg_id))
+                    self.emit(Not2(dst=Var(dst), src=Var(arg_id)))
                 }
             }
 
@@ -91,14 +91,14 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.Va
             let rhs_id = self.lower_value(rhs, env)
 
             match op {
-                TACBinaryOp::Add => self.emit(@asm.IR::Add(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Sub => self.emit(@asm.IR::Sub(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Mul => self.emit(@asm.IR::Mul(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Div => self.emit(@asm.IR::Div(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Mod => self.emit(@asm.IR::Mod(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::And => self.emit(@asm.IR::And(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Or => self.emit(@asm.IR::Or(dst~, src1=lhs_id, src2=rhs_id))
-                TACBinaryOp::Xor => self.emit(@asm.IR::Xor(dst~, src1=lhs_id, src2=rhs_id))
+                Add => self.emit(Add(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Sub => self.emit(Sub(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Mul => raise IRBuilderError("multiplication not implemented")
+                Div => raise IRBuilderError("division not implemented")
+                Mod => raise IRBuilderError("modulo not implemented")
+                And => self.emit(And(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Or => self.emit(Or(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Xor => self.emit(Xor(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
             }
 
             env.declare(target, dst)
@@ -107,27 +107,37 @@ pub fn IRBuilder::lower_expr(self: IRBuilder, expr: TAC, env: Env[TACId, @asm.Va
         TAC::Store(dst~, src~, offset=_) => {
             let dst_id = self.get_or_declare(env, dst)
             let src_id = self.lower_value(src, env)
-            self.emit(@asm.IR::Store(dst=dst_id, src=src_id))
+            self.emit(Store(dst=Var(dst_id), src=Var(src_id)))
             dst_id
         }
         TAC::Load(target~, addr~, offset=_) => {
             let target_id = self.get_or_declare(env, target)
             let addr_id = self.lower_value(addr, env)
-            self.emit(@asm.IR::Load(dst=target_id, src=addr_id))
+            self.emit(Load(dst=Var(target_id), addr=Var(addr_id)))
             target_id
         }
         TAC::Jump(label~) => {
-            self.emit(@asm.IR::Jump(label~))
+            self.emit(Jmp(dst=Label(label)))
             unit_var_id
         }
         TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
             let lhs_id = self.lower_value(lhs, env)
             let rhs_id = self.lower_value(rhs, env)
-            self.emit(@asm.IR::JumpIf(label~, cond=cond, lhs=lhs_id, rhs=rhs_id))
+
+            let pseudo: @asm.PseudoInst = match cond {
+                Equ => Jeq(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+                Neq => Jne(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+                Lss => Jlt(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+                Gtr => Jgt(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+                Geq => Jge(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+                Leq => Jle(dst=Label(label), src1=Var(lhs_id), src2=Var(rhs_id))
+            }
+
+            self.emit(pseudo)
             unit_var_id
         }
         TAC::Label(label~) => {
-            self.emit(@asm.IR::Label(label))
+            self.emit(LIR(Label(label)))
             unit_var_id
         }
         _ => raise IRBuilderError("not implemented: lower_expr")

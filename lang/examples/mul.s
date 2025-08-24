@@ -9,20 +9,20 @@ halt
 mul:
     push r3
     set r3 0
-    jge mulloop r1 r2 ; ensure r1 >= r2
+    jge mul_loop r1 r2 ; ensure r1 >= r2
 
-    mulswap:
+    mul_swap:
         move tmp r2
         move r2 r1
         move r1 tmp
     
-    mulloop:
-        jeq mulend r2 z
+    mul_loop:
+        jeq mul_end r2 z
         dec r2
         add r3 r3 r1
-        jmp mulloop
+        jmp mul_loop
 
-    mulend:
+    mul_end:
         move r2 r3
         pop r3
         ret
