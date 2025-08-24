@@ -179,6 +179,6 @@ pub fn lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise Ps
   }
 }
 
-pub fn lower_many(insts: Array[PseudoInst], var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
+fn lower_many(insts: Array[PseudoInst], var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
     insts.map(inst => inst.lower(var_counter)).flatten()
 }
