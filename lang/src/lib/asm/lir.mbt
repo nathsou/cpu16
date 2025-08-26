@@ -52,7 +52,7 @@ pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
                     1 => Reg::R2
                     2 => Reg::R3
                     3 => Reg::R4
-                    4 => Reg::TMP
+                    4 => Reg::R5
                     _ => abort("invalid register")
                 })
                 None => match alloc.mem_alloc.get(v) {
@@ -102,20 +102,27 @@ pub fn LIR::variables(self: LIR) -> Array[VarId] {
     unique
 }
 
-pub(all) struct VarIdCounter {
+pub(all) struct IdContext {
     mut next_var_id: VarId
+    mut next_label_id: LabelId
     fixed_temp_reg: Bool
 }
 
-fn VarIdCounter::next(self: VarIdCounter) -> VarId {
+pub fn IdContext::next_var(self: IdContext) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
 }
 
-fn VarIdCounter::next_tmp_loc(self: VarIdCounter) -> Loc {
-    if self.fixed_temp_reg { Reg(TMP) } else { Var(self.next()) }
+pub fn IdContext::next_label(self: IdContext) -> LabelId {
+    let label_id = self.next_label_id
+    self.next_label_id = self.next_label_id.inner() + 1U
+    label_id
+}
+
+pub fn IdContext::next_tmp_loc(self: IdContext) -> Loc {
+    if self.fixed_temp_reg { Reg(R5) } else { Var(self.next_var()) }
 }
 
 // TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
@@ -241,7 +248,7 @@ pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAlloca
     { reg_alloc, mem_alloc }
 }
 
-pub fn replace_labels(insts: Array[LIR], var_counter~: VarIdCounter) -> Array[LIR] raise InstLoweringError {
+pub fn replace_labels(insts: Array[LIR], ctx~: IdContext) -> Array[LIR] raise InstLoweringError {
     let without_labels: Array[LIR] = []
     let label_pos: Map[LabelId, Int] = {}
     let jump_info_by_set_index: Map[Int, (LabelId, LIRCond)] = {}
@@ -252,7 +259,7 @@ pub fn replace_labels(insts: Array[LIR], var_counter~: VarIdCounter) -> Array[LI
     for inst in insts {
         match inst {
             LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                let jmp_offset_loc = var_counter.next_tmp_loc()
+                let jmp_offset_loc = ctx.next_tmp_loc()
 
                 // record where to patch (index of the Set)
                 let set_index = without_labels.length()
@@ -427,15 +434,15 @@ pub struct LowerIROutput {
     insts: Array[Inst]
 }
 
-pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], var_counter~: VarIdCounter) -> Array[LIR] raise InstLoweringError {
-    match (try? lower_many(pseudo, var_counter)) {
+pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], ctx~: IdContext) -> Array[LIR] raise InstLoweringError {
+    match (try? lower_many(pseudo, ctx)) {
         Err(e) => raise Pseudo(e)
         Ok(lir) => lir
     }
 }
 
-pub fn lower_lir_to_insts(lir: Array[LIR], var_counter~: VarIdCounter) -> LowerIROutput raise InstLoweringError {
-    let without_labels = replace_labels(lir, var_counter~)
+pub fn lower_lir_to_insts(lir: Array[LIR], ctx~: IdContext) -> LowerIROutput raise InstLoweringError {
+    let without_labels = replace_labels(lir, ctx=ctx)
     let allocated = allocate(without_labels)
     let insts = lower_lir_to_inst(allocated)
 

@@ -399,18 +399,20 @@ fn parse_fn_decl(self: Parser) -> Decl raise ParserError {
     self.expect(Token::Lparen)
     let parameters = []
 
-    while true {
-        let param_name = self.identifier()
-        self.expect(Token::Colon)
-        let arg_type = self.parse_type()
-        parameters.push({ name: param_name, ty: arg_type })
+    if !self.consumes(Token::Rparen) {
+        while true {
+            let param_name = self.identifier()
+            self.expect(Token::Colon)
+            let arg_type = self.parse_type()
+            parameters.push({ name: param_name, ty: arg_type })
 
-        if not(self.consumes(Token::Comma)) {
-            break
+            if not(self.consumes(Token::Comma)) {
+                break
+            }
         }
-    }
 
-    self.expect(Token::Rparen)
+        self.expect(Token::Rparen)
+    }
 
     let returnType = if self.consumes(Token::Colon) {
         self.parse_type()

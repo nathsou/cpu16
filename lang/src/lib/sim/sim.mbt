@@ -43,7 +43,7 @@ fn write_reg(self: CPU, reg: @asm.Reg, value: UInt16) -> Unit {
         R2 => self.regs[2] = value
         R3 => self.regs[3] = value
         R4 => self.regs[4] = value
-        TMP => self.regs[5] = value
+        R5 => self.regs[5] = value
         SP => self.regs[6] = value
         PC => self.next_pc = value
     }
@@ -56,7 +56,7 @@ fn read_reg(self: CPU, reg: @asm.Reg) -> UInt16 {
         R2 => self.regs[2]
         R3 => self.regs[3]
         R4 => self.regs[4]
-        TMP => self.regs[5]
+        R5 => self.regs[5]
         SP => self.regs[6]
         PC => self.regs[7]
     }
@@ -166,6 +166,8 @@ pub fn show_nat(n: UInt16, base~: UInt16, digits~: Int? = None) -> String {
     }
 }
 
+const SHOW_STACK = true
+
 pub impl Show for CPU with output(self, logger) {
     logger.write_string("r1: \{show_nat(self.regs[1], base=16, digits=Some(4))} ")
     logger.write_string("r2: \{show_nat(self.regs[2], base=16, digits=Some(4))} ")
@@ -182,4 +184,17 @@ pub impl Show for CPU with output(self, logger) {
     let inst = self.mem[self.regs[7].to_int()]
     let inst = @asm.Inst::decode(inst.to_uint()).unwrap()
     logger.write_string("\{inst.to_string()}")
+
+    // show the top 8 words of the stack
+    if SHOW_STACK {
+        let stack_top = @lang.STACK_TOP.to_int()
+        logger.write_string(" [")
+
+        for i = 0; i < 8; i = i + 1 {
+            if i > 0 { logger.write_string(", ")}
+            logger.write_string(show_nat(self.mem[stack_top - i], base=16, digits=Some(4)))
+        }
+
+        logger.write_string("]")
+    }
 }

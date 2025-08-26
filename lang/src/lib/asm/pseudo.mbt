@@ -3,8 +3,8 @@ pub(all) enum PseudoInst {
     Halt
     Setz; Clrz // Set Zero Flag, Clear Zero Flag
     Setc; Clrc // Set Carry Flag, Clear Carry Flag
-    Load(dst~: Loc, addr~: Loc)
-    Store(dst~: Loc, src~: Loc)
+    Load(dst~: Loc, addr~: Loc, offset~: UInt16)
+    Store(dst~: Loc, src~: Loc, offset~: UInt16)
     Move(dst~: Loc, src~: Loc)
     Cmp(src1~: Loc, src2~: Loc) // Compare
     Setw(dst~: Loc, val~: UInt16) // Set Word
@@ -46,7 +46,7 @@ pub(all) enum PseudoInst {
 
 pub suberror PseudoLoweringError String derive (Show)
 
-pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
+pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -67,7 +67,7 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
             [Alu(dst~, src1=Reg(Z), src2=Reg(Z), op=Dec)]
         } else if val >= (0xffff - 0x7ff) {
             let sub_val = (0x1000).to_uint16() - val
-            let tmp = var_counter.next_tmp_loc()
+            let tmp = ctx.next_tmp_loc()
 
             [
                 Set(dst=tmp, val=sub_val),
@@ -80,7 +80,7 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
                 let shl_core = val_uint >> shl_amount
                 
                 if shl_core <= 0x7ff {
-                    let tmp = var_counter.next_tmp_loc()
+                    let tmp = ctx.next_tmp_loc()
 
                     return [
                         Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
@@ -93,7 +93,7 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
             // Fallback to a general strategy
             let high = (val >> 8) & 0xff
             let low = val & 0xff
-            let tmp = var_counter.next_tmp_loc()
+            let tmp = ctx.next_tmp_loc()
 
             [
                 Set(dst~, val=high),
@@ -105,8 +105,8 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
         }
     }
     // TODO: Support offsets
-    Load(dst~, addr~) => [Mem(dst~, addr~, load=true, offset=0)]
-    Store(dst~, src~) => [Mem(dst=src, addr=dst, load=false, offset=0)]
+    Load(dst~, addr~, offset~) => [Mem(dst~, addr~, load=true, offset~)]
+    Store(dst~, src~, offset~) => [Mem(dst=src, addr=dst, load=false, offset~)]
     Move(dst~, src~) => [Alu(dst~, src1=src, src2=Reg(Z), op=Add)]
     Cmp(src1~, src2~) => [Alu(dst=Reg(Z), src1~, src2~, op=Sub)]
     Add(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Add)]
@@ -155,15 +155,15 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
     Jz(dst~) => [Jmp(dst~, cond=IfZero)]
     Jnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
     Push(val~) => [
-        Store(dst=Reg(SP), src=val),
+        Store(dst=Reg(SP), src=val, offset=0),
         Dec(dst=Reg(SP)),
-    ] |> lower_many(var_counter)
+    ] |> lower_many(ctx)
     Pop(dst~) => [
         Inc(dst=Reg(SP)),
-        Load(dst~, addr=Reg(SP)),
-    ] |> lower_many(var_counter)
+        Load(dst~, addr=Reg(SP), offset=0),
+    ] |> lower_many(ctx)
     Call(dst~) => {
-        let tmp = var_counter.next_tmp_loc()
+        let tmp = ctx.next_tmp_loc()
 
         [
             // skip next 5 instructions which are part of the call pseudo-instruction itself
@@ -172,13 +172,13 @@ pub fn PseudoInst::lower(self: PseudoInst, var_counter: VarIdCounter) -> Array[L
             Push(val=tmp), // 2 instructions
             // TODO: Handle Jumps to arbitrary locations which might take more than 2 instructions
             Jmp(dst~), // 2 instructions
-        ] |> lower_many(var_counter)
+        ] |> lower_many(ctx)
     }
-    Ret => [Pop(dst=Reg(PC))] |> lower_many(var_counter)
+    Ret => [Pop(dst=Reg(PC))] |> lower_many(ctx)
     Nop => [Set(dst=Reg(Z), val=0)]
   }
 }
 
-fn lower_many(insts: Array[PseudoInst], var_counter: VarIdCounter) -> Array[LIR] raise PseudoLoweringError {
-    insts.map(inst => inst.lower(var_counter)).flatten()
+fn lower_many(insts: Array[PseudoInst], ctx: IdContext) -> Array[LIR] raise PseudoLoweringError {
+    insts.map(inst => inst.lower(ctx)).flatten()
 }

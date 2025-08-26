@@ -204,7 +204,7 @@ fn temp_get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TAC
     (cond_op, cond_lhs, cond_rhs)
 }
 
-pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TACLoweringError {
+pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
@@ -289,7 +289,7 @@ pub fn lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TACLoweringErr
     }
 }
 
-pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLoweringError {
     match stmt {
         Stmt::Let(name~, mutable=_, value~) => {
             let value = self.lower_expr(value)
@@ -351,7 +351,7 @@ pub fn lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLoweringError {
     }
 }
 
-pub fn lower_decl(self: TACBuilder, decl: Decl) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_decl(self: TACBuilder, decl: Decl) -> Unit raise TACLoweringError {
     match decl {
         Decl::Stmt(stmt) => self.lower_stmt(stmt)
         Decl::Func(name~, parameters~, return_type~, body~) => {

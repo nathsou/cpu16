@@ -1,6 +1,7 @@
 {
   "is-main": false,
       "import": [
-        "nathsou/cpu16-lang/lib/asm"
+        "nathsou/cpu16-lang/lib/asm",
+        "nathsou/cpu16-lang/lib/lang"
       ]
 }

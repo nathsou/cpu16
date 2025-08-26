@@ -19,20 +19,21 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         println("[TAC]")
 
         for tac in tac_builder.tac {
-            println(TAC::to_string(tac))
+            println(tac)
         }
     }
 
-    let pseudo_builder = PseudoBuilder::new()
+    let ctx: @asm.IdContext = {
+        next_var_id: 0U,
+        next_label_id: 0U,
+        fixed_temp_reg: false, // Use next available general purpose register for temporaries
+    }
+
+    let pseudo_builder = PseudoBuilder::new(ctx)
     let env = Env::new()
 
     for tac in tac_builder.tac {
         let _ = pseudo_builder.lower_expr(tac, env)
-    }
-    
-    let var_counter: @asm.VarIdCounter = {
-        next_var_id: pseudo_builder.next_var_id,
-        fixed_temp_reg: false, // Use next available general purpose register for temporaries
     }
 
     if verbose {
@@ -42,7 +43,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.insts, var_counter~)
+    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call(), ctx~)
 
     if verbose {
         println("\n[LIR]")
@@ -52,7 +53,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lowered = @asm.lower_lir_to_insts(lir, var_counter~)
+    let lowered = @asm.lower_lir_to_insts(lir, ctx~)
 
     if verbose {
         println("\n[Allocated LIR]")

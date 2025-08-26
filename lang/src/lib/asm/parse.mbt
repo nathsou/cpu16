@@ -108,12 +108,12 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
         Some(Load) => {
             self.advance()
             let (dst, addr) = self.expect_ll()
-            Some(Load(dst~, addr~))
+            Some(Load(dst~, addr~, offset=0))
         }
         Some(Store) => {
             self.advance()
             let (dst, src) = self.expect_ll()
-            Some(Store(dst~, src~))
+            Some(Store(dst~, src~, offset=0))
         }
         Some(Move) => {
             self.advance()
