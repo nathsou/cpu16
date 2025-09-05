@@ -143,11 +143,17 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
         TAC::Func(name~, parameters=_, return_type~, body~) => {
             let label_id = self.ctx.next_label()
             self.functions[name] = { return_type , label_id }
+            let is_main = name == "main"
 
             self.emit(LIR(Label(label_id)))
             // save the return address
-            let ret_addr = self.ctx.next_var()
-            self.emit(Pop(dst=Var(ret_addr)))
+            let ret_addr = if !is_main {
+                let ret_addr = self.ctx.next_var()
+                self.emit(Pop(dst=Var(ret_addr)))
+                Some(ret_addr)
+            } else {
+                None
+            }
 
             for inst in body {
                 match inst {
@@ -166,7 +172,9 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                             self.emit(Push(val=Var(ret_id)))
                         }
 
-                        self.emit(Move(dst=Reg(PC), src=Var(ret_addr)))
+                        if ret_addr is Some(ret_addr) {
+                            self.emit(Move(dst=Reg(PC), src=Var(ret_addr)))
+                        }
                     }
                     _ => {
                         let _ = self.lower_expr(inst, env)
