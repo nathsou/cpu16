@@ -1,5 +1,10 @@
-let a = if 3 + 7 == 10 {
-  if 2 + 1 == 4 { 1621 } else { 1998 }
-} else {
-  4 + 5 + (if 1 + 2 == 3 { 1 } else { 8 })
-};
+
+fn main(): u16 {
+    let a = if 3 + 7 == 10 {
+        if 2 + 1 == 4 { 1621 } else { 1998 }
+    } else {
+        4 + 5 + (if 1 + 2 == 3 { 1 } else { 8 })
+    };
+
+    return a;
+}

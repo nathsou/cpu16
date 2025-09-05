@@ -1,6 +1,10 @@
 
-var i = 0;
+fn main(): u16 {
+    var i = 0;
 
-while i != 9 {
-    i = i + 1;
+    while i != 9 {
+        i = i + 1;
+    }
+
+    return 0;
 }

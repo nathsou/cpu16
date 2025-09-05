@@ -1,13 +1,21 @@
 // Lower Intermediate Representation
 // Raw instructions with variables instead of registers (before register allocation) and labels
 
-pub(all) struct VarId(UInt) derive (Show, Eq, Hash)
+pub(all) struct VarId(UInt) derive (Eq, Hash)
+
+pub impl Show for VarId with output(self, logger) {
+    logger.write_string("%" + self.inner().to_string())
+}
 
 pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
     self.inner() + other.inner()
 }
 
-pub(all) struct LabelId(UInt) derive (Eq, Hash, Show)
+pub(all) struct LabelId(UInt) derive (Eq, Hash)
+
+pub impl Show for LabelId with output(self, logger) {
+    logger.write_string("L" + self.inner().to_string())
+}
 
 pub(all) enum JumpCond {
     Equ; Neq; Lss; Leq; Gtr; Geq

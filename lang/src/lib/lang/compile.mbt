@@ -9,7 +9,13 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         let _ = type_checker.type_decl(decl)
     }
 
-    let tac_builder = TACBuilder::new()
+    let ctx: @asm.IdContext = {
+        next_var_id: 0U,
+        next_label_id: 0U,
+        fixed_temp_reg: false, // Use next available general purpose register for temporaries
+    }
+
+    let tac_builder = TACBuilder::new(ctx)
 
     for decl in decls {
         tac_builder.lower_decl(decl)
@@ -21,12 +27,6 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         for tac in tac_builder.tac {
             println(tac)
         }
-    }
-
-    let ctx: @asm.IdContext = {
-        next_var_id: 0U,
-        next_label_id: 0U,
-        fixed_temp_reg: false, // Use next available general purpose register for temporaries
     }
 
     let pseudo_builder = PseudoBuilder::new(ctx)

@@ -24,7 +24,7 @@ pub fn PseudoBuilder::emit(self: PseudoBuilder, inst: @asm.PseudoInst) -> Unit {
 
 suberror IRBuilderError String derive (Show)
 
-pub fn PseudoBuilder::lower_value(self: PseudoBuilder, value: TACValue, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
+pub fn PseudoBuilder::lower_value(self: PseudoBuilder, value: TACValue, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match value {
         TACValue::Const(c) => {
             match c {
@@ -51,7 +51,7 @@ pub fn PseudoBuilder::lower_value(self: PseudoBuilder, value: TACValue, env: Env
     }
 }
 
-fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[TACId, @asm.VarId], target: TACId) -> @asm.VarId {
+fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[@asm.VarId, @asm.VarId], target: @asm.VarId) -> @asm.VarId {
     match env.lookup(target) {
         Some(dst) => dst
         None => {
@@ -64,7 +64,7 @@ fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[TACId, @asm.VarId
 
 let unit_var_id: @asm.VarId = 0U
 
-pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[TACId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
+pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match expr {
         TAC::Assign(target~, src~) => {
             let dst_id = self.get_or_declare(env, target)

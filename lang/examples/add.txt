@@ -1,1 +1,5 @@
-let a = 3 + 7;
+
+fn main(): u16 {
+    let a = 3 + 7;
+    return a;
+}

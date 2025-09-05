@@ -1,3 +1,8 @@
-var a = if 3 + 1 == 4 { 1 } else { 2 };
-let b = a + 1;
-a = b + 1;
+
+fn main(): u16 {
+    var a = if 3 + 1 == 4 { 1 } else { 2 };
+    let b = a + 1;
+    a = b + 1;
+
+    return a;
+}

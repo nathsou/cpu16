@@ -1,14 +1,8 @@
 // Three Address Code IR
 
-pub struct TACId(UInt) derive (Eq, Hash)
-
-pub impl Show for TACId with output(self, logger) {
-    logger.write_string("%" + self.inner().to_string())
-}
-
 pub enum TACValue {
     Const(Const)
-    Variable(TACId)
+    Variable(@asm.VarId)
 }
 
 pub enum TACBinaryOp {
@@ -17,19 +11,19 @@ pub enum TACBinaryOp {
 } derive (Show)
 
 pub enum TAC {
-    Assign(target~: TACId, src~: TACValue)
-    Unary(target~: TACId, op~: UnaryOp, arg~: TACValue)
-    Binary(target~: TACId, lhs~: TACValue, op~: TACBinaryOp, rhs~: TACValue)
-    Store(dst~: TACId, src~: TACValue, offset~: UInt)
-    Load(target~: TACId, addr~: TACValue, offset~: UInt)
+    Assign(target~: @asm.VarId, src~: TACValue)
+    Unary(target~: @asm.VarId, op~: UnaryOp, arg~: TACValue)
+    Binary(target~: @asm.VarId, lhs~: TACValue, op~: TACBinaryOp, rhs~: TACValue)
+    Store(dst~: @asm.VarId, src~: TACValue, offset~: UInt)
+    Load(target~: @asm.VarId, addr~: TACValue, offset~: UInt)
     Jump(label~: @asm.LabelId)
     JumpIf(label~: @asm.LabelId, cond~: @asm.JumpCond, lhs~: TACValue, rhs~: TACValue)
     Label(label~: @asm.LabelId)
     Func(name~: String, parameters~: Array[FunctionArgument], return_type~: Type, body~: Array[TAC])
-    GetLocal(target~: TACId, index~: UInt)
+    GetLocal(target~: @asm.VarId, index~: UInt)
     SetLocal(index~: UInt, src~: TACValue)
     Return(value~: Option[TACValue])
-    Call(target~: TACId, name~: String, parameters~: Array[TACValue])
+    Call(target~: @asm.VarId, name~: String, parameters~: Array[TACValue])
 }
 
 pub impl Show for TACValue with output(self, logger) {
@@ -100,17 +94,17 @@ pub impl Show for TAC with output(self, logger) {
 
 pub struct TACBuilder {
     tac: Array[TAC]
-    env: Env[String, TACId]
+    env: Env[String, @asm.VarId]
     functions: Env[String, @asm.LabelId]
-    mut next_label_id: @asm.LabelId
+    ctx: @asm.IdContext
 }
 
-pub fn TACBuilder::new() -> TACBuilder {
+pub fn TACBuilder::new(ctx: @asm.IdContext) -> TACBuilder {
     {
         tac: [],
         env: Env::new(),
         functions: Env::new(),
-        next_label_id: 0U,
+        ctx,
     }
 }
 
@@ -119,37 +113,23 @@ fn child(self: TACBuilder) -> TACBuilder {
         tac: [],
         env: self.env.child(),
         functions: self.functions,
-        next_label_id: self.next_label_id,
+        ctx: self.ctx,
     }
-}
-
-let _next_var_id: Ref[TACId] = Ref::new(0U)
-
-fn next_var_() -> TACId {
-    let var_id = _next_var_id.val
-    _next_var_id.val = _next_var_id.val.inner() + 1U
-    var_id
-}
-
-fn next_label(self: TACBuilder) -> @asm.LabelId {
-    let label_id = self.next_label_id
-    self.next_label_id = self.next_label_id.inner() + 1U
-    label_id
 }
 
 fn emit(self: TACBuilder, tac: TAC) -> Unit {
     self.tac.push(tac)
 }
 
-fn emit_assign(self: TACBuilder, target: TACId, src: TACValue) -> Unit {
+fn emit_assign(self: TACBuilder, target: @asm.VarId, src: TACValue) -> Unit {
     self.emit(TAC::Assign(target~, src~))
 }
 
-fn emit_unary_op(self: TACBuilder, target: TACId, op: UnaryOp, arg: TACValue) -> Unit {
+fn emit_unary_op(self: TACBuilder, target: @asm.VarId, op: UnaryOp, arg: TACValue) -> Unit {
     self.emit(TAC::Unary(target~, op~, arg~))
 }
 
-fn emit_binary_op(self: TACBuilder, target: TACId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
+fn emit_binary_op(self: TACBuilder, target: @asm.VarId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
     self.emit(TAC::Binary(target~, lhs~, op~, rhs~))
 }
 
@@ -167,7 +147,7 @@ fn emit_jump(self: TACBuilder, label: @asm.LabelId) -> Unit {
     self.emit(TAC::Jump(label~))
 }
 
-fn emit_get_local(self: TACBuilder, target: TACId, index: UInt) -> Unit {
+fn emit_get_local(self: TACBuilder, target: @asm.VarId, index: UInt) -> Unit {
     self.emit(TAC::GetLocal(target~, index~))
 }
 
@@ -219,14 +199,14 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
         }
         Expr::UnaryOp(op, arg) => {
             let arg = self.lower_expr(arg)
-            let target = next_var_()
+            let target = self.ctx.next_var()
             self.emit_unary_op(target, op, arg)
             TACValue::Variable(target)
         }
         Expr::BinaryOp(lhs, op, rhs) => {
             let lhs = self.lower_expr(lhs)
             let rhs = self.lower_expr(rhs)
-            let target = next_var_()
+            let target = self.ctx.next_var()
 
             let tac_binop = match op {
                 BinaryOp::Add => TACBinaryOp::Add
@@ -250,12 +230,12 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
             let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond(cond)
             let cond_lhs = self.lower_expr(cond_lhs)
             let cond_rhs = self.lower_expr(cond_rhs)
-            let ret = next_var_()
+            let ret = self.ctx.next_var()
 
             match else_expr {
                 Some(else_expr) => {
-                    let then_label = self.next_label()
-                    let end_label = self.next_label()
+                    let then_label = self.ctx.next_label()
+                    let end_label = self.ctx.next_label()
                     self.emit_jump_if(then_label, cond_op.negate(), cond_lhs, cond_rhs)
                     let then = self.lower_expr(then_expr)
                     self.emit_assign(ret, then)
@@ -266,7 +246,7 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
                     self.def_label(end_label)
                 }
                 None => {
-                    let skip_label = self.next_label()
+                    let skip_label = self.ctx.next_label()
                     self.emit_jump_if(skip_label, cond_op.negate(), cond_lhs, cond_rhs)
                     let _ = self.lower_expr(then_expr)
                     self.def_label(skip_label)
@@ -282,7 +262,7 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
                                     args.push(self.lower_expr(param))
             }
 
-            let target = next_var_()
+            let target = self.ctx.next_var()
             self.emit(TAC::Call(target~, name~, parameters=args))
             TACValue::Variable(target)            
         }
@@ -298,7 +278,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
                     self.env.declare(name, var_id)
                 }
                 _ => {
-                    let var_id = next_var_()
+                    let var_id = self.ctx.next_var()
                     self.env.declare(name, var_id)
                     self.emit_assign(var_id, value)
                 }
@@ -325,8 +305,8 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
             }
         }
         Stmt::While(cond~, body~) => {
-            let start_label = self.next_label()
-            let end_label = self.next_label()
+            let start_label = self.ctx.next_label()
+            let end_label = self.ctx.next_label()
             self.def_label(start_label)
             let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond(cond)
             let cond_lhs = self.lower_expr(cond_lhs)
@@ -358,7 +338,7 @@ pub fn TACBuilder::lower_decl(self: TACBuilder, decl: Decl) -> Unit raise TACLow
             let func_builder = self.child()
 
             for i, param in parameters {
-                let var_id = next_var_()
+                let var_id = self.ctx.next_var()
                 func_builder.env.declare(param.name, var_id)
                 func_builder.emit_get_local(var_id, i.reinterpret_as_uint())
             }
