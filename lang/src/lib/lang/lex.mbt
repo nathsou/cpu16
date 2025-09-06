@@ -4,6 +4,7 @@ pub enum Token {
     Ampersand; AmpersandAmpersand; Pipe; PipePipe
     Bang; Equal; EqualEqual; BangEqual
     LeftChevron; RightChevron; LeftFatArrow; RightFatArrow
+    DoubleLeftChevron; DoubleRightChevron
     U8; U16
     Fn; If; Else; Let; Var; While; Return
     True; False
@@ -121,15 +122,22 @@ pub fn next_token(lexer: @lex.Lexer) -> Token? raise {
             '<' => {
                 lexer.index += 1
 
-                if lexer.consumes('=') {
-                    Some(LeftFatArrow)
+                Some(if lexer.consumes('=') {
+                    LeftFatArrow
+                } else if lexer.consumes('<') {
+                    DoubleLeftChevron
                 } else {
-                    Some(LeftChevron)
-                }
+                    LeftChevron
+                })
             }
             '>' => {
                 lexer.index += 1
-                Some(RightChevron)
+
+                Some(if lexer.consumes('>') {
+                    DoubleRightChevron
+                } else {
+                    RightChevron
+                })
             }
             _ => {
                 if @lex.is_digit(c, base=10) {

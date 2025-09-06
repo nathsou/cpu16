@@ -115,6 +115,13 @@ pub(all) struct IdContext {
     mut next_label_id: LabelId
 }
 
+pub fn IdContext::new() -> IdContext {
+    {
+        next_var_id: VarId(1U), // start from 1, reserve 0 for unit type
+        next_label_id: LabelId(0U),
+    }
+}
+
 pub fn IdContext::next_var(self: IdContext) -> VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IRVarId
@@ -162,7 +169,7 @@ struct LivenessInterval {
     var_id: VarId
     start: Int
     end: Int
-}
+} derive(Show)
 
 impl Eq for LivenessInterval with equal(a: LivenessInterval, b: LivenessInterval) -> Bool {
     a.end == b.end && a.start == b.start

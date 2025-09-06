@@ -5,10 +5,8 @@ pub enum Type {
 
 pub fn word_size(self: Type) -> UInt {
     match self {
-        Type::U8 => 1U
-        Type::U16 => 1U
-        Type::Bool => 1U
-        Type::Unit => 0U
+        U8 | U16 | Bool => 1U
+        Unit => 0U
     }
 }
 
@@ -86,7 +84,7 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type raise TypeError {
             let rhs_ty = self.type_expr(rhs)
 
             match op {
-                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod => {
+                Add | Sub | Mul | Div | Mod | Shl | Shr | BitwiseAnd | BitwiseOr | BitwiseXor => {
                     if lhs_ty == Type::U8 && rhs_ty == Type::U8 {
                         Type::U8
                     } else if lhs_ty == Type::U16 && rhs_ty == Type::U16 {
@@ -95,14 +93,14 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type raise TypeError {
                         raise TypeError("expected integer operands in binary arithmetic op")
                     }
                 }
-                BinaryOp::And | BinaryOp::Or | BinaryOp::Xor => {
+                LogicalAnd | LogicalOr => {
                     if lhs_ty == Type::Bool && rhs_ty == Type::Bool {
                         Type::Bool
                     } else {
                         raise TypeError("expected boolean operands in binary logical op")
                     }
                 }
-                BinaryOp::Equ | BinaryOp::Neq | BinaryOp::Lss | BinaryOp::Leq | BinaryOp::Gtr | BinaryOp::Geq => {
+                Equ | Neq | Lss | Leq | Gtr | Geq => {
                     if lhs_ty == rhs_ty {
                         Type::Bool
                     } else {
@@ -134,6 +132,16 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type raise TypeError {
                 }
             } else {
                 raise TypeError("expected boolean condition in if expression")
+            }
+        }
+        Expr::Block(body~, result~) => {
+            for stmt in body {
+                self.type_stmt(stmt)
+            }
+
+            match result {
+                Some(expr) => self.type_expr(expr)
+                None => Type::Unit
             }
         }
         Expr::Call(name, args) => {

@@ -103,15 +103,9 @@ pub fn parse_expr(self: Parser) -> Expr raise ParserError {
 fn parse_if_expr(self: Parser) -> Expr raise ParserError {
     if self.consumes(Token::If) {
         let cond = self.parse_expr()
-        self.expect(Token::Lbrace)
-        let then_expr = self.parse_expr()
-        self.expect(Token::Rbrace)
-
+        let then_expr = self.parse_block_expr()
         let else_expr = if self.consumes(Token::Else) {
-            self.expect(Token::Lbrace)
-            let expr = self.parse_expr()
-            self.expect(Token::Rbrace)
-            Some(expr)
+            Some(self.parse_block_expr())
         } else {
             None
         }
@@ -129,7 +123,7 @@ fn parse_logical_or(self: Parser) -> Expr raise ParserError {
     while true {
         if self.consumes(Token::PipePipe) {
             let rhs = self.parse_logical_and()
-            lhs = Expr::BinaryOp(lhs, BinaryOp::Or, rhs)
+            lhs = Expr::BinaryOp(lhs, LogicalOr, rhs)
         } else {
             break
         }
@@ -138,14 +132,62 @@ fn parse_logical_or(self: Parser) -> Expr raise ParserError {
     lhs
 }
 
-// <equality> (|| <equality>)*
+// <bitwise_or> (&& <bitwise_or>)*
 fn parse_logical_and(self: Parser) -> Expr raise ParserError {
-    let mut lhs = self.parse_equality_expr()
+    let mut lhs = self.parse_bitwise_or()
 
     while true {
         if self.consumes(Token::AmpersandAmpersand) {
+            let rhs = self.parse_bitwise_or()
+            lhs = Expr::BinaryOp(lhs, LogicalAnd, rhs)
+        } else {
+            break
+        }
+    }
+
+    lhs
+}
+
+// <bitwise_xor> (| <bitwise_xor>)*
+fn parse_bitwise_or(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_bitwise_xor()
+
+    while true {
+        if self.consumes(Token::Pipe) {
+            let rhs = self.parse_bitwise_xor()
+            lhs = Expr::BinaryOp(lhs, BinaryOp::BitwiseOr, rhs)
+        } else {
+            break
+        }
+    }
+
+    lhs
+}
+
+// <bitwise_and> (^ <bitwise_and>)*
+fn parse_bitwise_xor(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_bitwise_and()
+
+    while true {
+        if self.consumes(Token::Caret) {
+            let rhs = self.parse_bitwise_and()
+            lhs = Expr::BinaryOp(lhs, BinaryOp::BitwiseXor, rhs)
+        } else {
+            break
+        }
+    }
+
+    lhs
+}
+
+// <equality> (& <equality>)*
+fn parse_bitwise_and(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_equality_expr()
+
+    while true {
+        if self.consumes(Token::Ampersand) {
             let rhs = self.parse_equality_expr()
-            lhs = Expr::BinaryOp(lhs, BinaryOp::And, rhs)
+            lhs = Expr::BinaryOp(lhs, BinaryOp::BitwiseAnd, rhs)
         } else {
             break
         }
@@ -173,9 +215,9 @@ fn parse_equality_expr(self: Parser) -> Expr raise ParserError {
     lhs
 }
 
-// <additive> ((< | > | <= | >=) <additive>)*
+// <shift> ((< | > | <= | >=) <shift>)*
 fn parse_comparison_expr(self: Parser) -> Expr raise ParserError {
-    let mut lhs = self.parse_additive_expr()
+    let mut lhs = self.parse_shift_expr()
 
     while true {
         let op = match self.peek() {
@@ -187,6 +229,24 @@ fn parse_comparison_expr(self: Parser) -> Expr raise ParserError {
         }
 
         self.advance()
+        let rhs = self.parse_shift_expr()
+        lhs = Expr::BinaryOp(lhs, op, rhs)
+    }
+
+    lhs
+}
+
+// <shift> (<< | >> <shift>)*
+fn parse_shift_expr(self: Parser) -> Expr raise ParserError {
+    let mut lhs = self.parse_additive_expr()
+    while true {
+        let op = match self.peek() {
+            Some(Token::DoubleLeftChevron) => BinaryOp::Shl
+            Some(Token::DoubleRightChevron) => BinaryOp::Shr
+            _ => break
+        }
+
+        self.advance()
         let rhs = self.parse_additive_expr()
         lhs = Expr::BinaryOp(lhs, op, rhs)
     }
@@ -194,7 +254,7 @@ fn parse_comparison_expr(self: Parser) -> Expr raise ParserError {
     lhs
 }
 
-// <unary> ((+ | -) <unary>)*
+// <multiplicative> ((+ | -) <multiplicative>)*
 fn parse_additive_expr(self: Parser) -> Expr raise ParserError {
     let mut lhs = self.parse_multiplicative_expr()
 
@@ -213,7 +273,7 @@ fn parse_additive_expr(self: Parser) -> Expr raise ParserError {
     lhs
 }
 
-// <additive> ((* | / | %) <additive>)*
+// <unary> ((* | / | %) <unary>)*
 fn parse_multiplicative_expr(self: Parser) -> Expr raise ParserError {
     let mut lhs = self.parse_unary_expr()
 
@@ -222,7 +282,6 @@ fn parse_multiplicative_expr(self: Parser) -> Expr raise ParserError {
             Some(Token::Star) => BinaryOp::Mul
             Some(Token::Slash) => BinaryOp::Div
             Some(Token::Percent) => BinaryOp::Mod
-            Some(Token::Caret) => BinaryOp::Xor
             _ => break
         }
 
@@ -272,7 +331,24 @@ fn parse_call_expr(self: Parser) -> Expr raise ParserError {
     }
 }
 
-// '(' <expr> ')' | <integer>
+fn parse_block_expr(self: Parser) -> Expr raise ParserError {
+    self.expect(Token::Lbrace)
+    let body: Array[Stmt] = []
+
+    while not(self.consumes(Token::Rbrace)) {
+        let stmt = self.parse_stmt()
+        body.push(stmt)
+    }
+
+    if body.last() is Some(Stmt::Semi(last_expr)) {
+        let _ = body.unsafe_pop()
+        Expr::Block(body~, result=Some(last_expr))
+    } else {
+        Expr::Block(body~, result=None)
+    }
+}
+
+// '(' <expr> ')' | '{' <expr> '}' | <integer>
 fn parse_primary_expr(self: Parser) -> Expr raise ParserError {
     match self.peek() {
         Some(Token::Lparen) => {
@@ -280,6 +356,9 @@ fn parse_primary_expr(self: Parser) -> Expr raise ParserError {
             let expr = self.parse_expr()
             self.expect(Token::Rparen)
             expr
+        }
+        Some(Token::Lbrace) => {
+            self.parse_block_expr()
         }
         Some(Token::Integer(n, kind)) => {
             self.advance()

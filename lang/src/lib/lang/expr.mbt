@@ -4,21 +4,36 @@ pub enum UnaryOp {
 } derive (Show)
 
 pub enum BinaryOp {
-    Add
-    Sub
-    Mul
-    Div
-    Mod
-    And
-    Or
-    Xor
-    Equ
-    Neq
-    Lss
-    Gtr
-    Leq
-    Geq
-} derive (Show)
+    Add; Sub; Mul; Div; Mod; Shl; Shr
+    BitwiseAnd; BitwiseOr; BitwiseXor
+    LogicalAnd; LogicalOr
+    Equ; Neq; Lss; Gtr; Leq; Geq
+}
+
+pub impl Show for BinaryOp with output(self, logger) {
+    let op_str = match self {
+        Add => "+"
+        Sub => "-"
+        Mul => "*"
+        Div => "/"
+        Mod => "%"
+        Shl => "<<"
+        Shr => ">>"
+        BitwiseAnd => "&"
+        BitwiseOr => "|"
+        BitwiseXor => "^"
+        LogicalAnd => "&&"
+        LogicalOr => "||"
+        Equ => "=="
+        Neq => "!="
+        Lss => "<"
+        Gtr => ">"
+        Leq => "<="
+        Geq => ">="
+    }
+
+    logger.write_string(op_str)
+}
 
 pub enum Const {
     Integer(Int, IntKind)
@@ -44,7 +59,8 @@ pub enum Expr {
     Var(String)
     UnaryOp(UnaryOp, Expr)
     BinaryOp(Expr, BinaryOp, Expr)
-    If(Expr, Expr, Option[Expr])
+    If(Expr, Expr, Expr?)
+    Block(body~: Array[Stmt], result~: Expr?)
     Call(String, Array[Expr])
 }
 
@@ -61,22 +77,8 @@ pub impl Show for Expr with output(self, logger) {
         Expr::BinaryOp(lhs, op, rhs) => {
             let lhs = lhs.to_string()
             let rhs = rhs.to_string()
-            match op {
-                BinaryOp::Add => lhs + " + " + rhs
-                BinaryOp::Sub => lhs + " - " + rhs
-                BinaryOp::Mul => lhs + " * " + rhs
-                BinaryOp::Div => lhs + " / " + rhs
-                BinaryOp::Mod => lhs + " % " + rhs
-                BinaryOp::And => lhs + " && " + rhs
-                BinaryOp::Or => lhs + " || " + rhs
-                BinaryOp::Xor => lhs + " ^ " + rhs
-                BinaryOp::Equ => lhs + " == " + rhs
-                BinaryOp::Neq => lhs + " != " + rhs
-                BinaryOp::Lss => lhs + " < " + rhs
-                BinaryOp::Gtr => lhs + " > " + rhs
-                BinaryOp::Leq => lhs + " <= " + rhs
-                BinaryOp::Geq => lhs + " >= " + rhs
-            }
+
+            "\{lhs} \{op} \{rhs}"
         }
         Expr::If(cond, then_expr, else_expr) => {
             let cond = cond.to_string()
@@ -84,14 +86,24 @@ pub impl Show for Expr with output(self, logger) {
             match else_expr {
                 Some(else_expr) => {
                     let else_expr = else_expr.to_string()
-                    "if " + cond + " { " + then_expr + " } else { " + else_expr + " }"
+                    "if \{cond} \{then_expr} else \{else_expr}"
                 }
-                None => "if " + cond + " { " + then_expr + " }"
+                None => "if \{cond} \{then_expr}"
+            }
+        }
+        Expr::Block(body~, result~) => {
+            let body_str = show_stmts(body)
+            match result {
+                Some(expr) => {
+                    let expr_str = expr.to_string()
+                    "{\n\{body_str}\n\{expr_str}\n}"
+                }
+                None => "{\n\{body_str}\n}"
             }
         }
         Expr::Call(name, params) => {
             let params_str = params.map(fn (param) { param.to_string() }).join(", ")
-            name + "(" + params_str + ")"
+            "\{name}(\{params_str})"
         }
     }
 

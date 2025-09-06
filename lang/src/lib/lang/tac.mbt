@@ -1,19 +1,15 @@
 // Three Address Code IR
 
 pub enum TACValue {
+    Unit
     Const(Const)
     Variable(@asm.VarId)
 }
 
-pub enum TACBinaryOp {
-    Add; Sub; Mul; Div; Mod
-    And; Or; Xor
-} derive (Show)
-
 pub enum TAC {
     Assign(target~: @asm.VarId, src~: TACValue)
     Unary(target~: @asm.VarId, op~: UnaryOp, arg~: TACValue)
-    Binary(target~: @asm.VarId, lhs~: TACValue, op~: TACBinaryOp, rhs~: TACValue)
+    Binary(target~: @asm.VarId, lhs~: TACValue, op~: BinaryOp, rhs~: TACValue)
     Store(dst~: @asm.VarId, src~: TACValue, offset~: UInt)
     Load(target~: @asm.VarId, addr~: TACValue, offset~: UInt)
     Jump(label~: @asm.LabelId)
@@ -28,6 +24,7 @@ pub enum TAC {
 
 pub impl Show for TACValue with output(self, logger) {
     let output = match self {
+        TACValue::Unit => "()"
         TACValue::Const(c) => c.to_string()
         TACValue::Variable(v) => v.to_string()
     }
@@ -129,7 +126,7 @@ fn emit_unary_op(self: TACBuilder, target: @asm.VarId, op: UnaryOp, arg: TACValu
     self.emit(TAC::Unary(target~, op~, arg~))
 }
 
-fn emit_binary_op(self: TACBuilder, target: @asm.VarId, lhs: TACValue, op: TACBinaryOp, rhs: TACValue) -> Unit {
+fn emit_binary_op(self: TACBuilder, target: @asm.VarId, lhs: TACValue, op: BinaryOp, rhs: TACValue) -> Unit {
     self.emit(TAC::Binary(target~, lhs~, op~, rhs~))
 }
 
@@ -208,32 +205,17 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
             let rhs = self.lower_expr(rhs)
             let target = self.ctx.next_var()
 
-            let tac_binop = match op {
-                BinaryOp::Add => TACBinaryOp::Add
-                BinaryOp::Sub => TACBinaryOp::Sub
-                BinaryOp::Mul => TACBinaryOp::Mul
-                BinaryOp::Div => TACBinaryOp::Div
-                BinaryOp::Mod => TACBinaryOp::Mod
-                BinaryOp::And => TACBinaryOp::And
-                BinaryOp::Or => TACBinaryOp::Or
-                BinaryOp::Xor => TACBinaryOp::Xor
-                _ => {
-                    println("expected arithmetic or logical operator in binary expression, got: \{op}")
-                    raise TACLoweringError("expected arithmetic or logical operator in binary expression")
-                }
-            }
-
-            self.emit_binary_op(target, lhs, tac_binop, rhs)
+            self.emit_binary_op(target, lhs, op, rhs)
             TACValue::Variable(target)
         }
         Expr::If(cond, then_expr, else_expr) => {
             let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond(cond)
             let cond_lhs = self.lower_expr(cond_lhs)
             let cond_rhs = self.lower_expr(cond_rhs)
-            let ret = self.ctx.next_var()
 
             match else_expr {
                 Some(else_expr) => {
+                    let ret = self.ctx.next_var()
                     let then_label = self.ctx.next_label()
                     let end_label = self.ctx.next_label()
                     self.emit_jump_if(then_label, cond_op.negate(), cond_lhs, cond_rhs)
@@ -244,22 +226,32 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
                     let else_ = self.lower_expr(else_expr)
                     self.emit_assign(ret, else_)
                     self.def_label(end_label)
+                    TACValue::Variable(ret)
                 }
                 None => {
                     let skip_label = self.ctx.next_label()
                     self.emit_jump_if(skip_label, cond_op.negate(), cond_lhs, cond_rhs)
                     let _ = self.lower_expr(then_expr)
                     self.def_label(skip_label)
+                    TACValue::Unit
                 }
             }
+        }
+        Expr::Block(body~, result~) => {
+            for stmt in body {
+                self.lower_stmt(stmt)
+            }
 
-            TACValue::Variable(ret)
+            match result {
+                Some(expr) => self.lower_expr(expr)
+                None => TACValue::Unit
+            }
         }
         Expr::Call(name, parameters) => {
             let args = []
 
             for param in parameters {
-                                    args.push(self.lower_expr(param))
+                args.push(self.lower_expr(param))
             }
 
             let target = self.ctx.next_var()
@@ -274,9 +266,9 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
         Stmt::Let(name~, mutable=_, value~) => {
             let value = self.lower_expr(value)
             match value {
-                TACValue::Variable(var_id) => {
-                    self.env.declare(name, var_id)
-                }
+                // TACValue::Variable(var_id) => {
+                //     self.env.declare(name, var_id)
+                // }
                 _ => {
                     let var_id = self.ctx.next_var()
                     self.env.declare(name, var_id)

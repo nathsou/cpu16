@@ -10,6 +10,8 @@ struct LowerFuncInfo {
     return_type: Type
 }
 
+const UNIT_VAR_ID: UInt = 0U
+
 pub fn PseudoBuilder::new(ctx: @asm.IdContext) -> PseudoBuilder {
     {
         ctx,
@@ -26,6 +28,9 @@ suberror IRBuilderError String derive (Show)
 
 pub fn PseudoBuilder::lower_value(self: PseudoBuilder, value: TACValue, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match value {
+        TACValue::Unit => {
+            UNIT_VAR_ID
+        }
         TACValue::Const(c) => {
             match c {
                 Const::Integer(n, _) => {
@@ -63,7 +68,6 @@ fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[@asm.VarId, @asm.
 }
 
 const SAVED_REGS_COUNT: UInt16 = 4
-let unit_var_id: @asm.VarId = 0U
 
 pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match expr {
@@ -97,9 +101,14 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                 Mul => raise IRBuilderError("multiplication not implemented")
                 Div => raise IRBuilderError("division not implemented")
                 Mod => raise IRBuilderError("modulo not implemented")
-                And => self.emit(And(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
-                Or => self.emit(Or(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
-                Xor => self.emit(Xor(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Shl => self.emit(Shl(dst=Var(dst), src=Var(lhs_id), amt=Var(rhs_id)))
+                Shr => self.emit(Shr(dst=Var(dst), src=Var(lhs_id), amt=Var(rhs_id)))
+                BitwiseAnd | LogicalAnd => self.emit(And(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                BitwiseOr | LogicalOr => self.emit(Or(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                BitwiseXor => self.emit(Xor(dst=Var(dst), src1=Var(lhs_id), src2=Var(rhs_id)))
+                Equ | Neq | Lss | Gtr | Leq | Geq => {
+                    raise IRBuilderError("comparison operators not supported in binary expressions")
+                }
             }
 
             env.declare(target, dst)
@@ -119,7 +128,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
         }
         TAC::Jump(label~) => {
             self.emit(Jmp(dst=Label(label)))
-            unit_var_id
+            UNIT_VAR_ID
         }
         TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
             let lhs_id = self.lower_value(lhs, env)
@@ -135,11 +144,11 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
             }
 
             self.emit(pseudo)
-            unit_var_id
+            UNIT_VAR_ID
         }
         TAC::Label(label~) => {
             self.emit(LIR(Label(label)))
-            unit_var_id
+            UNIT_VAR_ID
         }
         TAC::Func(name~, parameters=_, return_type~, body~) => {
             let label_id = self.ctx.next_label()
@@ -175,7 +184,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                 }
             }
 
-            unit_var_id
+            UNIT_VAR_ID
         }
         TAC::Call(target~, name~, parameters~) => {
             if self.functions.get(name) is Some(({ label_id, return_type })) {
@@ -213,11 +222,11 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
 
                 // step 6: retrieve return value
                 let target_id = if return_type is Unit {
-                    unit_var_id
+                    UNIT_VAR_ID
                 } else {
                     let target_id = self.get_or_declare(env, target)
                     self.emit(Pop(dst=Var(target_id)))
-                    target_id
+                    UNIT_VAR_ID
                 }
 
                 // step 7: deallocate space
