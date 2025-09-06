@@ -64,20 +64,12 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
             println(inst)
         }
 
-        println("\n[Final]")
+        println("\n[ASM]")
 
         for inst in lowered.insts {
             println(inst)
         }
     }
 
-    let buffer = @buffer.new(size_hint=lowered.insts.length() * 2)
-
-    for inst in lowered.insts {
-        let encoded = inst.encode()
-        buffer.write_byte(encoded.to_byte())
-        buffer.write_byte((encoded >> 8).to_byte())
-    }
-
-    buffer.to_bytes()
+    @asm.assemble(lowered.insts)
 }

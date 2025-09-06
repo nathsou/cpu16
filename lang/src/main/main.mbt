@@ -11,7 +11,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
     match command {
         Asm(source_file~, output_file~) => {
             let prog = @fs.read_file_to_string(source_file, encoding="utf8")
-            let compiled = @asm.assemble(prog, verbose~)
+            let compiled = @asm.assemble_source(prog, verbose~)
 
             match output_file {
                 Some(file) => {
@@ -36,7 +36,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
                 [.., ..".bin"] => @fs.read_file_to_bytes(source_file)
                 [.., ..".s"] => {
                     let source = @fs.read_file_to_string(source_file, encoding="utf8")
-                    @asm.assemble(source, verbose=false)
+                    @asm.assemble_source(source, verbose=false)
                 }
                 // TODO: Find language name and define file extension, for now use .txt
                 [.., ..".txt"] => {
@@ -44,11 +44,11 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
                     @lang.compile(source, verbose=false)
                 }
                 _ => {
-                    raise CommandError("Unsupported file extension: \{source_file}, expected .bin, .s, or .txt")
+                    raise CommandError("Unsupported file extension: '\{source_file}', expected .bin, .s, or .txt")
                 }
             }
 
-            let cpu = @sim.CPU::from(prog, 0x0000)
+            let cpu = @sim.CPU::from(prog, start_addr=@asm.PC_START_ADDR)
             let mut steps = 0U
 
             while !cpu.halted {

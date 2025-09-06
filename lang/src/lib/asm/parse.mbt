@@ -149,6 +149,17 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
 
             raise ParserError("Unexpected label: '\{label}'")
         }
+        Some(Directive(name)) => {
+            self.advance()
+            
+            match name {
+                "org" => {
+                    let addr = self.expect_const()
+                    Some(Directive(Origin(addr~)))
+                }
+                _ => raise ParserError("Invalid directive: '.\{name}'")
+            }
+        }
         Some(Setw) => {
             self.advance()
             let dst = self.expect_loc()

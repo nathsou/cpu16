@@ -1,5 +1,6 @@
 
 const DEBUG = false
+const PC_START_ADDR = 16'h8000
 
 module RegisterFile(
     clk: clock,
@@ -16,17 +17,23 @@ module RegisterFile(
     program_counter: uint<16>,
     display_reg: uint<32>,
 ) {
-    let regs = 8*[Reg<uint<16>>(clk, rst)]
+    let regs = [
+        Reg<uint<16>>(clk, rst: true), // R0 (Z)
+        ..(6*[Reg<uint<16>>(clk, rst)]), // R1-R6
+        Reg<uint<16>>(clk), // R7 (PC)
+    ]
 
     for i in 0..=7 {
         regs[i].d = regs[i].q
     }
 
-    if count_enable and not(write_enable and (write_dest == 3'd7)) {
+    if rst {
+        regs[7].d = PC_START_ADDR
+    } else if count_enable and not(write_enable and (write_dest == 3'd7)) {
         regs[7].d = regs[7].q + 1
     }
 
-    if write_enable and (write_dest != 3'd0) {
+    if write_enable {
         regs[write_dest].d = write_data
     }
 

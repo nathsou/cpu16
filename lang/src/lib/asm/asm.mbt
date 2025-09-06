@@ -1,5 +1,32 @@
 
-pub fn assemble(source: String, verbose~: Bool) -> Bytes raise {
+pub const PC_START_ADDR: UInt16 = 0x8000
+
+pub fn assemble(insts: Array[InstOrDirective]) -> Bytes {
+    let bytes: FixedArray[Byte] = FixedArray::make(128 * 1024, 0) // 64 * 16 bits (128KB)
+    let mut offset = 0
+
+    for inst_or_directive in insts {
+        match inst_or_directive {
+            Inst(inst) => {
+                let encoded = inst.encode()
+                bytes[offset] = encoded.to_byte()
+                bytes[offset + 1] = (encoded >> 8).to_byte()
+                offset += 2
+            }
+            Directive(directive) => {
+                match directive {
+                    Origin(addr~) => {
+                        offset = addr.to_int() * 2 // each instruction is 2 bytes
+                    }
+                }
+            }
+        }
+    }
+
+    @bytes.from_fixedarray(bytes)
+}
+
+pub fn assemble_source(source: String, verbose~: Bool) -> Bytes raise {
     let tokens = @lex.collect(source.to_lower(), next_token)
     let pseudo_insts = parse(tokens)
     let lir = lower_pseudo_to_lir(pseudo_insts)
@@ -25,13 +52,5 @@ pub fn assemble(source: String, verbose~: Bool) -> Bytes raise {
         }
     }
 
-    let buffer = @buffer.new(size_hint=lowered.insts.length() * 2)
-
-    for inst in lowered.insts {
-        let encoded = inst.encode()
-        buffer.write_byte(encoded.to_byte())
-        buffer.write_byte((encoded >> 8).to_byte())
-    }
-
-    buffer.to_bytes()
+    assemble(lowered.insts)
 }

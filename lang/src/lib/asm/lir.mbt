@@ -94,6 +94,7 @@ pub(all) enum LIR {
     Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: AluOp)
     Jmp(dst~: Loc, cond~: LIRCond)
     Label(LabelId)
+    Directive(Directive)
 } derive (Show)
 
 pub fn LIR::variables(self: LIR) -> Array[VarId] {
@@ -103,7 +104,7 @@ pub fn LIR::variables(self: LIR) -> Array[VarId] {
         Mem(dst~, addr~, load=_, offset=_) => dst.variables() + addr.variables()
         Alu(dst~, src1~, src2~, op=_) => dst.variables() + src1.variables() + src2.variables()
         Jmp(dst~, cond=_) => dst.variables()
-        Label(_) => []
+        Label(_) | Directive(_) => []
     }
 
     Set::from_array(vars).to_array()
@@ -228,56 +229,77 @@ pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAlloca
     { reg_alloc, mem_alloc }
 }
 
+priv struct JumpFixupInfo {
+    index: Int
+    offset: Int
+    label: LabelId
+    cond: LIRCond
+}
+
 pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
     let without_labels: Array[LIR] = []
-    let label_pos: Map[LabelId, Int] = {}
-    let jump_info_by_set_index: Map[Int, (LabelId, LIRCond)] = {}
+    let label_offsets: Map[LabelId, Int] = {}
+    let jump_info_by_set_index: Array[JumpFixupInfo] = []
 
     // Execution index increments only for non-label instructions and equals physical index
-    let mut exec_index = 0
+    {
+        let mut offset = 0
 
-    for inst in insts {
-        match inst {
-            LIR::Jmp(dst=Loc::Label(label), cond~) => {
-                // record where to patch (index of the Set)
-                let set_index = without_labels.length()
-                jump_info_by_set_index[set_index] = (label, cond)
+        for inst in insts {
+            match inst {
+                LIR::Jmp(dst=Loc::Label(label), cond~) => {
+                    jump_info_by_set_index.push({
+                        label,
+                        cond,
+                        // record where to patch (index of the Set instruction)
+                        index: without_labels.length(),
+                        offset,
+                    })
 
-                // emit placeholder SET and placeholder ALU (op fixed later)
-                without_labels.push(LIR::Set(dst=Reg(TMP), val=0))
-                without_labels.push(LIR::Alu(
-                    dst=Loc::Reg(Reg::PC),
-                    src1=Loc::Reg(Reg::PC),
-                    src2=Reg(TMP),
-                    op=AluOp::Add, // placeholder; fixed in second pass
-                ))
+                    // emit placeholder SET and placeholder ALU (op fixed later)
+                    without_labels.push(LIR::Set(dst=Reg(TMP), val=0))
+                    without_labels.push(LIR::Alu(
+                        dst=Loc::Reg(Reg::PC),
+                        src1=Loc::Reg(Reg::PC),
+                        src2=Reg(TMP),
+                        op=AluOp::Add, // placeholder; fixed in second pass
+                    ))
 
-                exec_index += 2
-            }
-            LIR::Label(label) => {
-                // label points to the next non-label instruction
-                label_pos[label] = exec_index
-                // do not emit label into final stream
-            }
-            _ => {
-                without_labels.push(inst)
-                exec_index += 1
+                    offset += 2 // Set + Alu
+                }
+                LIR::Label(label) => {
+                    // label points to the next non-label instruction
+                    label_offsets[label] = offset
+                    // do not emit label into final stream
+                }
+                LIR::Directive(directive) => {
+                    match directive {
+                        Origin(addr~) => {
+                            offset = addr.to_int()
+                        }
+                    }
+
+                    without_labels.push(inst)
+                }
+                _ => {
+                    without_labels.push(inst)
+                    offset += 1
+                }
             }
         }
     }
 
     // Second pass: fix jump immediates and ALU ops
-    for set_index, info in jump_info_by_set_index {
-        let (label, cond) = info
-        // ALU executes right after SET
-        let alu_exec_index = set_index + 1
-
-        let target_pos = match label_pos.get(label) {
+    for info in jump_info_by_set_index {
+        let { label, cond, index: set_index, offset: set_offset } = info
+        let target_offset = match label_offsets.get(label) {
             Some(pos) => pos
             None => raise MissingLabel(label)
         }
 
-        let delta = target_pos - alu_exec_index
+        // ALU executes right after SET
+        let alu_offset = set_offset + 1
+        let delta = target_offset - alu_offset
         let is_forward = delta >= 0
         let abs_delta = if is_forward { delta } else { -delta }
 
@@ -292,7 +314,7 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
             LIR::Set(dst~, val=_) => {
                 without_labels[set_index] = LIR::Set(dst~, val=abs_delta.to_uint16())
             }
-            _ => abort("unexpected instruction during jump SET fixup")
+            _ => raise JumpFixupFailed
         }
 
         // Patch ALU op based on direction and condition
@@ -307,9 +329,7 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                     IfNotCarry => if is_forward { AddIfNotCarry } else { SubIfNotCarry }
                 }
 
-                without_labels[alu_index] = LIR::Alu(
-                    dst~, src1~, src2~, op=new_op,
-                )
+                without_labels[alu_index] = LIR::Alu(dst~, src1~, src2~, op=new_op)
             }
             _ => abort("unexpected instruction during jump ALU fixup")
         }
@@ -338,7 +358,7 @@ fn allocate(insts: Array[LIR], alloc~: VariableAllocation) -> Array[LIR] {
             dst=dst.substitute_var(alloc),
             cond~,
         )
-        LIR::Label(_) => inst
+        LIR::Label(_) | Directive(_) => inst
     })
 }
 
@@ -351,10 +371,8 @@ suberror InstLoweringError {
     Pseudo(PseudoLoweringError)
     NonRegLoc
     OffsetTooLarge(UInt16)
+    JumpFixupFailed
 } derive (Show)
-
-// TODO: Store spilled variables in the current stack frame
-const SPILL_RAM_OFFSET: UInt16 = 100
 
 pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
     let spilled: Array[LIR] = Array::new(capacity=insts.length())
@@ -363,8 +381,7 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
         match loc {
             Loc::Reg(reg) => reg
             Loc::Mem(offset~) => {
-                // load split variable from memory into TMP
-                spilled.push(Mem(dst=Reg(TMP), addr=Reg(Z), load=true, offset=SPILL_RAM_OFFSET + offset.to_uint16()))
+                spilled.push(Mem(dst=Reg(TMP), addr=Reg(Z), load=true, offset=offset.to_uint16()))
                 Reg::TMP
             }
             _ => raise InstLoweringError::InvalidLoc(loc)
@@ -376,8 +393,9 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
             Loc::Reg(reg) => exec(reg)
             Loc::Mem(offset~) => {
                 exec(Reg::TMP)
-                // store TMP into split variable memory
-                spilled.push(Mem(dst=Reg(TMP), addr=Reg(Z), load=false, offset=SPILL_RAM_OFFSET + offset.to_uint16()))
+                // TODO: Store spilled variables in the current stack frame
+                // for now, store TMP into the first 127 bytes of RAM
+                spilled.push(Mem(dst=Reg(TMP), addr=Reg(Z), load=false, offset=offset.to_uint16()))
             }
             _ => raise InstLoweringError::InvalidLoc(loc)
         }
@@ -443,19 +461,23 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
             LIR::Label(label) => {
                 spilled.push(Label(label))
             }
+            LIR::Directive(directive) => {
+                spilled.push(Directive(directive))
+            }
         }
     }
 
     spilled
 }
 
-fn lower_lir_to_inst(lir: LIR) -> Inst raise InstLoweringError {
+fn lower_lir_to_inst(lir: LIR) -> InstOrDirective raise InstLoweringError {
     match lir {
-        Ctl(op~) => Ctl(op~)
-        Set(dst=Reg(dst), val~) => Set(dst~, val~)
+        Ctl(op~) => Inst(Ctl(op~))
+        Set(dst=Reg(dst), val~) => Inst(Set(dst~, val~))
         Mem(offset~, ..) if offset > 0x7f => raise OffsetTooLarge(offset)
-        Mem(dst=Reg(dst), addr=Reg(addr), load~, offset~) => Mem(dst~, addr~, load~, offset~)
-        Alu(dst=Reg(dst), src1=Reg(src1), src2=Reg(src2), op~) => Alu(dst~, src1~, src2~, op~)
+        Mem(dst=Reg(dst), addr=Reg(addr), load~, offset~) => Inst(Mem(dst~, addr~, load~, offset~))
+        Alu(dst=Reg(dst), src1=Reg(src1), src2=Reg(src2), op~) => Inst(Alu(dst~, src1~, src2~, op~))
+        Directive(dir) => Directive(dir)
         _ => raise NonRegLoc 
     }
 }
@@ -464,7 +486,7 @@ pub struct LowerIROutput {
     allocation: VariableAllocation
     allocated: Array[LIR]
     without_labels: Array[LIR]
-    insts: Array[Inst]
+    insts: Array[InstOrDirective]
 }
 
 pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst]) -> Array[LIR] raise InstLoweringError {

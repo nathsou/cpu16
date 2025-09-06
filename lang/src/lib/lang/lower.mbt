@@ -248,6 +248,7 @@ pub fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder) -> Array[@asm.Pseud
         }
 
          [
+            Directive(Origin(addr=@asm.PC_START_ADDR)),
             Setw(dst=Reg(SP), val=STACK_TOP),
             Call(dst=Label(label_id)),
             Halt

@@ -42,6 +42,7 @@ pub(all) enum PseudoInst {
     Nop // No Operation
 
     LIR(LIR)
+    Directive(Directive)
 } derive (Show)
 
 pub suberror PseudoLoweringError String derive (Show)
@@ -52,6 +53,7 @@ pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringErr
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
     }
     LIR(lir) => [lir]
+    Directive(dir) => [Directive(dir)]
     Halt => [Ctl(op=Halt)]
     Setz => [Ctl(op=Setz)]
     Clrz => [Ctl(op=Clrz)]

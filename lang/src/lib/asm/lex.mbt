@@ -4,6 +4,7 @@ pub enum Token {
     Const(value~: UInt16, base~: UInt)
     LabelDef(String)
     Label(String)
+    Directive(String)
     Comment(String)
     Ctl; Set; Mem; Alu
     Setw
@@ -160,6 +161,22 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
 
                 let comment = lexer.input[start_index:lexer.index].to_string()
                 Some(Token::Comment(comment))
+            }
+            '.' => {
+                lexer.index += 1
+                let start_index = lexer.index
+                
+                while true {
+                    match lexer.peek() {
+                        Some(c) if c is 'a'..='z' || c == '_' => {
+                            lexer.index += 1
+                        }
+                        _ => break
+                    }
+                }
+
+                let directive = lexer.input[start_index:lexer.index].to_string()
+                Some(Token::Directive(directive))
             }
             _ => {
                 raise AsmLexerError("unexpected character '\{c}' at position \{lexer.index}")

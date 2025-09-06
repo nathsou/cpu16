@@ -8,7 +8,7 @@ pub struct CPU {
     mut next_pc: UInt16
 }
 
-pub fn CPU::new(mem: FixedArray[UInt16], start_addr: UInt16) -> CPU {
+pub fn CPU::new(mem: FixedArray[UInt16], start_addr~: UInt16) -> CPU {
     {
         regs: {
             let regs: FixedArray[UInt16] = FixedArray::make(8, 0)
@@ -19,21 +19,21 @@ pub fn CPU::new(mem: FixedArray[UInt16], start_addr: UInt16) -> CPU {
         carry: false,
         zero: false,
         mem,
-        next_pc: start_addr,
+        next_pc: 0,
     }
 }
 
-pub fn CPU::from(prog: Bytes, start_addr: UInt16) -> CPU {
+pub fn CPU::from(prog: Bytes, start_addr~: UInt16) -> CPU {
     let mem: FixedArray[UInt16] = FixedArray::make(0x10000, 0)
     let mut mem_index = 0
 
     for i = 0; i < prog.length(); i = i + 2 {
         let word: UInt16 = (prog[i].to_uint16() | (prog[i + 1].to_uint16() << 8))
-        mem[mem_index + start_addr.to_int()] = word
+        mem[mem_index] = word
         mem_index += 1
     }
 
-    CPU::new(mem, start_addr)
+    CPU::new(mem, start_addr~)
 }
 
 fn write_reg(self: CPU, reg: @asm.Reg, value: UInt16) -> Unit {
