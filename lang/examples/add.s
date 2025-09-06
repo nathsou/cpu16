@@ -1,3 +1,5 @@
+
+.org 0x8000
 set r1 0x23
 set r2 0x17
 add r1 r1 r2

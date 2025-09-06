@@ -1,3 +1,5 @@
+
+.org 0x8000
 setw sp 0xffff
 setw r1 3
 push r1

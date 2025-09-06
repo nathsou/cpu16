@@ -1,3 +1,5 @@
+
+.org 0x8000
 set r1 0
 set r2 0xf
 

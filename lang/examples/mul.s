@@ -25,6 +25,6 @@ mul:
 
     mul_end:
         move r2 r3
-        load r3 z
+        load r3 z ; restore r3
         ret
 

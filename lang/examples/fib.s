@@ -1,3 +1,5 @@
+
+.org 0x8000
 set r1 1
 set r2 1
 set r4 1000

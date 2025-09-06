@@ -1,4 +1,5 @@
 
+.org 0x8000
 setw sp 0xffff
 setw r1 1621
 setw r2 17
