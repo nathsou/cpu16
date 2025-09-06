@@ -62,6 +62,7 @@ fn PseudoBuilder::get_or_declare(self: PseudoBuilder, env: Env[@asm.VarId, @asm.
     }
 }
 
+const SAVED_REGS_COUNT: UInt16 = 4
 let unit_var_id: @asm.VarId = 0U
 
 pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
@@ -143,24 +144,18 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
         TAC::Func(name~, parameters=_, return_type~, body~) => {
             let label_id = self.ctx.next_label()
             self.functions[name] = { return_type , label_id }
-            let is_main = name == "main"
 
             self.emit(LIR(Label(label_id)))
             // save the return address
-            let ret_addr = if !is_main {
-                let ret_addr = self.ctx.next_var()
-                self.emit(Pop(dst=Var(ret_addr)))
-                Some(ret_addr)
-            } else {
-                None
-            }
+            let ret_addr = self.ctx.next_var()
+            self.emit(Pop(dst=Var(ret_addr)))
 
             for inst in body {
                 match inst {
                     GetLocal(target~, index~) => {
                         let target_id = self.get_or_declare(env, target)
-                        // skip the 5 saved registers
-                        self.emit(Load(dst=Var(target_id), addr=Reg(SP), offset=5 + index.reinterpret_as_int().to_uint16()))
+                        // skip the saved registers
+                        self.emit(Load(dst=Var(target_id), addr=Reg(SP), offset=SAVED_REGS_COUNT + index.reinterpret_as_int().to_uint16()))
                     }
                     SetLocal(index=_, src=_) => {
                         // let source_id = self.lower_value(src, env)
@@ -172,9 +167,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                             self.emit(Push(val=Var(ret_id)))
                         }
 
-                        if ret_addr is Some(ret_addr) {
-                            self.emit(Move(dst=Reg(PC), src=Var(ret_addr)))
-                        }
+                        self.emit(Move(dst=Reg(PC), src=Var(ret_addr)))
                     }
                     _ => {
                         let _ = self.lower_expr(inst, env)
@@ -191,38 +184,32 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                 }
 
                 // TODO: Only save/restore registers that are used in the function body
+                // step 1: Allocate space for registers + arguments
+                let allocated_words = SAVED_REGS_COUNT + parameters.length().to_uint16()
+                self.emit(Setw(dst=Reg(TMP), val=allocated_words))
+                self.emit(Sub(dst=Reg(SP), src1=Reg(SP), src2=Reg(TMP)))
 
-                // step 1: Allocate space for registers (5), arguments (n)
-                let allocated_words = (5 + parameters.length()).to_uint16()
-                {
-                    let tmp = self.ctx.next_var()
-                    self.emit(Setw(dst=Var(tmp), val=allocated_words))
-                    self.emit(Sub(dst=Reg(SP), src1=Reg(SP), src2=Var(tmp)))
-                }
-
-                // step 2: save r1-r5
+                // step 2: save r1-r4
                 self.emit(Store(dst=Reg(SP), src=Reg(R1), offset=0))
                 self.emit(Store(dst=Reg(SP), src=Reg(R2), offset=1))
                 self.emit(Store(dst=Reg(SP), src=Reg(R3), offset=2))
                 self.emit(Store(dst=Reg(SP), src=Reg(R4), offset=3))
-                self.emit(Store(dst=Reg(SP), src=Reg(R5), offset=4))
 
                 // step 3: push parameters
                 for i in 0..<parameters.length() {
                     let param_id = self.lower_value(parameters[i], env)
-                    self.emit(Store(dst=Reg(SP), src=Var(param_id), offset=(5 + i).to_uint16()))
+                    self.emit(Store(dst=Reg(SP), src=Var(param_id), offset=SAVED_REGS_COUNT + i.to_uint16()))
                 }
 
                 // step 4: call the function 
                 self.emit(Call(dst=Label(label_id)))
                 let return_val_words = (if return_type is Unit { 0 } else { 1 }).to_uint16()
 
-                // step 5: restore r1-r5
+                // step 5: restore r1-r4
                 self.emit(Load(dst=Reg(R1), addr=Reg(SP), offset=return_val_words + 0))
                 self.emit(Load(dst=Reg(R2), addr=Reg(SP), offset=return_val_words + 1))
                 self.emit(Load(dst=Reg(R3), addr=Reg(SP), offset=return_val_words + 2))
                 self.emit(Load(dst=Reg(R4), addr=Reg(SP), offset=return_val_words + 3))
-                self.emit(Load(dst=Reg(R5), addr=Reg(SP), offset=return_val_words + 4))
 
                 // step 6: retrieve return value
                 let target_id = if return_type is Unit {
@@ -234,11 +221,8 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC, env: Env[@asm.V
                 }
 
                 // step 7: deallocate space
-                {
-                    let tmp = self.ctx.next_var()
-                    self.emit(Setw(dst=Var(tmp), val=allocated_words))
-                    self.emit(Add(dst=Reg(SP), src1=Reg(SP), src2=Var(tmp)))
-                }
+                self.emit(Setw(dst=Reg(TMP), val=allocated_words))
+                self.emit(Add(dst=Reg(SP), src1=Reg(SP), src2=Reg(TMP)))
 
                 target_id
             } else {

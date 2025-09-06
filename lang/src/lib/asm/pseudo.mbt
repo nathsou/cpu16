@@ -46,7 +46,7 @@ pub(all) enum PseudoInst {
 
 pub suberror PseudoLoweringError String derive (Show)
 
-pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise PseudoLoweringError {
+pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -67,11 +67,10 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise P
             [Alu(dst~, src1=Reg(Z), src2=Reg(Z), op=Dec)]
         } else if val >= (0xffff - 0x7ff) {
             let sub_val = (0x1000).to_uint16() - val
-            let tmp = ctx.next_tmp_loc()
 
             [
-                Set(dst=tmp, val=sub_val),
-                Alu(dst~, src1=Reg(Z), src2=tmp, op=Sub),
+                Set(dst=Reg(TMP), val=sub_val),
+                Alu(dst~, src1=Reg(Z), src2=Reg(TMP), op=Sub),
             ]
         } else {
             // Check if `val` can be represented as a left shift of an 11-bit value
@@ -80,12 +79,10 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise P
                 let shl_core = val_uint >> shl_amount
                 
                 if shl_core <= 0x7ff {
-                    let tmp = ctx.next_tmp_loc()
-
                     return [
                         Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
-                        Set(dst=tmp, val=shl_amount.to_uint16()),
-                        Alu(dst~, src1=dst, src2=tmp, op=Shl),
+                        Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
+                        Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
                     ]
                 }
             }
@@ -93,14 +90,13 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise P
             // Fallback to a general strategy
             let high = (val >> 8) & 0xff
             let low = val & 0xff
-            let tmp = ctx.next_tmp_loc()
 
             [
                 Set(dst~, val=high),
-                Set(dst=tmp, val=8),
-                Alu(dst~, src1=dst, src2=tmp, op=Shl),
-                Set(dst=tmp, val=low),
-                Alu(dst~, src1=dst, src2=tmp, op=Or),
+                Set(dst=Reg(TMP), val=8),
+                Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+                Set(dst=Reg(TMP), val=low),
+                Alu(dst~, src1=dst, src2=Reg(TMP), op=Or),
             ]
         }
     }
@@ -157,28 +153,26 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: IdContext) -> Array[LIR] raise P
     Push(val~) => [
         Store(dst=Reg(SP), src=val, offset=0),
         Dec(dst=Reg(SP)),
-    ] |> lower_many(ctx)
+    ] |> lower_many()
     Pop(dst~) => [
         Inc(dst=Reg(SP)),
         Load(dst~, addr=Reg(SP), offset=0),
-    ] |> lower_many(ctx)
+    ] |> lower_many()
     Call(dst~) => {
-        let tmp = ctx.next_tmp_loc()
-
         [
             // skip next 5 instructions which are part of the call pseudo-instruction itself
-            LIR(Set(dst=tmp, val=5)),
-            Add(dst=tmp, src1=tmp, src2=Reg(PC)),
-            Push(val=tmp), // 2 instructions
+            LIR(Set(dst=Reg(TMP), val=5)),
+            Add(dst=Reg(TMP), src1=Reg(TMP), src2=Reg(PC)),
+            Push(val=Reg(TMP)), // 2 instructions
             // TODO: Handle Jumps to arbitrary locations which might take more than 2 instructions
             Jmp(dst~), // 2 instructions
-        ] |> lower_many(ctx)
+        ] |> lower_many()
     }
-    Ret => [Pop(dst=Reg(PC))] |> lower_many(ctx)
+    Ret => [Pop(dst=Reg(PC))] |> lower_many()
     Nop => [Set(dst=Reg(Z), val=0)]
   }
 }
 
-fn lower_many(insts: Array[PseudoInst], ctx: IdContext) -> Array[LIR] raise PseudoLoweringError {
-    insts.map(inst => inst.lower(ctx)).flatten()
+fn lower_many(insts: Array[PseudoInst]) -> Array[LIR] raise PseudoLoweringError {
+    insts.map(PseudoInst::lower).flatten()
 }

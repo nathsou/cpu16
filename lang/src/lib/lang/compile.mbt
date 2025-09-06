@@ -12,7 +12,6 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     let ctx: @asm.IdContext = {
         next_var_id: 0U,
         next_label_id: 0U,
-        fixed_temp_reg: false, // Use next available general purpose register for temporaries
     }
 
     let tac_builder = TACBuilder::new(ctx)
@@ -43,7 +42,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call(), ctx~)
+    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call())
 
     if verbose {
         println("\n[LIR]")
@@ -53,12 +52,21 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lowered = @asm.lower_lir_to_insts(lir, ctx~)
+    let lowered = @asm.lower_lir_to_insts(lir)
 
     if verbose {
+        println("\n[Allocation]")
+        println(lowered.allocation)
+
         println("\n[Allocated LIR]")
 
         for inst in lowered.allocated {
+            println(inst)
+        }
+
+        println("\n[Final]")
+
+        for inst in lowered.insts {
             println(inst)
         }
     }
