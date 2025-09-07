@@ -99,7 +99,7 @@ pub fn parse_expr(self: Parser) -> Expr raise ParserError {
     self.parse_if_expr()
 }
 
-// if <expr> { <expr> } (else { <expr> })?
+// if <expr> <block> (else <block>)?
 fn parse_if_expr(self: Parser) -> Expr raise ParserError {
     if self.consumes(Token::If) {
         let cond = self.parse_expr()
@@ -422,7 +422,7 @@ fn parse_assignment_stmt(self: Parser) -> Stmt raise ParserError {
             Stmt::Semi(lhs)
         }
         _ => {
-            raise ParserError("expected assignment or expression statement")
+            raise ParserError("expected assignment or expression statement, got '\{self.peek()}'")
         }
     }
 }

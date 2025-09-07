@@ -6,21 +6,25 @@ pub enum TACValue {
     Variable(@asm.VarId)
 }
 
-pub enum TAC {
-    Assign(target~: @asm.VarId, src~: TACValue)
-    Unary(target~: @asm.VarId, op~: UnaryOp, arg~: TACValue)
-    Binary(target~: @asm.VarId, lhs~: TACValue, op~: BinaryOp, rhs~: TACValue)
-    Store(dst~: @asm.VarId, src~: TACValue, offset~: UInt)
-    Load(target~: @asm.VarId, addr~: TACValue, offset~: UInt)
+pub enum TAC[V] {
+    Assign(target~: @asm.VarId, val~: Const)
+    Move(target~: @asm.VarId, src~: @asm.VarId)
+    Unary(target~: @asm.VarId, op~: UnaryOp, arg~: V)
+    Binary(target~: @asm.VarId, lhs~: V, op~: BinaryOp, rhs~: V)
+    Store(dst~: @asm.VarId, src~: V, offset~: UInt)
+    Load(target~: @asm.VarId, addr~: V, offset~: UInt)
     Jump(label~: @asm.LabelId)
-    JumpIf(label~: @asm.LabelId, cond~: @asm.JumpCond, lhs~: TACValue, rhs~: TACValue)
+    JumpIf(label~: @asm.LabelId, cond~: @asm.JumpCond, lhs~: V, rhs~: V)
     Label(label~: @asm.LabelId)
-    Func(name~: String, parameters~: Array[FunctionArgument], return_type~: Type, body~: Array[TAC])
+    Func(name~: String, parameters~: Array[FunctionArgument], return_type~: Type, body~: Array[TAC[V]])
     GetLocal(target~: @asm.VarId, index~: UInt)
-    SetLocal(index~: UInt, src~: TACValue)
-    Return(value~: Option[TACValue])
-    Call(target~: @asm.VarId, name~: String, parameters~: Array[TACValue])
+    SetLocal(index~: UInt, src~: V)
+    Return(value~: Option[V])
+    Call(target~: @asm.VarId, name~: String, parameters~: Array[V])
 }
+
+pub typealias TAC[TACValue] as TAC1
+pub typealias TAC[@asm.VarId] as TAC2
 
 pub impl Show for TACValue with output(self, logger) {
     let output = match self {
@@ -32,9 +36,12 @@ pub impl Show for TACValue with output(self, logger) {
     logger.write_string(output)
 }
 
-pub impl Show for TAC with output(self, logger) {
+pub impl[V: Show] Show for TAC[V] with output(self, logger) {
     let output = match self {
-        TAC::Assign(target~, src~) => {
+        TAC::Assign(target~, val~) => {
+            "\{target} = \{val}"
+        }
+        TAC::Move(target~, src~) => {
             "\{target} = \{src}"
         }
         TAC::Unary(target~, op~, arg~) => {
@@ -89,68 +96,77 @@ pub impl Show for TAC with output(self, logger) {
     logger.write_string(output)
 }
 
-pub struct TACBuilder {
-    tac: Array[TAC]
+pub struct TACBuilder[V] {
+    tac: Array[TAC[V]]
     env: Env[String, @asm.VarId]
-    functions: Env[String, @asm.LabelId]
     ctx: @asm.IdContext
 }
 
-pub fn TACBuilder::new(ctx: @asm.IdContext) -> TACBuilder {
+pub fn[V] TACBuilder::new(ctx: @asm.IdContext) -> TACBuilder[V] {
     {
         tac: [],
         env: Env::new(),
-        functions: Env::new(),
         ctx,
     }
 }
 
-fn child(self: TACBuilder) -> TACBuilder {
+fn[V] TACBuilder::child(self: TACBuilder[V]) -> TACBuilder[V] {
     {
         tac: [],
         env: self.env.child(),
-        functions: self.functions,
         ctx: self.ctx,
     }
 }
 
-fn emit(self: TACBuilder, tac: TAC) -> Unit {
+fn[V] TACBuilder::emit(self: TACBuilder[V], tac: TAC[V]) -> Unit {
     self.tac.push(tac)
 }
 
-fn emit_assign(self: TACBuilder, target: @asm.VarId, src: TACValue) -> Unit {
-    self.emit(TAC::Assign(target~, src~))
+fn[V] TACBuilder::emit_assign(self: TACBuilder[V], target: @asm.VarId, val: Const) -> Unit {
+    self.emit(TAC::Assign(target~, val~))
 }
 
-fn emit_unary_op(self: TACBuilder, target: @asm.VarId, op: UnaryOp, arg: TACValue) -> Unit {
+fn TACBuilder::emit_assign_val(self: TACBuilder[TACValue], target: @asm.VarId, val: TACValue) -> Unit {
+    match val {
+        TACValue::Const(c) => self.emit_assign(target, c)
+        TACValue::Variable(v) => self.emit_move(target, v)
+        TACValue::Unit => ()
+    }
+}
+
+fn[V] TACBuilder::emit_move(self: TACBuilder[V], target: @asm.VarId, src: @asm.VarId) -> Unit {
+    self.emit(TAC::Move(target~, src~))
+}
+
+fn[V] TACBuilder::emit_unary_op(self: TACBuilder[V], target: @asm.VarId, op: UnaryOp, arg: V) -> Unit {
     self.emit(TAC::Unary(target~, op~, arg~))
 }
 
-fn emit_binary_op(self: TACBuilder, target: @asm.VarId, lhs: TACValue, op: BinaryOp, rhs: TACValue) -> Unit {
+fn[V] TACBuilder::emit_binary_op(self: TACBuilder[V], target: @asm.VarId, lhs: V, op: BinaryOp, rhs: V) -> Unit {
     self.emit(TAC::Binary(target~, lhs~, op~, rhs~))
 }
 
 // removed unused emit_store / emit_load helpers
 
-fn def_label(self: TACBuilder, label: @asm.LabelId) -> Unit {
+fn[V] TACBuilder::def_label(self: TACBuilder[V], label: @asm.LabelId) -> Unit {
     self.emit(TAC::Label(label~))
 }
 
-fn emit_jump_if(self: TACBuilder, label: @asm.LabelId, cond: @asm.JumpCond, lhs: TACValue, rhs: TACValue) -> Unit {
+fn[V] TACBuilder::emit_jump_if(self: TACBuilder[V], label: @asm.LabelId, cond: @asm.JumpCond, lhs: V, rhs: V) -> Unit {
     self.emit(TAC::JumpIf(label~, cond~, lhs~, rhs~))
 }
 
-fn emit_jump(self: TACBuilder, label: @asm.LabelId) -> Unit {
+fn[V] TACBuilder::emit_jump(self: TACBuilder[V], label: @asm.LabelId) -> Unit {
     self.emit(TAC::Jump(label~))
 }
 
-fn emit_get_local(self: TACBuilder, target: @asm.VarId, index: UInt) -> Unit {
+fn[V] TACBuilder::emit_get_local(self: TACBuilder[V], target: @asm.VarId, index: UInt) -> Unit {
     self.emit(TAC::GetLocal(target~, index~))
 }
 
 // removed unused emit_set_local helper
 
-fn emit_return(self: TACBuilder, value: Option[TACValue]) -> Unit {
+fn[V] TACBuilder::emit_return(self: TACBuilder[V], value: V?) -> Unit {
     self.emit(TAC::Return(value~))
 }
 
@@ -181,7 +197,7 @@ fn temp_get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TAC
     (cond_op, cond_lhs, cond_rhs)
 }
 
-pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TACLoweringError {
+pub fn TACBuilder::lower_expr(self: TACBuilder[TACValue], expr: Expr) -> TACValue raise TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
@@ -220,11 +236,11 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
                     let end_label = self.ctx.next_label()
                     self.emit_jump_if(then_label, cond_op.negate(), cond_lhs, cond_rhs)
                     let then = self.lower_expr(then_expr)
-                    self.emit_assign(ret, then)
+                    self.emit_assign_val(ret, then)
                     self.emit_jump(end_label)
                     self.def_label(then_label)
                     let else_ = self.lower_expr(else_expr)
-                    self.emit_assign(ret, else_)
+                    self.emit_assign_val(ret, else_)
                     self.def_label(end_label)
                     TACValue::Variable(ret)
                 }
@@ -261,7 +277,7 @@ pub fn TACBuilder::lower_expr(self: TACBuilder, expr: Expr) -> TACValue raise TA
     }
 }
 
-pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_stmt(self: TACBuilder[TACValue], stmt: Stmt) -> Unit raise TACLoweringError {
     match stmt {
         Stmt::Let(name~, mutable=_, value~) => {
             let value = self.lower_expr(value)
@@ -272,7 +288,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
                 _ => {
                     let var_id = self.ctx.next_var()
                     self.env.declare(name, var_id)
-                    self.emit_assign(var_id, value)
+                    self.emit_assign_val(var_id, value)
                 }
             }
         }
@@ -285,7 +301,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
             match lhs {
                 Expr::Var(name) => {
                     match self.env.lookup(name) {
-                        Some(var_id) => self.emit_assign(var_id, rhs)
+                        Some(var_id) => self.emit_assign_val(var_id, rhs)
                         None => {
                             raise TACLoweringError("undefined variable: '\{name}'")
                         }
@@ -323,11 +339,13 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder, stmt: Stmt) -> Unit raise TACLow
     }
 }
 
-pub fn TACBuilder::lower_decl(self: TACBuilder, decl: Decl) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_decl(self: TACBuilder[TACValue], decl: Decl) -> Unit raise TACLoweringError {
     match decl {
         Decl::Stmt(stmt) => self.lower_stmt(stmt)
         Decl::Func(name~, parameters~, return_type~, body~) => {
+            let start_label = self.ctx.next_label()
             let func_builder = self.child()
+            func_builder.def_label(start_label)
 
             for i, param in parameters {
                 let var_id = self.ctx.next_var()
@@ -340,6 +358,91 @@ pub fn TACBuilder::lower_decl(self: TACBuilder, decl: Decl) -> Unit raise TACLow
             }
 
             self.emit(TAC::Func(name~, parameters~, return_type~, body=func_builder.tac))
+        }
+    }
+}
+
+pub fn TACBuilder::lower_value(self: TACBuilder[@asm.VarId], value: TACValue) -> @asm.VarId {
+    match value {
+        TACValue::Unit => {
+            UNIT_VAR_ID
+        }
+        TACValue::Const(c) => {
+            let dst = self.ctx.next_var()
+            self.emit_assign(dst, c)
+            dst
+        }
+        TACValue::Variable(v) => v
+    }
+}
+
+// Rewrite TAC to ensure that all operands are variables (no immediates)
+pub fn TACBuilder::rewrite_immediates(self: TACBuilder[@asm.VarId], tac: Array[TAC[TACValue]]) -> Unit {
+    for item in tac {
+        match item {
+            TAC::Assign(target~, val~) => {
+                self.emit_assign(target, val)
+            }
+            TAC::Move(target~, src~) => {
+                self.emit_move(target, src)
+            }
+            TAC::Unary(target~, op~, arg~) => {
+                let arg = self.lower_value(arg)
+                self.emit_unary_op(target, op, arg)
+            }
+            TAC::Binary(target~, op~, lhs~, rhs~) => {
+                let lhs = self.lower_value(lhs)
+                let rhs = self.lower_value(rhs)
+                self.emit_binary_op(target, lhs, op, rhs)
+            }
+            TAC::Store(dst~, src~, offset~) => {
+                let src = self.lower_value(src)
+                self.emit(TAC::Store(dst~, src~, offset~))
+            }
+            TAC::Load(target~, addr~, offset~) => {
+                let addr = self.lower_value(addr)
+                self.emit(TAC::Load(target~, addr~, offset~))
+            }
+            TAC::Jump(label~) => {
+                self.emit_jump(label)
+            }
+            TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
+                let lhs = self.lower_value(lhs)
+                let rhs = self.lower_value(rhs)
+                self.emit_jump_if(label, cond, lhs, rhs)
+            }
+            TAC::Label(label~) => {
+                self.def_label(label)
+            }
+            TAC::Func(name~, parameters~, return_type~, body~) => {
+                let func_builder = self.child()
+                func_builder.rewrite_immediates(body)
+                self.emit(TAC::Func(name~, parameters~, return_type~, body=func_builder.tac))
+            }
+            TAC::GetLocal(target~, index~) => {
+                self.emit_get_local(target, index)
+            }
+            TAC::SetLocal(index~, src~) => {
+                let src = self.lower_value(src)
+                self.emit(TAC::SetLocal(index~, src~))
+            }
+            TAC::Return(value~) => {
+                let value = match value {
+                    Some(value) => Some(self.lower_value(value))
+                    None => None
+                }
+
+                self.emit_return(value)
+            }
+            TAC::Call(target~, name~, parameters~) => {
+                let args: Array[@asm.VarId] = []
+
+                for param in parameters {
+                    args.push(self.lower_value(param))
+                }
+
+                self.emit(TAC::Call(target~, name~, parameters=args))
+            }
         }
     }
 }

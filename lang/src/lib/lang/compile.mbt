@@ -24,10 +24,24 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let pseudo_builder = PseudoBuilder::new(ctx)
+    let tac2: Array[TAC2] = {
+        let builder = TACBuilder::new(ctx)
+        builder.rewrite_immediates(tac_builder.tac)
+        builder.tac
+    }
+
+    if verbose {
+        println("\n[TAC2]")
+
+        for tac in tac2 {
+            println(tac)
+        }
+    }
+
+    let pseudo_builder = PseudoBuilder::new()
     let env = Env::new()
 
-    for tac in tac_builder.tac {
+    for tac in tac2 {
         let _ = pseudo_builder.lower_expr(tac, env)
     }
 
