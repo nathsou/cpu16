@@ -123,14 +123,24 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
                         raise IRBuilderError("set_local not supported yet")
                     }
                     Return(value~) => {
+                        let is_main = name == "main"
+
                         if value is Some(v) {
                             // replace return address with return value on the stack
                             self.emit(Load(dst=Reg(TMP), addr=Reg(SP), offset=0))
                             self.emit(Store(dst=Reg(SP), src=Var(v), offset=0))
-                            self.emit(Move(dst=Reg(PC), src=Reg(TMP)))
-                        } else {
+
+                            if !is_main {
+                                self.emit(Move(dst=Reg(PC), src=Reg(TMP)))
+                            }
+                        } else if !is_main {
                             // just pop the return address into PC
                             self.emit(Pop(dst=Reg(PC)))
+                        }
+
+                        if is_main {
+                            // do not return from main, instead halt directly
+                            self.emit(Halt)
                         }
                     }
                     _ => {
@@ -188,10 +198,6 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
                 // step 7: deallocate space
                 self.emit(Setw(dst=Reg(TMP), val=allocated_words))
                 self.emit(Add(dst=Reg(SP), src1=Reg(SP), src2=Reg(TMP)))
-
-                if name == "main" {
-                    self.emit(Halt)
-                }
 
                 target
             } else {
