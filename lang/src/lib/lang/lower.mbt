@@ -214,7 +214,9 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
     }
 }
 
-pub const STACK_TOP: UInt16 = 0xffff
+// no hardware detection of stack overflow, adjust layout of data in 0x0000..0x7FFF to avoid collisions
+// depending on program needs (max recursion depth * stack frame size)
+pub const STACK_TOP: UInt16 = 0x7fff
 
 pub fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder) -> Array[@asm.PseudoInst] raise IRBuilderError {
     if self.functions.get("main") is Some(({ label_id, return_type })) {

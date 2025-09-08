@@ -47,6 +47,22 @@ pub(all) enum PseudoInst {
 
 pub suberror PseudoLoweringError String derive (Show)
 
+// Attempt to represent `n` as a left shift of an 11-bit value
+fn decompose_11bit_shl(n: UInt, dst: Loc) -> Array[LIR]? {
+    let shl_amount = n.ctz()
+    let shl_core = n >> shl_amount
+    
+    if shl_core <= 0x7ff {
+        Some([
+            Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
+            Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
+            Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+        ])
+    } else {
+        None
+    }
+}
+
 pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
@@ -76,17 +92,20 @@ pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringErr
             ]
         } else {
             // Check if `val` can be represented as a left shift of an 11-bit value
-            {
-                let shl_amount = val_uint.ctz()
-                let shl_core = val_uint >> shl_amount
-                
-                if shl_core <= 0x7ff {
-                    return [
-                        Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
-                        Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
-                        Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
-                    ]
-                }
+            if decompose_11bit_shl(val_uint, dst) is Some(insts) {
+                return insts
+            } else if decompose_11bit_shl(val_uint - 1, dst) is Some(insts) {
+                // If not, check `val - 1`
+                return [
+                    ..insts,
+                    Alu(dst~, src1=dst, src2=Reg(Z), op=Inc),
+                ]
+            } else if decompose_11bit_shl(val_uint + 1, dst) is Some(insts) {
+                // If not, check `val + 1`
+                return [
+                    ..insts,
+                    Alu(dst~, src1=dst, src2=Reg(Z), op=Dec),
+                ]
             }
 
             // Fallback to a general strategy
