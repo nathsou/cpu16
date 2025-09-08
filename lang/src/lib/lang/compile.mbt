@@ -24,24 +24,37 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let tac2: Array[TAC2] = {
+    let tac2 = {
         let builder = TACBuilder::new(ctx)
         builder.rewrite_immediates(tac_builder.tac)
-        builder.tac
+        builder
     }
 
     if verbose {
         println("\n[TAC2]")
 
-        for tac in tac2 {
+        for tac in tac2.tac {
             println(tac)
+        }
+    }
+
+    let basic_blocks = tac2.functions().map(f => (f.name, collect_basic_blocks(f.body)))
+
+    if verbose {
+        println("\n[CFG]")
+
+        for entry in basic_blocks {
+            println("<\{entry.0}>")
+            for bb in entry.1 {
+                println(bb)
+            }
         }
     }
 
     let pseudo_builder = PseudoBuilder::new()
     let env = Env::new()
 
-    for tac in tac2 {
+    for tac in tac2.tac {
         let _ = pseudo_builder.lower_expr(tac, env)
     }
 

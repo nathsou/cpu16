@@ -2,17 +2,21 @@
 pub struct BasicBlock {
     id: Int
     items: Array[TAC2]
-    predecessors: Array[BasicBlock]
-    successors: Array[BasicBlock]
+    predecessors: Set[BasicBlock]
+    successors: Set[BasicBlock]
 }
 
 pub impl Eq for BasicBlock with equal(self, other) {
     self.id == other.id
 }
 
+pub impl Hash for BasicBlock with hash_combine(self, hasher: Hasher) {
+    hasher.combine_int(self.id)
+}
+
 pub impl Show for BasicBlock with output(self, logger: &Logger) {
-    let preds = self.predecessors.map(bb => "BB" + bb.id.to_string()).join(", ")
-    let succs = self.successors.map(bb => "BB" + bb.id.to_string()).join(", ")
+    let preds = self.predecessors.iter().map(bb => "BB\{bb.id}").join(", ")
+    let succs = self.successors.iter().map(bb => "BB\{bb.id}").join(", ")
     logger.write_string("BB" + self.id.to_string() + ": [preds: {\{preds}}] [succs: {\{succs}}]\n")
 
     for item in self.items {
@@ -39,19 +43,17 @@ fn collect_basic_block_leaders(items: Array[TAC2]) -> Array[Int] {
 
     for i in 0..<items.length() {
         let item = items[i]
-        
+
         match item {
             Label(_) => {
                 // the target of a jump instruction is a leader
                 insert_leader_index(i)
             }
-            Jump(_) | JumpIf(_) | Call(_) | Return(_) => {
+            Jump(_) | JumpIf(_) | Return(_) => {
                 // the next instruction after a branching instruction is a leader
+                // Note: The next isntruction after a call is not a leader
+                // because we are not doing inter-procedural analysis
                 insert_leader_index(i + 1)
-            }
-            Func(..) => {
-                // TODO: Handle functions
-                ()
             }
             _ => ()
         }
@@ -60,7 +62,7 @@ fn collect_basic_block_leaders(items: Array[TAC2]) -> Array[Int] {
     leaders
 }
 
-fn _collect_basic_blocks(items: Array[TAC2]) -> Array[BasicBlock] {
+fn collect_basic_blocks(items: Array[TAC2]) -> Array[BasicBlock] {
     let leader_indices = collect_basic_block_leaders(items)
     let basic_blocks: Array[BasicBlock] = []
     let bb_by_label: Map[@asm.LabelId, BasicBlock] = {}
@@ -74,8 +76,8 @@ fn _collect_basic_blocks(items: Array[TAC2]) -> Array[BasicBlock] {
         let bb: BasicBlock = {
             id: basic_blocks.length(),
             items: [],
-            predecessors: [],
-            successors: [],
+            predecessors: Set::new(),
+            successors: Set::new(),
         }
 
         for j in prev_leader..<curr_leader {
@@ -91,30 +93,35 @@ fn _collect_basic_blocks(items: Array[TAC2]) -> Array[BasicBlock] {
         basic_blocks.push(bb)
     }
 
-    // fn connect(a: BasicBlock, b: BasicBlock) {
-    //   if !a.successors.contains(b) {
-    //     a.successors.push(b)
-    //   }
+    fn connect(a: BasicBlock, b: BasicBlock) {
+        a.successors.add(b)
+        b.predecessors.add(a)
+    }
 
-    //   if !b.predecessors.contains(a) {
-    //     b.predecessors.push(a)
-    //   }
-    // }
+    for index, bb in basic_blocks {
+        let (target_label, fallthrough) = match bb.items.last() {
+            Some(Jump(label~)) => {
+                (Some(label), false)
+            }
+            Some(JumpIf(label~, ..)) => {
+                (Some(label), true)
+            }
+            _ => (None, true)
+        }
 
-    // for index, bb in basic_blocks {
-    //   if bb.items.last() is Some(Jmp(dst=Label(label_id), cond=_)) {
-    //     match bb_by_label.get(label_id) {
-    //       Some(target_bb) => connect(bb, target_bb)
-    //       None => println("Jump to unknown label: {\{label_id}}")
-    //     }
-    //   }
+        if target_label is Some(label_id) {
+            match bb_by_label.get(label_id) {
+                Some(target_bb) => connect(bb, target_bb)
+                None => println("Jump to unknown label: {\{label_id}}")
+            }
+        }
 
-    //   // fallthrough to the next basic block
-    //   if index < basic_blocks.length() - 1 {
-    //     let next_bb = basic_blocks[index + 1]
-    //     connect(bb, next_bb)
-    //   }
-    // }
+        // fallthrough to the next basic block
+        if fallthrough && index < basic_blocks.length() - 1 {
+            let next_bb = basic_blocks[index + 1]
+            connect(bb, next_bb)
+        }
+    }
     
     basic_blocks
 }

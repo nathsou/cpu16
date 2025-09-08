@@ -26,7 +26,7 @@ suberror IRBuilderError String derive (Show)
 
 const SAVED_REGS_COUNT: UInt16 = 4
 
-pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
+pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
     match expr {
         TAC::Assign(target~, val~) => {
             self.emit(Setw(dst=Var(target), val=match val {
@@ -100,16 +100,16 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
             self.emit(LIR(Label(label)))
             UNIT_VAR_ID
         }
-        TAC::Func(name~, parameters=_, return_type~, body~) => {
-            if body[0] is Label(label=label_id) {
-                self.functions[name] = { return_type , label_id }
+        TAC::Func(f) => {
+            if f.body[0] is Label(label=label_id) {
+                self.functions[f.name] = { return_type: f.return_type , label_id }
             } else {
                 raise IRBuilderError("function body must start with a label")
             }
             // return address + saved registers
             let params_offset: UInt16 = 1 + SAVED_REGS_COUNT
 
-            for inst in body {
+            for inst in f.body {
                 match inst {
                     GetLocal(target~, index~) => {
                         self.emit(Load(
@@ -123,7 +123,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
                         raise IRBuilderError("set_local not supported yet")
                     }
                     Return(value~) => {
-                        let is_main = name == "main"
+                        let is_main = f.name == "main"
 
                         if value is Some(v) {
                             // replace return address with return value on the stack
@@ -178,7 +178,6 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
                 }
 
                 // step 4: call the function 
-
                 self.emit(LIR(Set(dst=Reg(TMP), val=4))) // return address is 4 instructions ahead
                 self.emit(Add(dst=Reg(TMP), src1=Reg(TMP), src2=Reg(PC)))
                 self.emit(Store(dst=Reg(SP), src=Reg(TMP), offset=0)) // save return address
@@ -191,7 +190,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC[@asm.VarId], env
                 self.emit(Load(dst=Reg(R4), addr=Reg(SP), offset=4))
 
                 // step 6: retrieve return value
-                if !(return_type is Unit) {
+                if return_type != Unit {
                     self.emit(Load(dst=Var(target), addr=Reg(SP), offset=0))
                 }
 
