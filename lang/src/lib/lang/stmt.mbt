@@ -1,8 +1,7 @@
 
 pub enum Stmt {
     Let(name~: String, mutable~: Bool, value~: Expr)
-    // Expr(Expr) // expr without semicolon
-    Semi(Expr) // expr with a trailing semicolon
+    Expr(expr~: Expr, semicolon~: Bool)
     Assign(lhs~: Expr, rhs~: Expr)
     While(cond~: Expr, body~: Array[Stmt])
     Return(value~: Option[Expr])
@@ -24,8 +23,7 @@ pub impl Show for Stmt with output(self, logger) {
             let kw = if mutable { "var" } else { "let" }
             "\{kw} \{name} = \{value};"
         }
-        // Stmt::Expr(expr) => expr.to_string()
-        Stmt::Semi(expr) => "\{expr};"
+        Stmt::Expr(expr~, semicolon~) => "\{expr}" + (if semicolon { ";" } else { "" })
         Stmt::Assign(lhs~, rhs~) => "\{lhs} = \{rhs};"
         Stmt::While(cond~, body~) => "while \{cond} \n{" + show_stmts(body) + "\n}"
         Stmt::Return(value~) => {

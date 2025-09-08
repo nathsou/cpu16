@@ -177,7 +177,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit raise TypeError {
             let valTy = self.type_expr(value)
             self.declare(name, { ty: valTy, mutable })
         }
-        Stmt::Semi(expr) => {
+        Stmt::Expr(expr~, semicolon=_) => {
             let _ = self.type_expr(expr)
         }
         Stmt::Assign(lhs~, rhs~) => {
@@ -186,7 +186,7 @@ pub fn type_stmt(self: TypeChecker, stmt: Stmt) -> Unit raise TypeError {
                     match self.lookup(name) {
                         Some({ ty, mutable }) => {
                             if mutable {
-                                                                 let rhsTy = self.type_expr(rhs)
+                                let rhsTy = self.type_expr(rhs)
 
                                 if ty != rhsTy {
                                     raise TypeError("Incompatible types in assignment for \{name}: '\{ty}' and '\{rhsTy}'")

@@ -193,12 +193,21 @@ pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAlloca
     }
 
     fn expire_old_intervals(expired_interval: LivenessInterval) -> Unit {
+        let to_remove: Array[LivenessInterval] = []
+        
+        // Collect intervals to remove
         for i = 0; i < active.values.length(); i = i + 1 {
             let interval = active.values[i]
             if interval.end < expired_interval.start {
-                active.remove(interval)
+                to_remove.push(interval)
                 free_regs.push(reg_alloc[interval.var_id])
             }
+        }
+        
+        // Remove collected intervals in a separate loop
+        // to avoid modifying the array while iterating
+        for interval in to_remove {
+            active.remove(interval)
         }
     }
 

@@ -340,7 +340,7 @@ fn parse_block_expr(self: Parser) -> Expr raise ParserError {
         body.push(stmt)
     }
 
-    if body.last() is Some(Stmt::Semi(last_expr)) {
+    if body.last() is Some(Stmt::Expr(expr=last_expr, semicolon=false)) {
         let _ = body.unsafe_pop()
         Expr::Block(body~, result=Some(last_expr))
     } else {
@@ -419,11 +419,9 @@ fn parse_assignment_stmt(self: Parser) -> Stmt raise ParserError {
         }
         Some(Token::Semicolon) => {
             self.advance()
-            Stmt::Semi(lhs)
+            Stmt::Expr(expr=lhs, semicolon=true)
         }
-        _ => {
-            raise ParserError("expected assignment or expression statement, got '\{self.peek()}'")
-        }
+        _ => Stmt::Expr(expr=lhs, semicolon=false)
     }
 }
 

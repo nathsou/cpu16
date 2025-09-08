@@ -292,7 +292,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder[TACValue], stmt: Stmt) -> Unit ra
                 }
             }
         }
-        Stmt::Semi(expr) => {
+        Stmt::Expr(expr~, semicolon=_) => {
             let _ = self.lower_expr(expr)
         }
         Stmt::Assign(lhs~, rhs~) => {
