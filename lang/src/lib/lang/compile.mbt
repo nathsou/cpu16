@@ -38,16 +38,15 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let basic_blocks = tac2.functions().map(f => (f.name, collect_basic_blocks(f.body)))
+    let cfg = tac2.functions().map(f => (f.name, f.cfg()))
 
     if verbose {
         println("\n[CFG]")
 
-        for entry in basic_blocks {
+        for entry in cfg {
             println("<\{entry.0}>")
-            for bb in entry.1 {
-                println(bb)
-            }
+            println("liveness intervals: \{entry.1.liveness_intervals()}")
+            println(entry.1)
         }
     }
 
