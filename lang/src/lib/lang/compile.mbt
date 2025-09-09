@@ -9,7 +9,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         let _ = type_checker.type_decl(decl)
     }
 
-    let ctx = @asm.IdContext::new()
+    let ctx = IdContext::new()
     let tac_builder = TACBuilder::new(ctx)
 
     for decl in decls {

@@ -16,8 +16,8 @@ priv struct BasicBlock {
     predecessors: Set[BasicBlock]
     successors: Set[BasicBlock]
     vars: LivenessVars
-    mut live_in: Set[@asm.VarId]
-    mut live_out: Set[@asm.VarId]
+    mut live_in: Set[VarId]
+    mut live_out: Set[VarId]
 }
 
 impl Eq for BasicBlock with equal(self, other) {
@@ -177,8 +177,8 @@ fn TACFunc::collect_basic_blocks(self: TACFunc2) -> Array[BasicBlock] {
 }
 
 priv struct LivenessVars {
-    used: Set[@asm.VarId]
-    defined: Set[@asm.VarId]
+    used: Set[VarId]
+    defined: Set[VarId]
 } derive (Show)
 
 fn LivenessVars::new() -> LivenessVars {
@@ -188,11 +188,11 @@ fn LivenessVars::new() -> LivenessVars {
     }
 }
 
-fn LivenessVars::add_def(self: LivenessVars, v: @asm.VarId) -> Unit {
+fn LivenessVars::add_def(self: LivenessVars, v: VarId) -> Unit {
     self.defined.add(v)
 }
 
-fn LivenessVars::add_use(self: LivenessVars, v: @asm.VarId) -> Unit {
+fn LivenessVars::add_use(self: LivenessVars, v: VarId) -> Unit {
     // a variable is in the use[B] set of a basic block B
     // if it is used in B before any assignment to it in B
     if !self.defined.contains(v) {
@@ -289,7 +289,7 @@ fn TAC2::vars(self: TAC2) -> LivenessVars {
 }
 
 // variable -> set of instruction offsets where it is live
-typealias Map[@asm.VarId, Set[Int]] as LivePoints
+typealias Map[VarId, Set[Int]] as LivePoints
 
 fn CFG::collect_live_points(self: CFG) -> LivePoints {
     let live_points: LivePoints = {}
@@ -348,7 +348,7 @@ fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
 }
 
 pub(all) struct LivenessInterval {
-    var_id: @asm.VarId
+    var_id: VarId
     start: Int
     end: Int
 } derive (Show, Eq)
@@ -358,11 +358,11 @@ impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessI
 }
 
 struct VariableAllocation {
-    reg_alloc: Map[@asm.VarId, Int]
-    mem_alloc: Map[@asm.VarId, Int]
+    reg_alloc: Map[VarId, Int]
+    mem_alloc: Map[VarId, Int]
 } derive (Show)
 
-pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: @asm.VarId) -> @asm.Loc raise {
+pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> @asm.Loc raise {
     match self.mem_alloc.get(var_id) {
         Some(mem) => Mem(offset=mem)
         None => match self.reg_alloc.get(var_id) {
@@ -382,8 +382,8 @@ pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: @asm.VarId)
 // Linear scan register allocation
 // TODO: Graph coloring register allocation
 pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) -> VariableAllocation {
-    let reg_alloc: Map[@asm.VarId, Int] = {}
-    let mem_alloc: Map[@asm.VarId, Int] = {}
+    let reg_alloc: Map[VarId, Int] = {}
+    let mem_alloc: Map[VarId, Int] = {}
     let active: SortedArray[LivenessInterval] = SortedArray::new()
     let free_regs: Array[Int] = []
 

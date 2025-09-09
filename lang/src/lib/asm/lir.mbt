@@ -1,15 +1,5 @@
 // Lower Intermediate Representation
-// Raw instructions with variables instead of registers (before register allocation) and labels
-
-pub(all) struct VarId(UInt) derive (Eq, Hash)
-
-pub impl Show for VarId with output(self, logger) {
-    logger.write_string("%" + self.inner().to_string())
-}
-
-pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
-    self.inner() + other.inner()
-}
+// Raw instructions with labels
 
 pub(all) struct LabelId(UInt) derive (Eq, Hash)
 
@@ -33,10 +23,10 @@ pub fn JumpCond::negate(self: JumpCond) -> JumpCond {
 }
 
 pub(all) enum Loc {
-    Reg(Reg)
     Unit
-    Mem(offset~: Int)
+    Reg(Reg)
     Label(LabelId)
+    Mem(offset~: Int) // spilled variable
 } derive (Show, Eq)
 
 pub fn Loc::unit() -> Loc {
@@ -66,31 +56,6 @@ pub(all) enum LIR {
     Label(LabelId)
     Directive(Directive)
 } derive (Show)
-
-pub(all) struct IdContext {
-    mut next_var_id: VarId
-    mut next_label_id: LabelId
-}
-
-pub fn IdContext::new() -> IdContext {
-    {
-        next_var_id: VarId(1U), // start from 1, reserve 0 for unit type
-        next_label_id: LabelId(0U),
-    }
-}
-
-pub fn IdContext::next_var(self: IdContext) -> VarId {
-    let var_id = self.next_var_id
-    // Increment without relying on Add trait for IRVarId
-    self.next_var_id = self.next_var_id.inner() + 1U
-    var_id
-}
-
-pub fn IdContext::next_label(self: IdContext) -> LabelId {
-    let label_id = self.next_label_id
-    self.next_label_id = self.next_label_id.inner() + 1U
-    label_id
-}
 
 priv struct JumpFixupInfo {
     index: Int

@@ -1,9 +1,19 @@
 // Three Address Code IR
 
+pub(all) struct VarId(UInt) derive (Eq, Hash)
+
+pub impl Show for VarId with output(self, logger) {
+    logger.write_string("%" + self.inner().to_string())
+}
+
+pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
+    self.inner() + other.inner()
+}
+
 pub enum TACValue {
     Unit
     Const(Const)
-    Variable(@asm.VarId)
+    Variable(VarId)
 }
 
 pub struct TACFunc[T, V] {
@@ -30,14 +40,14 @@ pub enum TAC[Target, Value] {
     Call(target~: Target, name~: String, parameters~: Array[Value])
 }
 
-typealias TAC[@asm.VarId, TACValue] as TAC1
-typealias TAC[@asm.VarId, @asm.VarId] as TAC2
+typealias TAC[VarId, TACValue] as TAC1
+typealias TAC[VarId, VarId] as TAC2
 typealias TAC[@asm.Loc, @asm.Loc] as TAC3
 
-typealias TACFunc[@asm.VarId, @asm.VarId] as TACFunc2
+typealias TACFunc[VarId, VarId] as TACFunc2
 
-typealias TACBuilder[@asm.VarId, TACValue] as TACBuilder1
-typealias TACBuilder[@asm.VarId, @asm.VarId] as TACBuilder2
+typealias TACBuilder[VarId, TACValue] as TACBuilder1
+typealias TACBuilder[VarId, VarId] as TACBuilder2
 typealias TACBuilder[@asm.Loc, @asm.Loc] as TACBuilder3
 
 pub impl Show for TACValue with output(self, logger) {
@@ -110,6 +120,45 @@ pub impl[T: Show, V: Show] Show for TAC[T, V] with output(self, logger) {
     logger.write_string(output)
 }
 
+pub(all) struct IdContext {
+    mut next_var_id: VarId
+    mut next_label_id: @asm.LabelId
+}
+
+pub fn IdContext::new() -> IdContext {
+    {
+        next_var_id: VarId(1U), // start from 1, reserve 0 for unit type
+        next_label_id: LabelId(0U),
+    }
+}
+
+pub fn IdContext::next_var(self: IdContext) -> VarId {
+    let var_id = self.next_var_id
+    // Increment without relying on Add trait for IRVarId
+    self.next_var_id = self.next_var_id.inner() + 1U
+    var_id
+}
+
+pub fn IdContext::next_label(self: IdContext) -> @asm.LabelId {
+    let label_id = self.next_label_id
+    self.next_label_id = self.next_label_id.inner() + 1U
+    label_id
+}
+
+pub struct TACBuilder[T, V] {
+    tac: Array[TAC[T, V]]
+    env: Env[String, VarId]
+    ctx: IdContext
+}
+
+pub fn[T, V] TACBuilder::new(ctx: IdContext) -> TACBuilder[T, V] {
+    {
+        tac: [],
+        env: Env::new(),
+        ctx,
+    }
+}
+
 pub fn[T, V] TACBuilder::functions(self: TACBuilder[T, V]) -> Iter[TACFunc[T, V]] {
     Iter::new(fn(visit: (TACFunc[T, V]) -> IterResult) -> IterResult {
         for item in self.tac {
@@ -123,20 +172,6 @@ pub fn[T, V] TACBuilder::functions(self: TACBuilder[T, V]) -> Iter[TACFunc[T, V]
             IterContinue
         }
     })
-}
-
-pub struct TACBuilder[T, V] {
-    tac: Array[TAC[T, V]]
-    env: Env[String, @asm.VarId]
-    ctx: @asm.IdContext
-}
-
-pub fn[T, V] TACBuilder::new(ctx: @asm.IdContext) -> TACBuilder[T, V] {
-    {
-        tac: [],
-        env: Env::new(),
-        ctx,
-    }
 }
 
 fn[T, V] TACBuilder::child(self: TACBuilder[T, V]) -> TACBuilder[T, V] {
@@ -155,7 +190,7 @@ fn[T, V] TACBuilder::emit_assign(self: TACBuilder[T, V], target: T, val: Const) 
     self.emit(TAC::Assign(target~, val~))
 }
 
-fn TACBuilder::emit_assign_val(self: TACBuilder1, target: @asm.VarId, val: TACValue) -> Unit {
+fn TACBuilder::emit_assign_val(self: TACBuilder1, target: VarId, val: TACValue) -> Unit {
     match val {
         TACValue::Const(c) => self.emit_assign(target, c)
         TACValue::Variable(v) => self.emit_move(target, v)
@@ -391,7 +426,7 @@ pub fn TACBuilder::lower_decl(self: TACBuilder1, decl: Decl) -> Unit raise TACLo
     }
 }
 
-pub fn TACBuilder::lower_value(self: TACBuilder2, value: TACValue) -> @asm.VarId {
+pub fn TACBuilder::lower_value(self: TACBuilder2, value: TACValue) -> VarId {
     match value {
         TACValue::Unit => {
             UNIT_VAR_ID
@@ -469,7 +504,7 @@ pub fn TACBuilder::rewrite_immediates(self: TACBuilder2, tac: Array[TAC1]) -> Un
                 self.emit_return(value)
             }
             TAC::Call(target~, name~, parameters~) => {
-                let args: Array[@asm.VarId] = []
+                let args: Array[VarId] = []
 
                 for param in parameters {
                     args.push(self.lower_value(param))

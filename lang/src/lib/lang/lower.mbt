@@ -26,7 +26,7 @@ suberror IRBuilderError String derive (Show)
 
 const SAVED_REGS_COUNT: UInt16 = 4
 
-pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[@asm.VarId, @asm.VarId]) -> @asm.Loc raise IRBuilderError {
+pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId, VarId]) -> @asm.Loc raise IRBuilderError {
     match item {
         TAC::Assign(target~, val~) => {
             self.emit(Setw(dst=target, val=match val {
