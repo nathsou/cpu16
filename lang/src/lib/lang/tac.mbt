@@ -30,9 +30,15 @@ pub enum TAC[Target, Value] {
     Call(target~: Target, name~: String, parameters~: Array[Value])
 }
 
-pub typealias TAC[@asm.VarId, TACValue] as TAC1
-pub typealias TAC[@asm.VarId, @asm.VarId] as TAC2
-pub typealias TAC[@asm.Loc, @asm.Loc] as TAC3
+typealias TAC[@asm.VarId, TACValue] as TAC1
+typealias TAC[@asm.VarId, @asm.VarId] as TAC2
+typealias TAC[@asm.Loc, @asm.Loc] as TAC3
+
+typealias TACFunc[@asm.VarId, @asm.VarId] as TACFunc2
+
+typealias TACBuilder[@asm.VarId, TACValue] as TACBuilder1
+typealias TACBuilder[@asm.VarId, @asm.VarId] as TACBuilder2
+typealias TACBuilder[@asm.Loc, @asm.Loc] as TACBuilder3
 
 pub impl Show for TACValue with output(self, logger) {
     let output = match self {
@@ -149,7 +155,7 @@ fn[T, V] TACBuilder::emit_assign(self: TACBuilder[T, V], target: T, val: Const) 
     self.emit(TAC::Assign(target~, val~))
 }
 
-fn TACBuilder::emit_assign_val(self: TACBuilder[@asm.VarId, TACValue], target: @asm.VarId, val: TACValue) -> Unit {
+fn TACBuilder::emit_assign_val(self: TACBuilder1, target: @asm.VarId, val: TACValue) -> Unit {
     match val {
         TACValue::Const(c) => self.emit_assign(target, c)
         TACValue::Variable(v) => self.emit_move(target, v)
@@ -220,7 +226,7 @@ fn temp_get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TAC
     (cond_op, cond_lhs, cond_rhs)
 }
 
-pub fn TACBuilder::lower_expr(self: TACBuilder[@asm.VarId, TACValue], expr: Expr) -> TACValue raise TACLoweringError {
+pub fn TACBuilder::lower_expr(self: TACBuilder1, expr: Expr) -> TACValue raise TACLoweringError {
     match expr {
         Expr::Const(c) => {
             TACValue::Const(c)
@@ -300,7 +306,7 @@ pub fn TACBuilder::lower_expr(self: TACBuilder[@asm.VarId, TACValue], expr: Expr
     }
 }
 
-pub fn TACBuilder::lower_stmt(self: TACBuilder[@asm.VarId, TACValue], stmt: Stmt) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_stmt(self: TACBuilder1, stmt: Stmt) -> Unit raise TACLoweringError {
     match stmt {
         Stmt::Let(name~, mutable=_, value~) => {
             let value = self.lower_expr(value)
@@ -362,7 +368,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder[@asm.VarId, TACValue], stmt: Stmt
     }
 }
 
-pub fn TACBuilder::lower_decl(self: TACBuilder[@asm.VarId, TACValue], decl: Decl) -> Unit raise TACLoweringError {
+pub fn TACBuilder::lower_decl(self: TACBuilder1, decl: Decl) -> Unit raise TACLoweringError {
     match decl {
         Decl::Stmt(stmt) => self.lower_stmt(stmt)
         Decl::Func(name~, parameters~, return_type~, body~) => {
@@ -385,7 +391,7 @@ pub fn TACBuilder::lower_decl(self: TACBuilder[@asm.VarId, TACValue], decl: Decl
     }
 }
 
-pub fn TACBuilder::lower_value(self: TACBuilder[@asm.VarId, @asm.VarId], value: TACValue) -> @asm.VarId {
+pub fn TACBuilder::lower_value(self: TACBuilder2, value: TACValue) -> @asm.VarId {
     match value {
         TACValue::Unit => {
             UNIT_VAR_ID
@@ -400,7 +406,7 @@ pub fn TACBuilder::lower_value(self: TACBuilder[@asm.VarId, @asm.VarId], value: 
 }
 
 // Rewrite TAC to ensure that all operands are variables (no immediates)
-pub fn TACBuilder::rewrite_immediates(self: TACBuilder[@asm.VarId, @asm.VarId], tac: Array[TAC1]) -> Unit {
+pub fn TACBuilder::rewrite_immediates(self: TACBuilder2, tac: Array[TAC1]) -> Unit {
     for item in tac {
         match item {
             TAC::Assign(target~, val~) => {
@@ -475,7 +481,7 @@ pub fn TACBuilder::rewrite_immediates(self: TACBuilder[@asm.VarId, @asm.VarId], 
     }
 }
 
-pub fn TACBuilder::to_tac3(self: TACBuilder[@asm.VarId, @asm.VarId]) -> Array[TAC3] raise {
+pub fn TACBuilder::to_tac3(self: TACBuilder2) -> Array[TAC3] raise {
     let tac3: Array[TAC3] = []
 
     for f in self.functions() {
@@ -494,7 +500,7 @@ pub fn TACBuilder::to_tac3(self: TACBuilder[@asm.VarId, @asm.VarId]) -> Array[TA
     tac3
 }
 
-pub fn TACBuilder::allocate(self: TACBuilder[@asm.Loc, @asm.Loc], fun~: TACFunc[@asm.VarId, @asm.VarId], alloc~: @asm.VariableAllocation) -> Unit raise {
+pub fn TACBuilder::allocate(self: TACBuilder3, fun~: TACFunc2, alloc~: VariableAllocation) -> Unit raise {
     for item in fun.body {
         match item {
             Assign(target~, val~) => {

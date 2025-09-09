@@ -1,5 +1,5 @@
 
-priv struct CFG {
+struct CFG {
     blocks: Array[BasicBlock]
 }
 
@@ -40,7 +40,7 @@ impl Show for BasicBlock with output(self, logger: &Logger) {
 
 typealias Array[TAC2] as TAC2s
 
-fn TAC2s::collect_basic_block_leaders(self: Array[TAC2]) -> Array[Int] {
+fn TAC2s::collect_basic_block_leaders(self: TAC2s) -> Array[Int] {
     let leaders: Array[Int] = []
 
     fn insert_leader_index(idx: Int) {
@@ -74,11 +74,11 @@ fn TAC2s::collect_basic_block_leaders(self: Array[TAC2]) -> Array[Int] {
     leaders
 }
 
-fn TACFunc::cfg(self: TACFunc[@asm.VarId, @asm.VarId]) -> CFG {
+fn TACFunc::cfg(self: TACFunc2) -> CFG {
     CFG::from(self.collect_basic_blocks())
 }
 
-impl Show for CFG with output(self, logger: &Logger) {
+pub impl Show for CFG with output(self, logger: &Logger) {
     for bb in self.blocks {
         logger.write_string(bb.vars.to_string())
         logger.write_string("live_in:  \{bb.live_in}")
@@ -87,7 +87,7 @@ impl Show for CFG with output(self, logger: &Logger) {
     }
 }
 
-fn TACFunc::collect_basic_blocks(self: TACFunc[@asm.VarId, @asm.VarId]) -> Array[BasicBlock] {
+fn TACFunc::collect_basic_blocks(self: TACFunc2) -> Array[BasicBlock] {
     let leader_indices = self.body.collect_basic_block_leaders()
     let basic_blocks: Array[BasicBlock] = []
     let bb_by_label: Map[@asm.LabelId, BasicBlock] = {}
@@ -301,7 +301,7 @@ fn CFG::collect_live_points(self: CFG) -> LivePoints {
     live_points
 }
 
-fn CFG::liveness_intervals(self: CFG) -> Array[@asm.LivenessInterval] {
+fn CFG::liveness_intervals(self: CFG) -> Array[LivenessInterval] {
     let live_points = self.collect_live_points()
     live_points.intervals()
 }
@@ -347,8 +347,105 @@ fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
     }
 }
 
-fn LivePoints::intervals(self: LivePoints) -> Array[@asm.LivenessInterval] {
-    let intervals: Array[@asm.LivenessInterval] = []
+pub(all) struct LivenessInterval {
+    var_id: @asm.VarId
+    start: Int
+    end: Int
+} derive (Show, Eq)
+
+impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessInterval) -> Int {
+    a.end.compare(b.end)
+}
+
+struct VariableAllocation {
+    reg_alloc: Map[@asm.VarId, Int]
+    mem_alloc: Map[@asm.VarId, Int]
+} derive (Show)
+
+pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: @asm.VarId) -> @asm.Loc raise {
+    match self.mem_alloc.get(var_id) {
+        Some(mem) => Mem(offset=mem)
+        None => match self.reg_alloc.get(var_id) {
+            Some(reg) => Reg(match reg {
+                0 => R1
+                1 => R2
+                2 => R3
+                3 => R4
+                4 => TMP
+                _ => @asm.panic_msg("invalid register")
+            })
+            None => raise Failure("variable not allocated: \{var_id} in \{self}")
+        }
+    }
+}
+
+// Linear scan register allocation
+// TODO: Graph coloring register allocation
+pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) -> VariableAllocation {
+    let reg_alloc: Map[@asm.VarId, Int] = {}
+    let mem_alloc: Map[@asm.VarId, Int] = {}
+    let active: SortedArray[LivenessInterval] = SortedArray::new()
+    let free_regs: Array[Int] = []
+
+    for i = regs_count - 1; i >= 0; i = i - 1 {
+        free_regs.push(i)
+    }
+
+    fn expire_old_intervals(expired_interval: LivenessInterval) -> Unit {
+        let to_remove: Array[LivenessInterval] = []
+        
+        // Collect intervals to remove
+        for i = 0; i < active.values.length(); i = i + 1 {
+            let interval = active.values[i]
+            if interval.end < expired_interval.start {
+                to_remove.push(interval)
+                free_regs.push(reg_alloc[interval.var_id])
+            }
+        }
+        
+        // Remove collected intervals in a separate loop
+        // to avoid modifying the array while iterating
+        for interval in to_remove {
+            active.remove(interval)
+        }
+    }
+
+    fn spill_at_interval(interval: LivenessInterval) -> Unit {
+        let spill_candidate = active.values.last().unwrap()
+        let new_mem_loc = mem_alloc.size()
+        
+        if spill_candidate.end > interval.end {
+            reg_alloc[interval.var_id] = reg_alloc[spill_candidate.var_id] 
+            mem_alloc[spill_candidate.var_id] = new_mem_loc
+            active.remove(spill_candidate)
+        } else {
+            mem_alloc[interval.var_id] = new_mem_loc
+        }
+    }
+
+    let intervals_sorted_by_start = {
+        let sorted = intervals.copy()
+        sorted.sort_by((a, b) => a.start - b.start)
+        sorted
+    }
+
+    for interval in intervals_sorted_by_start {
+        expire_old_intervals(interval)
+
+        if active.values.length() >= regs_count {
+            spill_at_interval(interval)
+        } else {
+            let reg = free_regs.unsafe_pop()
+            reg_alloc[interval.var_id] = reg
+            active.insert(interval)
+        }
+    }
+
+    { reg_alloc, mem_alloc }
+}
+
+fn LivePoints::intervals(self: LivePoints) -> Array[LivenessInterval] {
+    let intervals: Array[LivenessInterval] = []
 
     for var_id, offsets in self {
         let start = offsets.iter().minimum().unwrap()
@@ -359,7 +456,7 @@ fn LivePoints::intervals(self: LivePoints) -> Array[@asm.LivenessInterval] {
     intervals
 }
 
-fn CFG::allocate(self: CFG, regs_count~: Int = 4) -> @asm.VariableAllocation {
+fn CFG::allocate(self: CFG, regs_count~: Int = 4) -> VariableAllocation {
     let intervals = self.liveness_intervals()
-    @asm.allocate_registers(intervals, regs_count~)
+    allocate_registers(intervals, regs_count~)
 }

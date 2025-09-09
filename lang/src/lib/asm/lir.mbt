@@ -43,28 +43,6 @@ pub fn Loc::unit() -> Loc {
     Reg(Z)
 }
 
-struct VariableAllocation {
-    reg_alloc: Map[VarId, Int]
-    mem_alloc: Map[VarId, Int]
-} derive(Show)
-
-pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> Loc raise {
-    match self.mem_alloc.get(var_id) {
-        Some(mem) => Loc::Mem(offset=mem)
-        None => match self.reg_alloc.get(var_id) {
-            Some(reg) => Loc::Reg(match reg {
-                0 => Reg::R1
-                1 => Reg::R2
-                2 => Reg::R3
-                3 => Reg::R4
-                4 => Reg::TMP
-                _ => abort("invalid register")
-            })
-            None => raise Failure("variable not allocated: \{var_id} in {\{self}}")
-        }
-    }
-}
-
 pub enum LIRCond {
     Always; IfZero; IfNotZero; IfCarry; IfNotCarry
 } derive (Show)
@@ -112,85 +90,6 @@ pub fn IdContext::next_label(self: IdContext) -> LabelId {
     let label_id = self.next_label_id
     self.next_label_id = self.next_label_id.inner() + 1U
     label_id
-}
-
-pub(all) struct LivenessInterval {
-    var_id: VarId
-    start: Int
-    end: Int
-} derive(Show)
-
-impl Eq for LivenessInterval with equal(a: LivenessInterval, b: LivenessInterval) -> Bool {
-    a.end == b.end && a.start == b.start
-}
-
-impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessInterval) -> Int {
-    a.end.compare(b.end)
-}
-
-// Linear scan register allocation
-// TODO: Graph coloring register allocation
-pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) -> VariableAllocation {
-    let reg_alloc: Map[VarId, Int] = {}
-    let mem_alloc: Map[VarId, Int] = {}
-    let active: SortedArray[LivenessInterval] = SortedArray::new()
-    let free_regs: Array[Int] = []
-
-    for i = regs_count - 1; i >= 0; i = i - 1 {
-        free_regs.push(i)
-    }
-
-    fn expire_old_intervals(expired_interval: LivenessInterval) -> Unit {
-        let to_remove: Array[LivenessInterval] = []
-        
-        // Collect intervals to remove
-        for i = 0; i < active.values.length(); i = i + 1 {
-            let interval = active.values[i]
-            if interval.end < expired_interval.start {
-                to_remove.push(interval)
-                free_regs.push(reg_alloc[interval.var_id])
-            }
-        }
-        
-        // Remove collected intervals in a separate loop
-        // to avoid modifying the array while iterating
-        for interval in to_remove {
-            active.remove(interval)
-        }
-    }
-
-    fn spill_at_interval(interval: LivenessInterval) -> Unit {
-        let spill_candidate = active.values.last().unwrap()
-        let new_mem_loc = mem_alloc.size()
-        
-        if spill_candidate.end > interval.end {
-            reg_alloc[interval.var_id] = reg_alloc[spill_candidate.var_id] 
-            mem_alloc[spill_candidate.var_id] = new_mem_loc
-            active.remove(spill_candidate)
-        } else {
-            mem_alloc[interval.var_id] = new_mem_loc
-        }
-    }
-
-    let intervals_sorted_by_start = {
-        let sorted = intervals.copy()
-        sorted.sort_by((a, b) => a.start - b.start)
-        sorted
-    }
-
-    for interval in intervals_sorted_by_start {
-        expire_old_intervals(interval)
-
-        if active.values.length() >= regs_count {
-            spill_at_interval(interval)
-        } else {
-            let reg = free_regs.unsafe_pop()
-            reg_alloc[interval.var_id] = reg
-            active.insert(interval)
-        }
-    }
-
-    { reg_alloc, mem_alloc }
 }
 
 priv struct JumpFixupInfo {
@@ -295,7 +194,7 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
 
                 without_labels[alu_index] = LIR::Alu(dst~, src1~, src2~, op=new_op)
             }
-            _ => abort("unexpected instruction during jump ALU fixup")
+            _ => panic_msg("unexpected instruction during jump ALU fixup")
         }
     }
 
@@ -371,7 +270,7 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                         Mem(_) => {
                             // if src1, src2 and dst are all memory locations, then we're out of luck
                             // since we only have one temporary register (TMP)
-                            abort("cannot handle ALU operation with all three operands in memory")
+                            panic_msg("cannot handle ALU operation with all three operands in memory")
                         }
                         Reg(dst_reg) => {
                             // if both arguments are memory locations
@@ -385,7 +284,7 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                                 spilled.push(Alu(dst=Reg(dst_reg), src1=Reg(dst_reg), src2=Reg(src2_reg), op~))
                             })
                         }
-                        Label(_) | Unit => abort("invalid dst location")
+                        Label(_) | Unit => panic_msg("invalid dst location")
                     }
                 } else {
                     let src2_reg = get_reg(src2)

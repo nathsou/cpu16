@@ -37,7 +37,7 @@ pub fn TypeChecker::new() -> TypeChecker {
 fn get_top_env_exn(self: TypeChecker) -> Env[String, VarInfo] {
     match self.env_stack.last() {
         Some(env) => env
-        None => abort("empty env stack")
+        None => @asm.panic_msg("empty env stack")
     }
 }
 
