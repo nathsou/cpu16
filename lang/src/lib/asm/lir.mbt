@@ -34,16 +34,13 @@ pub fn JumpCond::negate(self: JumpCond) -> JumpCond {
 
 pub(all) enum Loc {
     Reg(Reg)
-    Var(VarId)
+    Unit
     Mem(offset~: Int)
     Label(LabelId)
-} derive (Show)
+} derive (Show, Eq)
 
-pub fn variables(self: Loc) -> Array[VarId] {
-    match self {
-        Loc::Var(v) => [v]
-        _ => []
-    }
+pub fn Loc::unit() -> Loc {
+    Reg(Z)
 }
 
 struct VariableAllocation {
@@ -51,25 +48,20 @@ struct VariableAllocation {
     mem_alloc: Map[VarId, Int]
 } derive(Show)
 
-pub fn substitute_var(self: Loc, alloc: VariableAllocation) -> Loc {
-    match self {
-        Loc::Var(v) => {
-            match alloc.reg_alloc.get(v) {
-                Some(reg) => Loc::Reg(match reg {
-                    0 => Reg::R1
-                    1 => Reg::R2
-                    2 => Reg::R3
-                    3 => Reg::R4
-                    4 => Reg::TMP
-                    _ => abort("invalid register")
-                })
-                None => match alloc.mem_alloc.get(v) {
-                    Some(mem) => Loc::Mem(offset=mem)
-                    None => Loc::Var(v)
-                }
-            }
+pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> Loc raise {
+    match self.mem_alloc.get(var_id) {
+        Some(mem) => Loc::Mem(offset=mem)
+        None => match self.reg_alloc.get(var_id) {
+            Some(reg) => Loc::Reg(match reg {
+                0 => Reg::R1
+                1 => Reg::R2
+                2 => Reg::R3
+                3 => Reg::R4
+                4 => Reg::TMP
+                _ => abort("invalid register")
+            })
+            None => raise Failure("variable not allocated: \{var_id} in {\{self}}")
         }
-        _ => self
     }
 }
 
@@ -97,19 +89,6 @@ pub(all) enum LIR {
     Directive(Directive)
 } derive (Show)
 
-pub fn LIR::variables(self: LIR) -> Array[VarId] {
-    let vars = match self {
-        Ctl(_) => []
-        Set(dst~, val=_) => dst.variables()
-        Mem(dst~, addr~, load=_, offset=_) => dst.variables() + addr.variables()
-        Alu(dst~, src1~, src2~, op=_) => dst.variables() + src1.variables() + src2.variables()
-        Jmp(dst~, cond=_) => dst.variables()
-        Label(_) | Directive(_) => []
-    }
-
-    Set::from_array(vars).to_array()
-}
-
 pub(all) struct IdContext {
     mut next_var_id: VarId
     mut next_label_id: LabelId
@@ -135,37 +114,7 @@ pub fn IdContext::next_label(self: IdContext) -> LabelId {
     label_id
 }
 
-// TODO: implement https://wikiwand.com/en/articles/Live_variable_analysis
-pub fn liveness_intervals(insts: Array[LIR]) -> Array[LivenessInterval] {
-    let intervals: Map[VarId, (Int, Int)] = {}
-
-    for i = 0; i < insts.length(); i = i + 1 {
-        let vars = insts[i].variables()
-
-        for j = 0; j < vars.length(); j = j + 1 {
-            let v = vars[j]
-
-            match intervals.get(v) {
-                Some((start, _)) => {
-                    intervals[v] = (start, i)
-                }
-                None => {
-                    intervals[v] = (i, i)
-                }
-            }
-        }
-    }
-
-    let liveness_intervals: Array[LivenessInterval] = []
-
-    for var_id, interval in intervals {
-        liveness_intervals.push({ var_id, start: interval.0, end: interval.1 })
-    }
-
-    liveness_intervals
-}
-
-struct LivenessInterval {
+pub(all) struct LivenessInterval {
     var_id: VarId
     start: Int
     end: Int
@@ -181,8 +130,7 @@ impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessI
 
 // Linear scan register allocation
 // TODO: Graph coloring register allocation
-pub fn allocate_registers(insts: Array[LIR], regs_count~: Int) -> VariableAllocation {
-    let intervals = liveness_intervals(insts)
+pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) -> VariableAllocation {
     let reg_alloc: Map[VarId, Int] = {}
     let mem_alloc: Map[VarId, Int] = {}
     let active: SortedArray[LivenessInterval] = SortedArray::new()
@@ -354,30 +302,6 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
     without_labels
 }
 
-fn allocate(insts: Array[LIR], alloc~: VariableAllocation) -> Array[LIR] {
-    insts.map(inst => match inst {
-        LIR::Ctl(op~) => LIR::Ctl(op~)
-        LIR::Set(dst~, val~) => LIR::Set(dst=dst.substitute_var(alloc), val=val)
-        LIR::Mem(dst~, addr~, load~, offset~) => LIR::Mem(
-            dst=dst.substitute_var(alloc),
-            addr=addr.substitute_var(alloc),
-            load~,
-            offset~,
-        )
-        LIR::Alu(dst~, src1~, src2~, op~) => LIR::Alu(
-            dst=dst.substitute_var(alloc),
-            src1=src1.substitute_var(alloc),
-            src2=src2.substitute_var(alloc),
-            op~,
-        )
-        LIR::Jmp(dst~, cond~) => LIR::Jmp(
-            dst=dst.substitute_var(alloc),
-            cond~,
-        )
-        LIR::Label(_) | Directive(_) => inst
-    })
-}
-
 suberror InstLoweringError {
     UnexpectedJmp
     UnexpectedLabel
@@ -461,7 +385,7 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                                 spilled.push(Alu(dst=Reg(dst_reg), src1=Reg(dst_reg), src2=Reg(src2_reg), op~))
                             })
                         }
-                        Label(_) | Var(_) => abort("invalid dst location")
+                        Label(_) | Unit => abort("invalid dst location")
                     }
                 } else {
                     let src2_reg = get_reg(src2)
@@ -499,8 +423,6 @@ fn lower_lir_to_inst(lir: LIR) -> InstOrDirective raise InstLoweringError {
 }
 
 pub struct LowerIROutput {
-    allocation: VariableAllocation
-    allocated: Array[LIR]
     without_labels: Array[LIR]
     insts: Array[InstOrDirective]
 }
@@ -513,15 +435,11 @@ pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst]) -> Array[LIR] raise InstLo
 }
 
 pub fn lower_lir_to_insts(lir: Array[LIR]) -> LowerIROutput raise InstLoweringError {
-    let alloc = allocate_registers(lir, regs_count=4)
-    let allocated = allocate(lir, alloc~)
-    let spilled = spill(allocated)
+    let spilled = spill(lir)
     let without_labels = replace_labels(spilled)
     let insts = without_labels.map(lower_lir_to_inst)
 
     {
-        allocation: alloc,
-        allocated,
         without_labels,
         insts,
     }

@@ -254,6 +254,7 @@ fn LivenessVars::collect(self: LivenessVars, item: TAC2) -> Unit {
     }
 }
 
+// TODO: Use SSA
 fn BasicBlock::liveness_step(self: BasicBlock) -> Bool {
     // iterate until reaching a fixed point:
 
@@ -290,8 +291,6 @@ fn TAC2::vars(self: TAC2) -> LivenessVars {
 // variable -> set of instruction offsets where it is live
 typealias Map[@asm.VarId, Set[Int]] as LivePoints
 
-typealias Map[@asm.VarId, (Int, Int)] as LivenessIntervals
-
 fn CFG::collect_live_points(self: CFG) -> LivePoints {
     let live_points: LivePoints = {}
 
@@ -302,8 +301,9 @@ fn CFG::collect_live_points(self: CFG) -> LivePoints {
     live_points
 }
 
-fn CFG::liveness_intervals(self: CFG) -> LivenessIntervals {
-    self.collect_live_points().intervals()
+fn CFG::liveness_intervals(self: CFG) -> Array[@asm.LivenessInterval] {
+    let live_points = self.collect_live_points()
+    live_points.intervals()
 }
 
 fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
@@ -311,12 +311,17 @@ fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
     let mut live_now = bb.live_out.copy()
 
     while i >= 0 {
-        // live_now = use(i) ∪ (live_now - def(i))
+        // live_now (before update) is the "live after" set for this instruction
+        let prev_live_after = live_now.copy()
+
         let item = bb.items[i]
         let vars = item.vars()
         let offset = bb.offset + i
-        live_now = vars.used.union(live_now.difference(vars.defined))
 
+        // compute live_before = use(i) ∪ (live_after - def(i))
+        live_now = vars.used.union(prev_live_after.difference(vars.defined))
+
+        // 1) record all variables that are live before the instruction
         for v in live_now {
             if !self.contains(v) {
                 self[v] = Set::new()
@@ -325,14 +330,36 @@ fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
             self[v].add(offset)
         }
 
+        // 2) ensure defs that are live after the instruction also get the def position
+        // We only add the def position if the defined value is actually live after the inst,
+        // which avoids creating intervals for dead definitions.
+        for v in vars.defined {
+            if prev_live_after.contains(v) {
+                if !self.contains(v) {
+                    self[v] = Set::new()
+                }
+
+                self[v].add(offset)
+            }
+        }
+
         i -= 1
     }
 }
 
-fn LivePoints::intervals(self: LivePoints) -> LivenessIntervals {
-    self.map((_, offsets) => {
-        let min = offsets.iter().minimum().unwrap()
-        let max = offsets.iter().maximum().unwrap()
-        (min, max)
-    })
+fn LivePoints::intervals(self: LivePoints) -> Array[@asm.LivenessInterval] {
+    let intervals: Array[@asm.LivenessInterval] = []
+
+    for var_id, offsets in self {
+        let start = offsets.iter().minimum().unwrap()
+        let end = offsets.iter().maximum().unwrap()
+        intervals.push({ var_id, start, end })
+    }
+
+    intervals
+}
+
+fn CFG::allocate(self: CFG, regs_count~: Int = 4) -> @asm.VariableAllocation {
+    let intervals = self.liveness_intervals()
+    @asm.allocate_registers(intervals, regs_count~)
 }

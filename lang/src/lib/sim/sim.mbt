@@ -119,7 +119,7 @@ pub fn step(self: CPU) -> Unit {
                         IfNotCarry => !self.carry
                     }
 
-                    let b = if is_sub { bitwise_not(b) } else { b}
+                    let b = if is_sub { bitwise_not(b) } else { b }
                     let sum = a.to_uint() + b.to_uint() + carry_in.to_uint()
                     new_carry = (sum & 0x10000) != 0
 

@@ -38,23 +38,20 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let cfg = tac2.functions().map(f => (f.name, f.cfg()))
+    let pseudo_builder = PseudoBuilder::new()
+    let env = Env::new()
+    let tac3 = tac2.to_tac3()
 
     if verbose {
-        println("\n[CFG]")
+        println("\n[TAC3]")
 
-        for entry in cfg {
-            println("<\{entry.0}>")
-            println("liveness intervals: \{entry.1.liveness_intervals()}")
-            println(entry.1)
+        for tac in tac3 {
+            println(tac)
         }
     }
 
-    let pseudo_builder = PseudoBuilder::new()
-    let env = Env::new()
-
-    for tac in tac2.tac {
-        let _ = pseudo_builder.lower_expr(tac, env)
+    for tac in tac3 {
+        let _ = pseudo_builder.lower_tac(tac, env)
     }
 
     if verbose {
@@ -77,15 +74,6 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
     let lowered = @asm.lower_lir_to_insts(lir)
 
     if verbose {
-        println("\n[Allocation]")
-        println(lowered.allocation)
-
-        println("\n[Allocated LIR]")
-
-        for inst in lowered.allocated {
-            println(inst)
-        }
-
         println("\n[ASM]")
 
         for inst in lowered.insts {

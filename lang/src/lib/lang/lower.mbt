@@ -26,10 +26,10 @@ suberror IRBuilderError String derive (Show)
 
 const SAVED_REGS_COUNT: UInt16 = 4
 
-pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.VarId, @asm.VarId]) -> @asm.VarId raise IRBuilderError {
-    match expr {
+pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[@asm.VarId, @asm.VarId]) -> @asm.Loc raise IRBuilderError {
+    match item {
         TAC::Assign(target~, val~) => {
-            self.emit(Setw(dst=Var(target), val=match val {
+            self.emit(Setw(dst=target, val=match val {
                 Integer(n, _) => n.to_uint16()
                 Boolean(q) => if q { 1 } else { 0 }
             }))
@@ -38,7 +38,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
         }
         TAC::Move(target~, src~) => {
             if target != src {
-                self.emit(Move(dst=Var(target), src=Var(src)))
+                self.emit(Move(dst=target, src~))
             }
 
             target
@@ -46,7 +46,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
         TAC::Unary(target~, op~, arg~) => {
             match op {
                 UnaryOp::Not => {
-                    self.emit(Not2(dst=Var(target), src=Var(arg)))
+                    self.emit(Not2(dst=target, src=arg))
                 }
             }
 
@@ -54,16 +54,16 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
         }
         TAC::Binary(target~, lhs~, op~, rhs~) => {
             match op {
-                Add => self.emit(Add(dst=Var(target), src1=Var(lhs), src2=Var(rhs)))
-                Sub => self.emit(Sub(dst=Var(target), src1=Var(lhs), src2=Var(rhs)))
+                Add => self.emit(Add(dst=target, src1=lhs, src2=rhs))
+                Sub => self.emit(Sub(dst=target, src1=lhs, src2=rhs))
                 Mul => raise IRBuilderError("multiplication not implemented")
                 Div => raise IRBuilderError("division not implemented")
                 Mod => raise IRBuilderError("modulo not implemented")
-                Shl => self.emit(Shl(dst=Var(target), src=Var(lhs), amt=Var(rhs)))
-                Shr => self.emit(Shr(dst=Var(target), src=Var(lhs), amt=Var(rhs)))
-                BitwiseAnd | LogicalAnd => self.emit(And(dst=Var(target), src1=Var(lhs), src2=Var(rhs)))
-                BitwiseOr | LogicalOr => self.emit(Or(dst=Var(target), src1=Var(lhs), src2=Var(rhs)))
-                BitwiseXor => self.emit(Xor(dst=Var(target), src1=Var(lhs), src2=Var(rhs)))
+                Shl => self.emit(Shl(dst=target, src=lhs, amt=rhs))
+                Shr => self.emit(Shr(dst=target, src=lhs, amt=rhs))
+                BitwiseAnd | LogicalAnd => self.emit(And(dst=target, src1=lhs, src2=rhs))
+                BitwiseOr | LogicalOr => self.emit(Or(dst=target, src1=lhs, src2=rhs))
+                BitwiseXor => self.emit(Xor(dst=target, src1=lhs, src2=rhs))
                 Equ | Neq | Lss | Gtr | Leq | Geq => {
                     raise IRBuilderError("comparison operators not supported in binary expressions")
                 }
@@ -72,33 +72,33 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
             target
         }
         TAC::Store(dst~, src~, offset=_) => {
-            self.emit(Store(dst=Var(dst), src=Var(src), offset=0))
+            self.emit(Store(dst~, src~, offset=0))
             dst
         }
         TAC::Load(target~, addr~, offset=_) => {
-            self.emit(Load(dst=Var(target), addr=Var(addr), offset=0))
+            self.emit(Load(dst=target, addr~, offset=0))
             target
         }
         TAC::Jump(label~) => {
             self.emit(Jmp(dst=Label(label)))
-            UNIT_VAR_ID
+            @asm.Loc::Unit
         }
         TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
             let pseudo: @asm.PseudoInst = match cond {
-                Equ => Jeq(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Neq => Jne(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Lss => Jlt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Gtr => Jgt(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Geq => Jge(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
-                Leq => Jle(dst=Label(label), src1=Var(lhs), src2=Var(rhs))
+                Equ => Jeq(dst=Label(label), src1=lhs, src2=rhs)
+                Neq => Jne(dst=Label(label), src1=lhs, src2=rhs)
+                Lss => Jlt(dst=Label(label), src1=lhs, src2=rhs)
+                Gtr => Jgt(dst=Label(label), src1=lhs, src2=rhs)
+                Geq => Jge(dst=Label(label), src1=lhs, src2=rhs)
+                Leq => Jle(dst=Label(label), src1=lhs, src2=rhs)
             }
 
             self.emit(pseudo)
-            UNIT_VAR_ID
+            @asm.Loc::Unit
         }
         TAC::Label(label~) => {
             self.emit(LIR(Label(label)))
-            UNIT_VAR_ID
+            @asm.Loc::Unit
         }
         TAC::Func(f) => {
             if f.body[0] is Label(label=label_id) {
@@ -113,7 +113,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
                 match inst {
                     GetLocal(target~, index~) => {
                         self.emit(Load(
-                            dst=Var(target),
+                            dst=target,
                             addr=Reg(SP),
                             offset=params_offset + index.reinterpret_as_int().to_uint16()
                         ))
@@ -128,7 +128,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
                         if value is Some(v) {
                             // replace return address with return value on the stack
                             self.emit(Load(dst=Reg(TMP), addr=Reg(SP), offset=0))
-                            self.emit(Store(dst=Reg(SP), src=Var(v), offset=0))
+                            self.emit(Store(dst=Reg(SP), src=v, offset=0))
 
                             if !is_main {
                                 self.emit(Move(dst=Reg(PC), src=Reg(TMP)))
@@ -144,12 +144,12 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
                         }
                     }
                     _ => {
-                        let _ = self.lower_expr(inst, env)
+                        let _ = self.lower_tac(inst, env)
                     }
                 }
             }
 
-            UNIT_VAR_ID
+            @asm.Loc::Unit
         }
         TAC::Call(target~, name~, parameters~) => {
             if self.functions.get(name) is Some(({ label_id, return_type })) {
@@ -174,7 +174,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
 
                 // step 3: push parameters
                 for i in 0..<parameters.length() {
-                    self.emit(Store(dst=Reg(SP), src=Var(parameters[i]), offset=params_offset + i.to_uint16()))
+                    self.emit(Store(dst=Reg(SP), src=parameters[i], offset=params_offset + i.to_uint16()))
                 }
 
                 // step 4: call the function 
@@ -191,7 +191,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
 
                 // step 6: retrieve return value
                 if return_type != Unit {
-                    self.emit(Load(dst=Var(target), addr=Reg(SP), offset=0))
+                    self.emit(Load(dst=target, addr=Reg(SP), offset=0))
                 }
 
                 // step 7: deallocate space
@@ -209,7 +209,7 @@ pub fn PseudoBuilder::lower_expr(self: PseudoBuilder, expr: TAC2, env: Env[@asm.
         TAC::SetLocal(..) => {
             raise IRBuilderError("set_local outside of function body")
         }
-        _ => raise IRBuilderError("not implemented: lower_expr for '\{expr}'")
+        _ => raise IRBuilderError("not implemented: lower_expr for '\{item}'")
     }
 }
 

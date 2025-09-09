@@ -32,7 +32,7 @@ pub enum TAC[Target, Value] {
 
 pub typealias TAC[@asm.VarId, TACValue] as TAC1
 pub typealias TAC[@asm.VarId, @asm.VarId] as TAC2
-pub typealias TAC[@asm.Reg, @asm.Reg] as TAC3
+pub typealias TAC[@asm.Loc, @asm.Loc] as TAC3
 
 pub impl Show for TACValue with output(self, logger) {
     let output = match self {
@@ -469,6 +469,95 @@ pub fn TACBuilder::rewrite_immediates(self: TACBuilder[@asm.VarId, @asm.VarId], 
                     args.push(self.lower_value(param))
                 }
 
+                self.emit(TAC::Call(target~, name~, parameters=args))
+            }
+        }
+    }
+}
+
+pub fn TACBuilder::to_tac3(self: TACBuilder[@asm.VarId, @asm.VarId]) -> Array[TAC3] raise {
+    let tac3: Array[TAC3] = []
+
+    for f in self.functions() {
+        let builder = TACBuilder::new(self.ctx)
+        let cfg = f.cfg()
+        let alloc = cfg.allocate()
+        builder.allocate(fun=f, alloc~)
+        tac3.push(Func({
+            name: f.name,
+            parameters: f.parameters,
+            return_type: f.return_type,
+            body: builder.tac
+        }))
+    }
+
+    tac3
+}
+
+pub fn TACBuilder::allocate(self: TACBuilder[@asm.Loc, @asm.Loc], fun~: TACFunc[@asm.VarId, @asm.VarId], alloc~: @asm.VariableAllocation) -> Unit raise {
+    for item in fun.body {
+        match item {
+            Assign(target~, val~) => {
+                let target = alloc.get_loc(target)
+                self.emit_assign(target, val)
+            }
+            Move(target~, src~) => {
+                let target = alloc.get_loc(target)
+                let src = alloc.get_loc(src)
+                self.emit_move(target, src)
+            }
+            Unary(target~, op~, arg~) => {
+                let target = alloc.get_loc(target)
+                let arg = alloc.get_loc(arg)
+                self.emit_unary_op(target, op, arg)
+            }
+            Binary(target~, lhs~, op~, rhs~) => {
+                let target = alloc.get_loc(target)
+                let lhs = alloc.get_loc(lhs)
+                let rhs = alloc.get_loc(rhs)
+                self.emit_binary_op(target, lhs, op, rhs)
+            }
+            Store(dst~, src~, offset~) => {
+                let dst = alloc.get_loc(dst)
+                let src = alloc.get_loc(src)
+                self.emit(TAC::Store(dst~, src~, offset~))
+            }
+            Load(target~, addr~, offset~) => {
+                let target = alloc.get_loc(target)
+                let addr = alloc.get_loc(addr)
+                self.emit(TAC::Load(target~, addr~, offset~))
+            }
+            Jump(label~) => {
+                self.emit_jump(label)
+            }
+            JumpIf(label~, cond~, lhs~, rhs~) => {
+                let lhs = alloc.get_loc(lhs)
+                let rhs = alloc.get_loc(rhs)
+                self.emit_jump_if(label, cond, lhs, rhs)
+            }
+            Label(label~) => {
+                self.def_label(label)
+            }
+            Func(_) => ()
+            GetLocal(target~, index~) => {
+                let target = alloc.get_loc(target)
+                self.emit_get_local(target, index)
+            }
+            SetLocal(index~, src~) => {
+                let src = alloc.get_loc(src)
+                self.emit(TAC::SetLocal(index~, src~))
+            }
+            Return(value~) => {
+                let value = match value {
+                    Some(value) => Some(alloc.get_loc(value))
+                    None => None
+                }
+
+                self.emit_return(value)
+            }
+            Call(target~, name~, parameters~) => {
+                let target = alloc.get_loc(target)
+                let args = parameters.map(arg => alloc.get_loc(arg))
                 self.emit(TAC::Call(target~, name~, parameters=args))
             }
         }
