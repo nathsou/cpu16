@@ -99,13 +99,17 @@ pub fn parse_expr(self: Parser) -> Expr raise ParserError {
     self.parse_if_expr()
 }
 
-// if <expr> <block> (else <block>)?
+// if <expr> <block> (else <block> | <if>)?
 fn parse_if_expr(self: Parser) -> Expr raise ParserError {
     if self.consumes(Token::If) {
         let cond = self.parse_expr()
         let then_expr = self.parse_block_expr()
         let else_expr = if self.consumes(Token::Else) {
-            Some(self.parse_block_expr())
+            if self.matches(Token::If) {
+                Some(self.parse_if_expr())
+            } else {
+                Some(self.parse_block_expr())
+            }
         } else {
             None
         }
@@ -223,8 +227,8 @@ fn parse_comparison_expr(self: Parser) -> Expr raise ParserError {
         let op = match self.peek() {
             Some(Token::LeftChevron) => BinaryOp::Lss
             Some(Token::RightChevron) => BinaryOp::Gtr
-            Some(Token::LeftFatArrow) => BinaryOp::Leq
-            Some(Token::RightFatArrow) => BinaryOp::Geq
+            Some(Token::LeftChevronEqual) => BinaryOp::Leq
+            Some(Token::RightChevronEqual) => BinaryOp::Geq
             _ => break
         }
 

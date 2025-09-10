@@ -230,12 +230,12 @@ pub fn spill(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
             LIR::Alu(dst~, src1~, src2~, op~) => {
                 let src1_reg = get_reg(src1)
 
-                if src1 is Mem(_) && dst is Mem(_) {
+                if src1 is Mem(_) && src2 is Mem(_) {
                     match dst {
                         Mem(_) => {
                             // if src1, src2 and dst are all memory locations, then we're out of luck
                             // since we only have one temporary register (TMP)
-                            panic_msg("cannot handle ALU operation with all three operands in memory")
+                            panic_msg("cannot handle ALU operation with all three operands in memory: \{inst}")
                         }
                         Reg(dst_reg) => {
                             // if both arguments are memory locations

@@ -3,7 +3,8 @@ pub enum Token {
     Plus; Minus; Star; Slash; Percent; Caret
     Ampersand; AmpersandAmpersand; Pipe; PipePipe
     Bang; Equal; EqualEqual; BangEqual
-    LeftChevron; RightChevron; LeftFatArrow; RightFatArrow
+    LeftChevron; RightChevron
+    LeftChevronEqual; RightChevronEqual
     DoubleLeftChevron; DoubleRightChevron
     U8; U16
     Fn; If; Else; Let; Var; While; Return
@@ -113,17 +114,15 @@ pub fn next_token(lexer: @lex.Lexer) -> Token? raise {
 
                 Some(if lexer.consumes('=') {
                         EqualEqual
-                    } else if lexer.consumes('>') {
-                        RightFatArrow
                     } else {
                         Equal
-                })
+                    })
             }
             '<' => {
                 lexer.index += 1
 
                 Some(if lexer.consumes('=') {
-                    LeftFatArrow
+                    LeftChevronEqual
                 } else if lexer.consumes('<') {
                     DoubleLeftChevron
                 } else {
@@ -133,7 +132,9 @@ pub fn next_token(lexer: @lex.Lexer) -> Token? raise {
             '>' => {
                 lexer.index += 1
 
-                Some(if lexer.consumes('>') {
+                Some(if lexer.consumes('=') {
+                    RightChevronEqual
+                } else if lexer.consumes('>') {
                     DoubleRightChevron
                 } else {
                     RightChevron

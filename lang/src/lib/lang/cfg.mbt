@@ -147,7 +147,7 @@ fn TACFunc::collect_basic_blocks(self: TACFunc2) -> Array[BasicBlock] {
         if target_label is Some(label_id) {
             match bb_by_label.get(label_id) {
                 Some(target_bb) => connect(bb, target_bb)
-                None => println("Jump to unknown label: {\{label_id}}")
+                None => @asm.panic_msg("Jump to unknown label: {\{label_id}}")
             }
         }
 
@@ -330,17 +330,14 @@ fn LivePoints::collect(self: LivePoints, bb: BasicBlock) -> Unit {
             self[v].add(offset)
         }
 
-        // 2) ensure defs that are live after the instruction also get the def position
-        // We only add the def position if the defined value is actually live after the inst,
-        // which avoids creating intervals for dead definitions.
+        // 2) record all variables that are defined by the instruction
+        // to avoid missing intervals for variables that are defined but not used
         for v in vars.defined {
-            if prev_live_after.contains(v) {
-                if !self.contains(v) {
-                    self[v] = Set::new()
-                }
-
-                self[v].add(offset)
+            if !self.contains(v) {
+                self[v] = Set::new()
             }
+
+            self[v].add(offset)
         }
 
         i -= 1
@@ -363,20 +360,46 @@ struct VariableAllocation {
 } derive (Show)
 
 pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> @asm.Loc raise {
-    match self.mem_alloc.get(var_id) {
-        Some(mem) => Mem(offset=mem)
-        None => match self.reg_alloc.get(var_id) {
-            Some(reg) => Reg(match reg {
+    for kv in self.mem_alloc {
+        if kv.0 == var_id {
+            return Mem(offset=kv.1)
+        }
+    }
+
+    for kv in self.reg_alloc {
+        if kv.0 == var_id {
+            return Reg(match kv.1 {
                 0 => R1
                 1 => R2
                 2 => R3
                 3 => R4
                 4 => TMP
-                _ => @asm.panic_msg("invalid register")
+                _ => R1 // @asm.panic_msg("invalid register: \{kv.1}")
             })
-            None => raise Failure("variable not allocated: \{var_id} in \{self}")
         }
     }
+
+    raise Failure("variable not allocated: \{var_id} in \{self}")
+
+    // weird issue bug where .get(key) sometimes returns None when the key is present
+    // match self.mem_alloc.get(var_id) {
+    //     Some(mem) => Mem(offset=mem)
+    //     None => match self.reg_alloc.get(var_id) {
+    //         Some(reg) => {
+    //             println("Found var in reg_alloc: \{var_id}")
+
+    //             Reg(match reg {
+    //                 0 => R1
+    //                 1 => R2
+    //                 2 => R3
+    //                 3 => R4
+    //                 4 => TMP
+    //                 _ => @asm.panic_msg("invalid register")
+    //             })
+    //         }
+    //         None => raise Failure("variable not allocated: \{var_id} in \{self}")
+    //     }
+    // }
 }
 
 // Linear scan register allocation

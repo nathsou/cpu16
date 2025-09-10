@@ -1,0 +1,50 @@
+
+fn mul(a: u16, b: u16): u16 {
+    var prod = 0;
+    var q = b;
+    var p = a;
+    var i = 0;
+
+    if q > p {
+        q = p;
+        p = b;
+    }
+
+    while i < 16 {
+        if (q & 1) == 1 {
+            prod = prod + p;
+        } else if q == 0 {
+            return prod;
+        }
+
+        p = p << 1;
+        q = q >> 1;
+        i = i + 1;
+    }
+
+    return prod;
+}
+
+fn main(): u16 {
+    if mul(1998, 26) != 51948 {
+        return 1;
+    }
+
+    if mul(26, 1998) != 51948 {
+        return 2;
+    }
+
+    if mul(11, 11) != 121 {
+        return 3;
+    }
+
+    if mul(1621, 1783) != 6659 {
+        return 4;
+    }
+
+    if mul(17, 2025) != 34425 {
+        return 5;
+    }
+
+    return 0;
+}

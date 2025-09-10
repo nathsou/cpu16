@@ -236,29 +236,23 @@ fn[T, V] TACBuilder::emit_return(self: TACBuilder[T, V], value: V?) -> Unit {
 
 suberror TACLoweringError String derive (Show)
 
-fn temp_get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TACLoweringError {
-        let (cond_op, cond_lhs, cond_rhs) = match cond {
+fn get_comparison_cond(cond: Expr) -> (@asm.JumpCond, Expr, Expr) raise TACLoweringError {
+    match cond {
         Expr::BinaryOp(lhs, op, rhs) => {
             match op {
-                BinaryOp::Equ => (@asm.JumpCond::Equ, lhs, rhs)
-                BinaryOp::Neq => (@asm.JumpCond::Neq, lhs, rhs)
-                BinaryOp::Lss => (@asm.JumpCond::Lss, lhs, rhs)
-                BinaryOp::Leq => (@asm.JumpCond::Leq, lhs, rhs)
-                BinaryOp::Gtr => (@asm.JumpCond::Gtr, lhs, rhs)
-                BinaryOp::Geq => (@asm.JumpCond::Geq, lhs, rhs)
+                Equ => (Equ, lhs, rhs)
+                Neq => (Neq, lhs, rhs)
+                Lss => (Lss, lhs, rhs)
+                Leq => (Leq, lhs, rhs)
+                Gtr => (Gtr, lhs, rhs)
+                Geq => (Geq, lhs, rhs)
                 _ => {
-                    println("expected comparison operator in condition")
                     raise TACLoweringError("expected comparison operator in condition")
                 }
             }
         }
-        _ => {
-            println("TODO: implement if with non-comparison condition")
-            raise TACLoweringError("TODO: implement conditions with non-comparison operators")
-        }
+        _ => (Neq, cond, Const(Boolean(false))) // a Equ true <=> a Neq false <=> a Neq Reg(Z)
     }
-
-    (cond_op, cond_lhs, cond_rhs)
 }
 
 pub fn TACBuilder::lower_expr(self: TACBuilder1, expr: Expr) -> TACValue raise TACLoweringError {
@@ -281,15 +275,27 @@ pub fn TACBuilder::lower_expr(self: TACBuilder1, expr: Expr) -> TACValue raise T
             TACValue::Variable(target)
         }
         Expr::BinaryOp(lhs, op, rhs) => {
-            let lhs = self.lower_expr(lhs)
-            let rhs = self.lower_expr(rhs)
             let target = self.ctx.next_var()
 
-            self.emit_binary_op(target, lhs, op, rhs)
+            match op {
+                Equ | Neq | Lss | Gtr | Leq | Geq => {
+                    self.emit_assign_val(target, self.lower_expr(If(
+                        BinaryOp(lhs, op, rhs),
+                        Const(Boolean(true)),
+                        Some(Const(Boolean(false)))
+                    )))
+                }
+                _ => {
+                    let lhs = self.lower_expr(lhs)
+                    let rhs = self.lower_expr(rhs)
+                    self.emit_binary_op(target, lhs, op, rhs)
+                }
+            }
+
             TACValue::Variable(target)
         }
         Expr::If(cond, then_expr, else_expr) => {
-            let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond(cond)
+            let (cond_op, cond_lhs, cond_rhs) = get_comparison_cond(cond)
             let cond_lhs = self.lower_expr(cond_lhs)
             let cond_rhs = self.lower_expr(cond_rhs)
 
@@ -380,7 +386,7 @@ pub fn TACBuilder::lower_stmt(self: TACBuilder1, stmt: Stmt) -> Unit raise TACLo
             let start_label = self.ctx.next_label()
             let end_label = self.ctx.next_label()
             self.def_label(start_label)
-            let (cond_op, cond_lhs, cond_rhs) = temp_get_comparison_cond(cond)
+            let (cond_op, cond_lhs, cond_rhs) = get_comparison_cond(cond)
             let cond_lhs = self.lower_expr(cond_lhs)
             let cond_rhs = self.lower_expr(cond_rhs)
             self.emit_jump_if(end_label, cond_op.negate(), cond_lhs, cond_rhs)
