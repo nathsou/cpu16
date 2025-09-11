@@ -20,6 +20,7 @@ fn mul(a: u16, b: u16): u16 {
         p = p << 1;
         q = q >> 1;
         i = i + 1;
+        @show(prod);
     }
 
     return prod;

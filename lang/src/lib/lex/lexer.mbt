@@ -32,7 +32,11 @@ pub fn is_alphanumeric(c: Char) -> Bool {
 }
 
 pub fn is_identifier_start(c: Char) -> Bool {
-    is_alpha(c) || c == '_'
+    is_alpha(c) || c is ('_' | '$' | '@')
+}
+
+pub fn is_identifier_char(c: Char) -> Bool {
+    is_alphanumeric(c) || c is ('_' | '$' | '@')
 }
 
 pub fn is_digit(c: Char, base~: UInt) -> Bool {
@@ -79,7 +83,7 @@ pub fn parse_identifier(self: Lexer) -> String {
     while true {
         match self.peek() {
             Some(c) => {
-                if is_alphanumeric(c) || c == '_' {
+                if is_identifier_char(c) {
                     identifier.write_char(c)
                     self.index += 1
                 } else {

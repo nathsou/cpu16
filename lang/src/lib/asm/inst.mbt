@@ -9,6 +9,7 @@ pub(all) enum ControlOp {
     Clrz
     Setc
     Clrc
+    Show(Reg)
 } derive (Show, Eq)
 
 pub(all) enum AluOp {
@@ -70,6 +71,7 @@ impl Encode for ControlOp with encode(op) -> UInt {
     Clrz => 2
     Setc => 3
     Clrc => 4
+    Show(reg) => (Encode::encode(reg) << 3) | 5
   }
 }
 
@@ -80,7 +82,14 @@ impl Decode for ControlOp with decode(op) -> ControlOp? {
     2 => Some(ControlOp::Clrz)
     3 => Some(ControlOp::Setc)
     4 => Some(ControlOp::Clrc)
-    _ => None
+    _ => {
+      if (op & 0b111) == 5U {
+        let reg = Reg::decode((op >> 3) & 0b111U)
+        reg.map(r => ControlOp::Show(r))
+      } else {
+        None
+      }
+    }
   }
 }
 

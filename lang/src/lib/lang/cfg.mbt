@@ -374,7 +374,7 @@ pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> @
                 2 => R3
                 3 => R4
                 4 => TMP
-                _ => R1 // @asm.panic_msg("invalid register: \{kv.1}")
+                _ => @asm.panic_msg("invalid register: \{kv.1}")
             })
         }
     }

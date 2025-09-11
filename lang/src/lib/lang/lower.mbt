@@ -199,6 +199,13 @@ pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId,
                 self.emit(Add(dst=Reg(SP), src1=Reg(SP), src2=Reg(TMP)))
 
                 target
+            } else if name == "@show" {
+                match parameters {
+                    [Reg(r)] => self.emit(LIR(Ctl(op=Show(r))))
+                    _ => raise IRBuilderError("@show expects a single register parameter")
+                }
+
+                @asm.Loc::Unit
             } else {
                 raise IRBuilderError("call to undeclared function '\{name}'")
             }

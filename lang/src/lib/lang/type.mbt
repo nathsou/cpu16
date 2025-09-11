@@ -20,6 +20,13 @@ pub struct FuncInfo {
     return_type: Type
 }
 
+fn lookup_builtin(name: String) -> FuncInfo? {
+    match name {
+        "@show" => Some({ parameters: [{ name: "value", ty: U16 }], return_type: Unit })
+        _ => None
+    }
+}
+
 pub struct TypeChecker {
     env_stack: Array[Env[String, VarInfo]]
     fun_stack: Array[Type] // return types
@@ -145,7 +152,12 @@ pub fn type_expr(self: TypeChecker, expr: Expr) -> Type raise TypeError {
             }
         }
         Expr::Call(name, args) => {
-            match self.functions.lookup(name) {
+            let func_info = match self.functions.lookup(name) {
+                Some(info) => Some(info)
+                None => lookup_builtin(name)
+            }
+
+            match func_info {
                 Some({ parameters, return_type }) => {
                     if args.length() == parameters.length() {
                         for i, param in parameters {
