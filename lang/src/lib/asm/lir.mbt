@@ -291,8 +291,8 @@ pub struct LowerIROutput {
     insts: Array[InstOrDirective]
 }
 
-pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst]) -> Array[LIR] raise InstLoweringError {
-    match (try? lower_many(pseudo)) {
+pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], ctx~: &LabelContext) -> Array[LIR] raise InstLoweringError {
+    match (try? lower_many(pseudo, ctx~)) {
         Err(e) => raise Pseudo(e)
         Ok(lir) => lir
     }

@@ -79,7 +79,7 @@ pub fn step(self: CPU) -> Unit {
             Clrz => self.zero = false
             Setc => self.carry = true
             Clrc => self.carry = false
-            Show(r) => println(show_nat(self.read_reg(r), base=16, digits=Some(4)))
+            Show(r) => println(self.read_reg(r))
         }
         Set(dst~, val~) => self.write_reg(dst, val)
         Mem(dst~, addr~, load~, offset~) => {

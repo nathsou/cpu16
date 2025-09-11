@@ -63,7 +63,21 @@ fn decompose_11bit_shl(n: UInt, dst: Loc) -> Array[LIR]? {
     }
 }
 
-pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringError {
+pub(open) trait LabelContext {
+    next_label(Self) -> LabelId
+}
+
+priv struct LabelContextImpl {
+    mut next_id: UInt
+}
+
+impl LabelContext for LabelContextImpl with next_label(self) -> LabelId {
+    let id = self.next_id
+    self.next_id += 1
+    LabelId(id)
+}
+
+pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -155,13 +169,21 @@ pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringErr
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotCarry),
     ]
-    Jgt(dst~, src1~, src2~) => [
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-      Jmp(dst~, cond=IfCarry),
-    ]
+    Jgt(dst~, src1~, src2~) => {
+        let skip_zero_check_label = ctx.next_label()
+
+        [
+            Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+            Jmp(dst=Label(skip_zero_check_label), cond=IfNotCarry),
+            Jmp(dst~, cond=IfNotZero),
+            Label(skip_zero_check_label),
+        ]
+    }
     Jle(dst~, src1~, src2~) => [
+      // src1 <= src2 iff (carry == 0 OR zero == 1)
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotCarry),
+      Jmp(dst~, cond=IfZero),
     ]
     Jge(dst~, src1~, src2~) => [
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
@@ -174,11 +196,11 @@ pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringErr
     Push(val~) => [
         Store(dst=Reg(SP), src=val, offset=0),
         Dec(dst=Reg(SP)),
-    ] |> lower_many()
+    ] |> lower_many(ctx~)
     Pop(dst~) => [
         Inc(dst=Reg(SP)),
         Load(dst~, addr=Reg(SP), offset=0),
-    ] |> lower_many()
+    ] |> lower_many(ctx~)
     Call(dst~) => {
         [
             // skip next 5 instructions which are part of the call pseudo-instruction itself
@@ -187,13 +209,13 @@ pub fn PseudoInst::lower(self: PseudoInst) -> Array[LIR] raise PseudoLoweringErr
             Push(val=Reg(TMP)), // 2 instructions
             // TODO: Handle Jumps to arbitrary locations which might take more than 2 instructions
             Jmp(dst~), // 2 instructions
-        ] |> lower_many()
+        ] |> lower_many(ctx~)
     }
-    Ret => [Pop(dst=Reg(PC))] |> lower_many()
+    Ret => [Pop(dst=Reg(PC))] |> lower_many(ctx~)
     Nop => [Set(dst=Reg(Z), val=0)]
   }
 }
 
-fn lower_many(insts: Array[PseudoInst]) -> Array[LIR] raise PseudoLoweringError {
-    insts.map(PseudoInst::lower).flatten()
+fn lower_many(insts: Array[PseudoInst], ctx~: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
+    insts.map(inst => inst.lower(ctx)).flatten()
 }

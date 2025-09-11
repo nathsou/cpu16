@@ -61,7 +61,7 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call())
+    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call(), ctx~)
 
     if verbose {
         println("\n[LIR]")

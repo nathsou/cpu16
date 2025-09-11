@@ -62,6 +62,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
 
             if !verbose {
                 println(cpu)
+                println("steps: \{steps}")
             } else {
                 println("steps: \{steps}")
             }

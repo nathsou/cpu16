@@ -125,6 +125,12 @@ pub(all) struct IdContext {
     mut next_label_id: @asm.LabelId
 }
 
+impl @asm.LabelContext for IdContext with next_label(self) -> @asm.LabelId {
+    let label_id = self.next_label_id
+    self.next_label_id = self.next_label_id.inner() + 1U
+    label_id
+}
+
 pub fn IdContext::new() -> IdContext {
     {
         next_var_id: VarId(1U), // start from 1, reserve 0 for unit type
@@ -137,12 +143,6 @@ pub fn IdContext::next_var(self: IdContext) -> VarId {
     // Increment without relying on Add trait for IRVarId
     self.next_var_id = self.next_var_id.inner() + 1U
     var_id
-}
-
-pub fn IdContext::next_label(self: IdContext) -> @asm.LabelId {
-    let label_id = self.next_label_id
-    self.next_label_id = self.next_label_id.inner() + 1U
-    label_id
 }
 
 pub struct TACBuilder[T, V] {

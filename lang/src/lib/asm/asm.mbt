@@ -29,7 +29,8 @@ pub fn assemble(insts: Array[InstOrDirective]) -> Bytes {
 pub fn assemble_source(source: String, verbose~: Bool) -> Bytes raise {
     let tokens = @lex.collect(source.to_lower(), next_token)
     let pseudo_insts = parse(tokens)
-    let lir = lower_pseudo_to_lir(pseudo_insts)
+    let ctx: LabelContextImpl = { next_id: 0 }
+    let lir = lower_pseudo_to_lir(pseudo_insts, ctx~)
     let lowered = lower_lir_to_insts(lir)
 
     if verbose {
