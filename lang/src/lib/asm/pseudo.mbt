@@ -170,6 +170,7 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] rai
       Jmp(dst~, cond=IfNotCarry),
     ]
     Jgt(dst~, src1~, src2~) => {
+        // src1 > src2 iff carry == 1 AND zero == 0
         let skip_zero_check_label = ctx.next_label()
 
         [
@@ -180,7 +181,7 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] rai
         ]
     }
     Jle(dst~, src1~, src2~) => [
-      // src1 <= src2 iff (carry == 0 OR zero == 1)
+      // src1 <= src2 iff carry == 0 OR zero == 1
       Alu(dst=Reg(Z), src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotCarry),
       Jmp(dst~, cond=IfZero),

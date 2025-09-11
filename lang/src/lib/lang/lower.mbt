@@ -202,7 +202,11 @@ pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId,
             } else if name == "@show" {
                 match parameters {
                     [Reg(r)] => self.emit(LIR(Ctl(op=Show(r))))
-                    _ => raise IRBuilderError("@show expects a single register parameter")
+                    [Mem(offset~)] => {
+                        self.emit(Add(dst=Reg(TMP), src1=Mem(offset~), src2=Reg(Z)))
+                        self.emit(LIR(Ctl(op=Show(TMP))))
+                    }
+                    _ => raise IRBuilderError("@show expects a single register/mem parameter, got: '\{parameters}'")
                 }
 
                 @asm.Loc::Unit

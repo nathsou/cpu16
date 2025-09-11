@@ -318,7 +318,12 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
     }
 }
 
-pub fn parse(tokens: Array[Token]) -> Array[PseudoInst] raise ParserError {
+priv struct ParseResult {
+    pseudo: Array[PseudoInst]
+    next_label_id: UInt
+}
+
+fn parse(tokens: Array[Token]) -> ParseResult raise ParserError {
     // collect label definitions
     let label_ids = {
         let mapping: Map[String, LabelId] = {}
@@ -351,5 +356,8 @@ pub fn parse(tokens: Array[Token]) -> Array[PseudoInst] raise ParserError {
         }
     }
 
-    pseudo_insts
+    {
+        pseudo: pseudo_insts,
+        next_label_id: label_ids.size().reinterpret_as_uint(),
+    }
 }
