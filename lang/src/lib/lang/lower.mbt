@@ -1,7 +1,7 @@
 
 pub struct PseudoBuilder {
     functions: Map[String, LowerFuncInfo]
-    insts: Array[@asm.PseudoInst]
+    insts: Array[@asm.PseudoInst[@asm.Loc]]
 }
 
 struct LowerFuncInfo {
@@ -18,7 +18,7 @@ pub fn PseudoBuilder::new() -> PseudoBuilder {
     }
 }
 
-pub fn PseudoBuilder::emit(self: PseudoBuilder, inst: @asm.PseudoInst) -> Unit {
+pub fn PseudoBuilder::emit(self: PseudoBuilder, inst: @asm.PseudoInst[@asm.Loc]) -> Unit {
     self.insts.push(inst)
 }
 
@@ -26,7 +26,7 @@ suberror IRBuilderError String derive (Show)
 
 const SAVED_REGS_COUNT: UInt16 = 4
 
-pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId, VarId]) -> @asm.Loc raise IRBuilderError {
+pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[@asm.VarId, @asm.VarId]) -> @asm.Loc raise IRBuilderError {
     match item {
         TAC::Assign(target~, val~) => {
             self.emit(Setw(dst=target, val=match val {
@@ -80,17 +80,17 @@ pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId,
             target
         }
         TAC::Jump(label~) => {
-            self.emit(Jmp(dst=Label(label)))
+            self.emit(Jmp(dst=label))
             @asm.Loc::Unit
         }
         TAC::JumpIf(label~, cond~, lhs~, rhs~) => {
-            let pseudo: @asm.PseudoInst = match cond {
-                Equ => Jeq(dst=Label(label), src1=lhs, src2=rhs)
-                Neq => Jne(dst=Label(label), src1=lhs, src2=rhs)
-                Lss => Jlt(dst=Label(label), src1=lhs, src2=rhs)
-                Gtr => Jgt(dst=Label(label), src1=lhs, src2=rhs)
-                Geq => Jge(dst=Label(label), src1=lhs, src2=rhs)
-                Leq => Jle(dst=Label(label), src1=lhs, src2=rhs)
+            let pseudo: @asm.PseudoInst[@asm.Loc] = match cond {
+                Equ => Jeq(dst=label, src1=lhs, src2=rhs)
+                Neq => Jne(dst=label, src1=lhs, src2=rhs)
+                Lss => Jlt(dst=label, src1=lhs, src2=rhs)
+                Gtr => Jgt(dst=label, src1=lhs, src2=rhs)
+                Geq => Jge(dst=label, src1=lhs, src2=rhs)
+                Leq => Jle(dst=label, src1=lhs, src2=rhs)
             }
 
             self.emit(pseudo)
@@ -181,7 +181,7 @@ pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId,
                 self.emit(LIR(Set(dst=Reg(TMP), val=4))) // return address is 4 instructions ahead
                 self.emit(Add(dst=Reg(TMP), src1=Reg(TMP), src2=Reg(PC)))
                 self.emit(Store(dst=Reg(SP), src=Reg(TMP), offset=0)) // save return address
-                self.emit(Jmp(dst=Label(label_id))) // jump to function
+                self.emit(Jmp(dst=label_id)) // jump to function
 
                 // step 5: restore r1-r4
                 self.emit(Load(dst=Reg(R1), addr=Reg(SP), offset=1))
@@ -228,7 +228,7 @@ pub fn PseudoBuilder::lower_tac(self: PseudoBuilder, item: TAC3, env: Env[VarId,
 // depending on program needs (max recursion depth * stack frame size)
 pub const STACK_TOP: UInt16 = 0x7fff
 
-pub fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder) -> Array[@asm.PseudoInst] raise IRBuilderError {
+pub fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder) -> Array[@asm.PseudoInst[@asm.Loc]] raise IRBuilderError {
     if self.functions.get("main") is Some(({ label_id, return_type })) {
         guard return_type == U16 else {
             raise IRBuilderError("The 'main' function must have return type 'u16', found '\{return_type}'")
@@ -237,7 +237,7 @@ pub fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder) -> Array[@asm.Pseud
          [
             Directive(Origin(addr=@asm.PC_START_ADDR)),
             Setw(dst=Reg(SP), val=STACK_TOP),
-            Jmp(dst=Label(label_id)),
+            Jmp(dst=label_id),
         ] + self.insts
     } else {
         raise IRBuilderError("no 'main' function declared")

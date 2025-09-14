@@ -1,49 +1,66 @@
 
-pub(all) enum PseudoInst {
+pub(all) enum PseudoInst[T] {
     Halt
     Setz; Clrz // Set Zero Flag, Clear Zero Flag
     Setc; Clrc // Set Carry Flag, Clear Carry Flag
-    Load(dst~: Loc, addr~: Loc, offset~: UInt16)
-    Store(dst~: Loc, src~: Loc, offset~: UInt16)
-    Move(dst~: Loc, src~: Loc)
-    Cmp(src1~: Loc, src2~: Loc) // Compare
-    Setw(dst~: Loc, val~: UInt16) // Set Word
-    Add(dst~: Loc, src1~: Loc, src2~: Loc)
-    Sub(dst~: Loc, src1~: Loc, src2~: Loc)
-    Adc(dst~: Loc, src1~: Loc, src2~: Loc) // Add with Carry
-    Sbc(dst~: Loc, src1~: Loc, src2~: Loc) // Subtract with Carry
-    Inc(dst~: Loc) // Increment
-    Dec(dst~: Loc) // Decrement
-    Inc2(dst~: Loc, src~: Loc) // dst = src + 1
-    Dec2(dst~: Loc, src~: Loc) // dst = src - 1
-    And(dst~: Loc, src1~: Loc, src2~: Loc)
-    Nand(dst~: Loc, src1~: Loc, src2~: Loc)
-    Or(dst~: Loc, src1~: Loc, src2~: Loc)
-    Xor(dst~: Loc, src1~: Loc, src2~: Loc)
-    Shl(dst~: Loc, src~: Loc, amt~: Loc) // Shift Left
-    Shr(dst~: Loc, src~: Loc, amt~: Loc) // Shift Right
-    Not(dst~: Loc)
-    Not2(dst~: Loc, src~: Loc) // dst = not src
-    Jmp(dst~: Loc) // Jump
-    Jeq(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Equal
-    Jne(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Not Equal
-    Jlt(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Less Than
-    Jgt(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Greater Than
-    Jle(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Less Than or Equal
-    Jge(dst~: Loc, src1~: Loc, src2~: Loc) // Jump if Greater Than or Equal
-    Jc(dst~: Loc) // Jump on carry set
-    Jnc(dst~: Loc) // Jump on carry clear
-    Jz(dst~: Loc) // Jump on zero set
-    Jnz(dst~: Loc) // Jump on zero clear
-    Push(val~: Loc) // Push value onto stack
-    Pop(dst~: Loc) // Pop value from stack into dst
-    Call(dst~: Loc) // Call subroutine
+    Load(dst~: T, addr~: T, offset~: UInt16)
+    Store(dst~: T, src~: T, offset~: UInt16)
+    Move(dst~: T, src~: T)
+    Cmp(src1~: T, src2~: T) // Compare
+    Setw(dst~: T, val~: UInt16) // Set Word
+    Add(dst~: T, src1~: T, src2~: T)
+    Sub(dst~: T, src1~: T, src2~: T)
+    Adc(dst~: T, src1~: T, src2~: T) // Add with Carry
+    Sbc(dst~: T, src1~: T, src2~: T) // Subtract with Carry
+    Inc(dst~: T) // Increment
+    Dec(dst~: T) // Decrement
+    Inc2(dst~: T, src~: T) // dst = src + 1
+    Dec2(dst~: T, src~: T) // dst = src - 1
+    And(dst~: T, src1~: T, src2~: T)
+    Nand(dst~: T, src1~: T, src2~: T)
+    Or(dst~: T, src1~: T, src2~: T)
+    Xor(dst~: T, src1~: T, src2~: T)
+    Shl(dst~: T, src~: T, amt~: T) // Shift Left
+    Shr(dst~: T, src~: T, amt~: T) // Shift Right
+    Not(dst~: T)
+    Not2(dst~: T, src~: T) // dst = not src
+    Jmp(dst~: LabelId) // Jump
+    Jeq(dst~: LabelId, src1~: T, src2~: T) // Jump if Equal
+    Jne(dst~: LabelId, src1~: T, src2~: T) // Jump if Not Equal
+    Jlt(dst~: LabelId, src1~: T, src2~: T) // Jump if Less Than
+    Jgt(dst~: LabelId, src1~: T, src2~: T) // Jump if Greater Than
+    Jle(dst~: LabelId, src1~: T, src2~: T) // Jump if Less Than or Equal
+    Jge(dst~: LabelId, src1~: T, src2~: T) // Jump if Greater Than or Equal
+    Jc(dst~: LabelId) // Jump on carry set
+    Jnc(dst~: LabelId) // Jump on carry clear
+    Jz(dst~: LabelId) // Jump on zero set
+    Jnz(dst~: LabelId) // Jump on zero clear
+    Push(val~: T) // Push value onto stack
+    Pop(dst~: T) // Pop value from stack into dst
+    Call(dst~: LabelId) // Call subroutine
     Ret // Return from subroutine
     Nop // No Operation
 
     LIR(LIR)
     Directive(Directive)
 } derive (Show)
+
+pub(all) struct VarId(UInt) derive (Eq, Hash)
+
+pub impl Show for VarId with output(self, logger) {
+    logger.write_string("%" + self.inner().to_string())
+}
+
+pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
+    self.inner() + other.inner()
+}
+
+pub(all) struct PseudoFunc {
+    name: String
+    args_count: Int
+    locals_count: Int
+    body: Array[PseudoInst[Loc]]
+}
 
 pub suberror PseudoLoweringError String derive (Show)
 
@@ -77,7 +94,7 @@ impl LabelContext for LabelContextImpl with next_label(self) -> LabelId {
     LabelId(id)
 }
 
-pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
+pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -175,7 +192,7 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] rai
 
         [
             Alu(dst=Reg(Z), src1~, src2~, op=Sub),
-            Jmp(dst=Label(skip_zero_check_label), cond=IfNotCarry),
+            Jmp(dst=skip_zero_check_label, cond=IfNotCarry),
             Jmp(dst~, cond=IfNotZero),
             Label(skip_zero_check_label),
         ]
@@ -217,6 +234,6 @@ pub fn PseudoInst::lower(self: PseudoInst, ctx: &LabelContext) -> Array[LIR] rai
   }
 }
 
-fn lower_many(insts: Array[PseudoInst], ctx~: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
+fn lower_many(insts: Array[PseudoInst[Loc]], ctx~: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
     insts.map(inst => inst.lower(ctx)).flatten()
 }

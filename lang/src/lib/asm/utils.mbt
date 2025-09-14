@@ -4,3 +4,7 @@ pub fn[T] panic_msg(msg: String) -> T {
     println("PANIC: \{msg}")
     panic()
 }
+
+pub fn[T] impossible() -> T {
+    panic_msg("unreachable")
+}

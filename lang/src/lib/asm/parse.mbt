@@ -45,6 +45,20 @@ pub fn expect_loc(self: Parser) -> Loc raise ParserError {
     }
 }
 
+pub fn expect_label(self: Parser) -> LabelId raise ParserError {
+    match self.peek() {
+        Some(Token::Label(label)) => {
+            self.advance()
+
+            match self.label_ids.get(label) {
+                Some(label_id) => label_id
+                None => raise ParserError("Undefined label: '\{label}'")
+            }
+        }
+        _ => raise ParserError("Expected a label")
+    }
+}
+
 pub fn expect_const(self: Parser) -> UInt16 raise ParserError {
     match self.peek() {
         Some(Token::Const(value~, base=_)) => {
@@ -79,7 +93,7 @@ fn expect_lll(self: Parser) -> (Loc, Loc, Loc) raise ParserError {
     (dst, src1, src2)
 }
 
-pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
+pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
     self.skip_comments()
 
     match self.peek() {
@@ -238,58 +252,27 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
         }
         Some(Jmp) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_label()
             Some(Jmp(dst~))
         }
-        Some(Jeq) => {
+        Some((Jeq | Jne | Jlt | Jgt | Jle | Jge | Jc | Jnc | Jz | Jnz) as cond) => {
             self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jeq(dst~, src1~, src2~))
-        }
-        Some(Jne) => {
-            self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jne(dst~, src1~, src2~))
-        }
-        Some(Jlt) => {
-            self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jlt(dst~, src1~, src2~))
-        }
-        Some(Jgt) => {
-            self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jgt(dst~, src1~, src2~))
-        }
-        Some(Jle) => {
-            self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jle(dst~, src1~, src2~))
-        }
-        Some(Jge) => {
-            self.advance()
-            let (dst, src1, src2) = self.expect_lll()
-            Some(Jge(dst~, src1~, src2~))
-        }
-        Some(Jc) => {
-            self.advance()
-            let dst = self.expect_loc()
-            Some(Jc(dst~))
-        }
-        Some(Jnc) => {
-            self.advance()
-            let dst = self.expect_loc()
-            Some(Jnc(dst~))
-        }
-        Some(Jz) => {
-            self.advance()
-            let dst = self.expect_loc()
-            Some(Jz(dst~))
-        }
-        Some(Jnz) => {
-            self.advance()
-            let dst = self.expect_loc()
-            Some(Jnz(dst~))
+            let dst = self.expect_label()
+            let (src1, src2) = self.expect_ll()
+
+            Some(match cond {
+                Jeq => Jeq(dst~, src1~, src2~)
+                Jne => Jne(dst~, src1~, src2~)
+                Jlt => Jlt(dst~, src1~, src2~)
+                Jgt => Jgt(dst~, src1~, src2~)
+                Jle => Jle(dst~, src1~, src2~)
+                Jge => Jge(dst~, src1~, src2~)
+                Jc => Jc(dst~)
+                Jnc => Jnc(dst~)
+                Jz => Jz(dst~)
+                Jnz => Jnz(dst~)
+                _ => impossible()
+            })
         }
         Some(Push) => {
             self.advance()
@@ -303,7 +286,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
         }
         Some(Call) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_label()
             Some(Call(dst~))
         }
         Some(Ret) => {
@@ -319,7 +302,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst? raise ParserError {
 }
 
 priv struct ParseResult {
-    pseudo: Array[PseudoInst]
+    pseudo: Array[PseudoInst[Loc]]
     next_label_id: UInt
 }
 
@@ -345,7 +328,7 @@ fn parse(tokens: Array[Token]) -> ParseResult raise ParserError {
     }
 
     let parser = Parser::new(tokens, label_ids)
-    let pseudo_insts: Array[PseudoInst] = []
+    let pseudo_insts: Array[PseudoInst[Loc]] = []
 
     while parser.index < parser.tokens.length() {
         match parser.parse_inst() {

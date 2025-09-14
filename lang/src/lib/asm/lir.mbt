@@ -52,7 +52,7 @@ pub(all) enum LIR {
     Set(dst~: Loc, val~: UInt16)
     Mem(dst~: Loc, addr~: Loc, load~: Bool, offset~: UInt16)
     Alu(dst~: Loc, src1~: Loc, src2~: Loc, op~: AluOp)
-    Jmp(dst~: Loc, cond~: LIRCond)
+    Jmp(dst~: LabelId, cond~: LIRCond)
     Label(LabelId)
     Directive(Directive)
 } derive (Show)
@@ -75,7 +75,7 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
 
         for inst in insts {
             match inst {
-                LIR::Jmp(dst=Loc::Label(label), cond~) => {
+                LIR::Jmp(dst=label, cond~) => {
                     jump_info_by_set_index.push({
                         label,
                         cond,
@@ -291,7 +291,7 @@ pub struct LowerIROutput {
     insts: Array[InstOrDirective]
 }
 
-pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst], ctx~: &LabelContext) -> Array[LIR] raise InstLoweringError {
+pub fn lower_pseudo_to_lir(pseudo: Array[PseudoInst[Loc]], ctx~: &LabelContext) -> Array[LIR] raise InstLoweringError {
     match (try? lower_many(pseudo, ctx~)) {
         Err(e) => raise Pseudo(e)
         Ok(lir) => lir
