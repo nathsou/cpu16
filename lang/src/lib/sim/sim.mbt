@@ -183,8 +183,11 @@ pub impl Show for CPU with output(self, logger) {
     logger.write_string("z: \{self.zero.to_uint()} ")
 
     let inst = self.mem[self.regs[7].to_int()]
-    let inst = @asm.Inst::decode(inst.to_uint()).unwrap()
-    logger.write_string("\{inst.to_string()}")
+    if @asm.Inst::decode(inst.to_uint()) is Some(inst) {
+        logger.write_string("\{inst.to_string()}")
+    } else {
+        logger.write_string("invalid inst: \{show_nat(inst, base=16, digits=Some(4))}")
+    }
 
     // show the top 8 words of the stack
     if SHOW_STACK {

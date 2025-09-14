@@ -8,22 +8,13 @@ fn[T] SortedArray::new() -> SortedArray[T] {
 }
 
 fn[T: Eq] SortedArray::remove(self: SortedArray[T], value: T) -> Unit {
-    match self.values.search_by(x => x == value) {
-        Some(idx) => {
-            self.values.swap(idx, self.values.length() - 1)
-            let _ = self.values.unsafe_pop()
-        }
-        None => ()
-    }
+  if self.values.search(value) is Some(idx) {
+    let _ = self.values.remove(idx)
+  }
 }
 
 fn[T: Compare] SortedArray::insert(self: SortedArray[T], value: T) -> Unit {
-    match self.values.search_by(x => x < value) {
-        Some(idx) => {
-            self.values.insert(idx, value)
-        }
-        None => {
-            self.values.push(value)
-        }
-    }
+  match self.values.binary_search(value) {
+    Ok(insert_idx) | Err(insert_idx) => self.values.insert(insert_idx, value)
+  }
 }

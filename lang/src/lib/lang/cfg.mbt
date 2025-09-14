@@ -351,78 +351,46 @@ pub(all) struct LivenessInterval {
 } derive (Show, Eq)
 
 impl Compare for LivenessInterval with compare(a: LivenessInterval, b: LivenessInterval) -> Int {
-    a.end.compare(b.end)
+    b.end.compare(a.end)
 }
 
 struct VariableAllocation {
-    reg_alloc: Map[VarId, Int]
+    reg_alloc: Map[VarId, @asm.Reg]
     mem_alloc: Map[VarId, Int]
 } derive (Show)
 
 pub fn VariableAllocation::get_loc(self: VariableAllocation, var_id: VarId) -> @asm.Loc raise {
-    for kv in self.mem_alloc {
-        if kv.0 == var_id {
-            return Mem(offset=kv.1)
+    match self.mem_alloc.get(var_id) {
+        Some(mem) => Mem(offset=mem)
+        None => match self.reg_alloc.get(var_id) {
+            Some(reg) => Reg(reg)
+            None => raise Failure("variable not allocated: \{var_id} in \{self}")
         }
     }
-
-    for kv in self.reg_alloc {
-        if kv.0 == var_id {
-            return Reg(match kv.1 {
-                0 => R1
-                1 => R2
-                2 => R3
-                3 => R4
-                4 => TMP
-                _ => @asm.panic_msg("invalid register: \{kv.1}")
-            })
-        }
-    }
-
-    raise Failure("variable not allocated: \{var_id} in \{self}")
-
-    // weird issue bug where .get(key) sometimes returns None when the key is present
-    // match self.mem_alloc.get(var_id) {
-    //     Some(mem) => Mem(offset=mem)
-    //     None => match self.reg_alloc.get(var_id) {
-    //         Some(reg) => {
-    //             println("Found var in reg_alloc: \{var_id}")
-
-    //             Reg(match reg {
-    //                 0 => R1
-    //                 1 => R2
-    //                 2 => R3
-    //                 3 => R4
-    //                 4 => TMP
-    //                 _ => @asm.panic_msg("invalid register")
-    //             })
-    //         }
-    //         None => raise Failure("variable not allocated: \{var_id} in \{self}")
-    //     }
-    // }
 }
 
 // Linear scan register allocation
 // TODO: Graph coloring register allocation
 pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) -> VariableAllocation {
-    let reg_alloc: Map[VarId, Int] = {}
+    let reg_alloc: Map[VarId, @asm.Reg] = {}
     let mem_alloc: Map[VarId, Int] = {}
     let active: SortedArray[LivenessInterval] = SortedArray::new()
-    let free_regs: Array[Int] = []
-
-    for i = regs_count - 1; i >= 0; i = i - 1 {
-        free_regs.push(i)
-    }
+    let free_regs: Array[@asm.Reg] = [R4, R3, R2, R1]
 
     fn expire_old_intervals(expired_interval: LivenessInterval) -> Unit {
         let to_remove: Array[LivenessInterval] = []
         
         // Collect intervals to remove
-        for i = 0; i < active.values.length(); i = i + 1 {
-            let interval = active.values[i]
-            if interval.end < expired_interval.start {
+        for interval in active.values {
+            if interval.end >= expired_interval.start {
+              return
+            } else {
                 to_remove.push(interval)
-                free_regs.push(reg_alloc[interval.var_id])
+                let reg = reg_alloc[interval.var_id]
+
+                if !free_regs.contains(reg) {
+                  free_regs.push(reg)
+                }
             }
         }
         
@@ -440,7 +408,7 @@ pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) 
         if spill_candidate.end > interval.end {
             reg_alloc[interval.var_id] = reg_alloc[spill_candidate.var_id] 
             mem_alloc[spill_candidate.var_id] = new_mem_loc
-            active.remove(spill_candidate)
+            active.insert(interval)
         } else {
             mem_alloc[interval.var_id] = new_mem_loc
         }
@@ -455,12 +423,16 @@ pub fn allocate_registers(intervals: Array[LivenessInterval], regs_count~: Int) 
     for interval in intervals_sorted_by_start {
         expire_old_intervals(interval)
 
-        if active.values.length() >= regs_count {
+        if active.values.length() == regs_count {
             spill_at_interval(interval)
         } else {
-            let reg = free_regs.unsafe_pop()
-            reg_alloc[interval.var_id] = reg
-            active.insert(interval)
+            match free_regs.pop() {
+              Some(reg) => {
+                reg_alloc[interval.var_id] = reg
+                active.insert(interval)
+              }
+              None => @asm.panic_msg("No free registers available")
+            }
         }
     }
 

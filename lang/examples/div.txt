@@ -1,0 +1,27 @@
+
+
+fn div(a: u16, b: u16): u16 {
+    if b == 0 { return 65535; }
+
+    var quotient = 0;
+    var remainder = 0;
+    var i = 0;
+   
+    while i < 16 {
+        let shift = (15 - i);
+        remainder = (remainder << 1) | ((a >> shift) & 1);
+
+        if remainder >= b {
+            remainder = remainder - b;
+            quotient = quotient | (1 << shift);
+        }
+
+        i = i + 1;
+    }
+
+    return quotient;
+}
+
+fn main(): u16 {
+  return div(1998, 2);
+}
