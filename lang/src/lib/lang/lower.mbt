@@ -1,12 +1,7 @@
 
 pub struct PseudoBuilder[T] {
-    functions: Map[String, LowerFuncInfo]
+    functions: Map[String, PseudoFunc[T]]
     insts: Array[@asm.PseudoInst[T]]
-}
-
-struct LowerFuncInfo {
-    label_id: @asm.LabelId
-    return_type: Type
 }
 
 const UNIT_VAR_ID: UInt = 0U
@@ -28,6 +23,8 @@ pub(all) struct PseudoFunc[T] {
     name: String
     label: @asm.LabelId
     body: Array[@asm.PseudoInst[T]]
+    return_type: Type
+    mut spilled_locals: UInt16
 }
 
 priv struct RegUse {
@@ -139,27 +136,22 @@ fn MemAlloc::assign(self: MemAlloc, var_id: @asm.VarId) -> UInt16 {
     }
 }
 
-pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> PseudoFunc[@asm.Reg] raise IRBuilderError {
-    let current_func_start_label = if self.body[0] is Label(label=label_id) {
-        funcs[self.name] = { return_type: self.return_type, label_id }
-        label_id
-    } else {
-        raise IRBuilderError("function body must start with a label")
-    }
-
+pub fn PseudoBuilder::lower(self: PseudoBuilder[@asm.Reg], func: TACFunc2) -> PseudoFunc[@asm.Reg] raise IRBuilderError {
     // return address
     let params_offset: UInt16 = 1
+    let spilled_offset: UInt16 = params_offset + func.parameters.length().to_uint16()
+    let mem = MemAlloc::new(spilled_offset)
 
-    let body: Array[@asm.PseudoInst[@asm.Reg]] = Array::new(capacity=self.body.length())
+    let body: Array[@asm.PseudoInst[@asm.Reg]] = Array::new(capacity=func.body.length())
 
     fn store(var_id: @asm.VarId, reg: @asm.Reg) -> Unit {
-        let offset = var_id.inner().reinterpret_as_int().to_uint16()
-        body.push(Store(dst=Z, src=reg, offset~))
+        let offset = mem.assign(var_id)
+        body.push(Store(dst=SP, src=reg, offset~))
     }
 
     let mut next_reg = @asm.Reg::R1
 
-    fn read_reg(var_id: @asm.VarId) -> @asm.Reg {
+    fn read_reg_offset(var_id: @asm.VarId, base_offset: UInt16) -> @asm.Reg {
         next_reg = match next_reg {
             R1 => R2
             R2 => R3
@@ -167,10 +159,14 @@ pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> Pseu
             _ => R1
         }
 
-        let offset = var_id.inner().reinterpret_as_int().to_uint16()
-        body.push(Load(dst=next_reg, addr=Z, offset~))
+        let offset = base_offset + mem.assign(var_id)
+        body.push(Load(dst=next_reg, addr=SP, offset~))
 
         next_reg
+    }
+
+    fn read_reg(var_id: @asm.VarId) -> @asm.Reg {
+        read_reg_offset(var_id, 0)
     }
 
     fn write_reg() -> @asm.Reg {
@@ -205,7 +201,7 @@ pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> Pseu
     //     regs.assign(var_id)
     // }
 
-    for item in self.body {
+    for item in func.body {
         match item {
             TAC::Assign(target~, val~) => {
                 let dst = write_reg()
@@ -306,43 +302,38 @@ pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> Pseu
                 raise IRBuilderError("set_local not supported yet")
             }
             Return(value~) => {
-                let is_main = self.name == "main"
-
                 if value is Some(v) {
                     // replace return address with return value on the stack
                     let src = read_reg(v)
                     body.push(Load(dst=TMP, addr=SP, offset=0))
                     body.push(Store(dst=SP, src~, offset=0))
-
-                    if !is_main {
-                        body.push(Move(dst=PC, src=TMP))
-                    }
-                } else if !is_main {
+                    body.push(Move(dst=PC, src=TMP))
+                } else {
                     body.push(Load(dst=PC, addr=SP, offset=0))
-                }
-
-                if is_main {
-                    // do not return from main, instead halt directly
-                    body.push(Halt)
                 }
             }
             TAC::Call(target~, name~, parameters~) => {
-                if funcs.get(name) is Some(({ label_id, return_type })) {
+                if self.functions.get(name) is Some(({ label, return_type, spilled_locals, .. })) {
                     guard return_type == U16 else {
                         raise IRBuilderError("function return type not supported for '\{name}': '\{return_type}'")
                     }
 
-                    // step 1: Allocate space for return address + parameters
+                    guard name != func.name else {
+                        // we need to know the size of the stack frame to support recursion
+                        raise IRBuilderError("recursive function calls not supported for '\{name}'")
+                    }
+
+                    // step 1: Allocate space for return address + parameters + spilled locals
                     let params_offset: UInt16 = 1
-                    let allocated_words = params_offset + parameters.length().to_uint16()
+                    let allocated_words = params_offset + parameters.length().to_uint16() + spilled_locals
                     body.push(Setw(dst=TMP, val=allocated_words))
                     body.push(Sub(dst=SP, src1=SP, src2=TMP))
 
                     // offset 0: return address
 
-                    // step 2: push parameters from the registers into the new stack frame
+                    // step 2: push parameters into the new stack frame
                     for i in 0..<parameters.length() {
-                        let src = read_reg(parameters[i])
+                        let src = read_reg_offset(parameters[i], allocated_words)
                         body.push(Store(dst=SP, src~, offset=params_offset + i.to_uint16()))
                     }
 
@@ -350,18 +341,25 @@ pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> Pseu
                     body.push(LIR(Set(dst=TMP, val=4))) // return address is 4 instructions ahead
                     body.push(Add(dst=TMP, src1=TMP, src2=PC))
                     body.push(Store(dst=SP, src=TMP, offset=0)) // save return address
-                    body.push(Jmp(dst=label_id)) // jump to function
+                    body.push(Jmp(dst=label)) // jump to function
 
-                    // step 4: retrieve return value
-                    if return_type != Unit {
+                    // step 4: retrieve return value (if any) BEFORE deallocating
+                    let return_reg = if return_type != Unit {
                         let dst = write_reg()
                         body.push(Load(dst~, addr=SP, offset=0))
-                        store(target, dst)
+                        Some(dst)
+                    } else {
+                        None
                     }
 
-                    // step 5: deallocate space
+                    // step 5: deallocate space (restore SP)
                     body.push(Setw(dst=TMP, val=allocated_words))
                     body.push(Add(dst=SP, src1=SP, src2=TMP))
+
+                    // step 6: store return value AFTER restoring SP
+                    if return_reg is Some(reg) {
+                        store(target, reg)
+                    }
                 } else if name == "@show" {
                     let r = read_reg(parameters[0])
                     body.push(LIR(Ctl(op=Show(r))))
@@ -372,35 +370,50 @@ pub fn TACFunc::lower(self: TACFunc2, funcs: Map[String, LowerFuncInfo]) -> Pseu
         }
     }
 
-    {
-        name: self.name,
-        label: current_func_start_label,
+    let pseudo_func: PseudoFunc[@asm.Reg] = {
+        name: func.name,
+        label: {
+            if func.body[0] is Label(label=label_id) {
+                label_id
+            } else {
+                raise IRBuilderError("function body must start with a label")
+            }
+        },
         body,
+        return_type: func.return_type,
+        spilled_locals: mem.offsets.size().to_uint16(),
     }
-}
 
-typealias Array[PseudoFunc[@asm.Reg]] as PseudoFuncs
+    self.functions[func.name] = pseudo_func
+
+    pseudo_func
+}
 
 // no hardware detection of stack overflow, adjust layout of data in 0x0000..0x7FFF to avoid collisions
 // depending on program needs (max recursion depth * stack frame size)
 pub const STACK_TOP: UInt16 = 0x7fff
 
-fn PseudoFuncs::with_main_fn_call(self: PseudoFuncs) -> Array[@asm.PseudoInst[@asm.Reg]] raise IRBuilderError {
-    if self.search_by(f => f.name == "main") is Some(main_idx) {
-        let f = self[main_idx]
-
-        let insts: Array[@asm.PseudoInst[@asm.Reg]] = [
-            Directive(Origin(addr=@asm.PC_START_ADDR)),
-            Setw(dst=SP, val=STACK_TOP),
-            Jmp(dst=f.label),
-        ]
-
-        for f in self {
-            insts.push_iter(f.body.iter())
-        }
-
-        insts
-    } else {
-        raise IRBuilderError("no 'main' function declared")
+fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder[@asm.Reg]) -> Array[@asm.PseudoInst[@asm.Reg]] raise IRBuilderError {
+    let start: TACFunc2 = {
+        name: "<start>",
+        return_type: Unit,
+        parameters: [],
+        body: [
+            Label(label=@uint.max_value),
+            Call(target=UNIT_VAR_ID, name="main", parameters=[]),
+        ],
     }
+
+    let insts: Array[@asm.PseudoInst[@asm.Reg]] = [
+        Directive(Origin(addr=@asm.PC_START_ADDR)),
+        Setw(dst=SP, val=STACK_TOP),
+        ..self.lower(start).body,
+        Halt,
+    ]
+
+    for f in self.functions.values() {
+        insts.push_iter(f.body.iter())
+    }
+
+    insts
 }

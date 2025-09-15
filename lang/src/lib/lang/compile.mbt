@@ -38,21 +38,20 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let pseudo: PseudoFuncs = {
-        let funcs = {}
-        let pseudo: PseudoFuncs = []
+    let pseudo: PseudoBuilder[@asm.Reg] = {
+        let builder = PseudoBuilder::new()
 
         for f in tac2.functions() {
-            pseudo.push(f.lower(funcs))
+            let _ = builder.lower(f)
         }
 
-        pseudo
+        builder
     }
 
     if verbose {
         println("\n[Pseudo]")
         
-        for func in pseudo {
+        for func in pseudo.functions.values() {
             println("<\{func.name}>")
 
             for inst in func.body {

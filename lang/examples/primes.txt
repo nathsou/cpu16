@@ -42,7 +42,7 @@ fn main(): u16 {
     var count = 0;
     var i = 2;
 
-    while i < 10000 {
+    while i < 1000 {
         count = count + is_prime(i);
         i = i + 1;
     }
