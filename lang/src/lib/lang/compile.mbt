@@ -38,30 +38,32 @@ pub fn compile(source: String, verbose~: Bool = false) -> Bytes raise {
         }
     }
 
-    let pseudo_builder = PseudoBuilder::new()
-    let env = Env::new()
-    let tac3 = tac2.to_tac3()
+    let pseudo: PseudoFuncs = {
+        let funcs = {}
+        let pseudo: PseudoFuncs = []
 
-    if verbose {
-        println("\n[TAC3]")
-
-        for tac in tac3 {
-            println(tac)
+        for f in tac2.functions() {
+            pseudo.push(f.lower(funcs))
         }
-    }
 
-    for tac in tac3 {
-        let _ = pseudo_builder.lower_tac(tac, env)
+        pseudo
     }
 
     if verbose {
         println("\n[Pseudo]")
-        for inst in pseudo_builder.insts {
-            println(inst)
+        
+        for func in pseudo {
+            println("<\{func.name}>")
+
+            for inst in func.body {
+                println(inst)
+            }
+
+            println("")
         }
     }
 
-    let lir = @asm.lower_pseudo_to_lir(pseudo_builder.with_main_fn_call(), ctx~)
+    let lir = @asm.lower_pseudo_to_lir(pseudo.with_main_fn_call(), ctx~)
 
     if verbose {
         println("\n[LIR]")

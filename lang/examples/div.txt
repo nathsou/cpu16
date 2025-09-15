@@ -1,5 +1,4 @@
 
-
 fn div(a: u16, b: u16): u16 {
     if b == 0 { return 65535; }
 
@@ -23,5 +22,5 @@ fn div(a: u16, b: u16): u16 {
 }
 
 fn main(): u16 {
-  return div(1998, 2);
+  return div(1998, 61);
 }

@@ -55,25 +55,18 @@ pub fn VarId::op_add(self: VarId, other: VarId) -> VarId {
     self.inner() + other.inner()
 }
 
-pub(all) struct PseudoFunc {
-    name: String
-    args_count: Int
-    locals_count: Int
-    body: Array[PseudoInst[Loc]]
-}
-
 pub suberror PseudoLoweringError String derive (Show)
 
 // Attempt to represent `n` as a left shift of an 11-bit value
-fn decompose_11bit_shl(n: UInt, dst: Loc) -> Array[LIR]? {
+fn decompose_11bit_shl(n: UInt, dst: Reg) -> Array[LIR]? {
     let shl_amount = n.ctz()
     let shl_core = n >> shl_amount
     
     if shl_core <= 0x7ff {
         Some([
             Set(dst~, val=shl_core.reinterpret_as_int().to_uint16()),
-            Set(dst=Reg(TMP), val=shl_amount.to_uint16()),
-            Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
+            Set(dst=TMP, val=shl_amount.to_uint16()),
+            Alu(dst~, src1=dst, src2=TMP, op=Shl),
         ])
     } else {
         None
@@ -94,7 +87,7 @@ impl LabelContext for LabelContextImpl with next_label(self) -> LabelId {
     LabelId(id)
 }
 
-pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
+pub fn PseudoInst::lower(self: PseudoInst[Reg], ctx: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
   match self {
     LIR(Set(dst=_, val~)) if val > 0x7ff => {
       raise PseudoLoweringError("`set` instruction value exceeds 11 bits: \{val}, use the `setw` pseudo-instruction instead")
@@ -113,13 +106,13 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
         if val <= 0x7ff {
             [Set(dst~, val~)]
         } else if val == 0xffff {
-            [Alu(dst~, src1=Reg(Z), src2=Reg(Z), op=Dec)]
+            [Alu(dst~, src1=Z, src2=Z, op=Dec)]
         } else if val >= (0xffff - 0x7ff) {
             let sub_val = (0x1000).to_uint16() - val
 
             [
-                Set(dst=Reg(TMP), val=sub_val),
-                Alu(dst~, src1=Reg(Z), src2=Reg(TMP), op=Sub),
+                Set(dst=TMP, val=sub_val),
+                Alu(dst~, src1=Z, src2=TMP, op=Sub),
             ]
         } else {
             // Check if `val` can be represented as a left shift of an 11-bit value
@@ -129,13 +122,13 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
                 // If not, check `val - 1`
                 return [
                     ..insts,
-                    Alu(dst~, src1=dst, src2=Reg(Z), op=Inc),
+                    Alu(dst~, src1=dst, src2=Z, op=Inc),
                 ]
             } else if decompose_11bit_shl(val_uint + 1, dst) is Some(insts) {
                 // If not, check `val + 1`
                 return [
                     ..insts,
-                    Alu(dst~, src1=dst, src2=Reg(Z), op=Dec),
+                    Alu(dst~, src1=dst, src2=Z, op=Dec),
                 ]
             }
 
@@ -145,27 +138,27 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
 
             [
                 Set(dst~, val=high),
-                Set(dst=Reg(TMP), val=8),
-                Alu(dst~, src1=dst, src2=Reg(TMP), op=Shl),
-                Set(dst=Reg(TMP), val=low),
-                Alu(dst~, src1=dst, src2=Reg(TMP), op=Or),
+                Set(dst=TMP, val=8),
+                Alu(dst~, src1=dst, src2=TMP, op=Shl),
+                Set(dst=TMP, val=low),
+                Alu(dst~, src1=dst, src2=TMP, op=Or),
             ]
         }
     }
     // TODO: Support offsets
     Load(dst~, addr~, offset~) => [Mem(dst~, addr~, load=true, offset~)]
     Store(dst~, src~, offset~) => [Mem(dst=src, addr=dst, load=false, offset~)]
-    Move(dst~, src~) => [Alu(dst~, src1=src, src2=Reg(Z), op=Add)]
-    Cmp(src1~, src2~) => [Alu(dst=Reg(Z), src1~, src2~, op=Sub)]
+    Move(dst~, src~) => [Alu(dst~, src1=src, src2=Z, op=Add)]
+    Cmp(src1~, src2~) => [Alu(dst=Z, src1~, src2~, op=Sub)]
     Add(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Add)]
     Sub(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Sub)]
     And(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=And)]
     Adc(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Adc)]
     Sbc(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Sbc)]
-    Inc(dst~) => [Alu(dst~, src1=dst, src2=Reg(Z), op=Inc)]
-    Dec(dst~) => [Alu(dst~, src1=dst, src2=Reg(Z), op=Dec)]
-    Inc2(dst~, src~) => [Alu(dst~, src1=src, src2=Reg(Z), op=Inc)]
-    Dec2(dst~, src~) => [Alu(dst~, src1=src, src2=Reg(Z), op=Dec)]
+    Inc(dst~) => [Alu(dst~, src1=dst, src2=Z, op=Inc)]
+    Dec(dst~) => [Alu(dst~, src1=dst, src2=Z, op=Dec)]
+    Inc2(dst~, src~) => [Alu(dst~, src1=src, src2=Z, op=Inc)]
+    Dec2(dst~, src~) => [Alu(dst~, src1=src, src2=Z, op=Dec)]
     Nand(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Nand)]
     Or(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Or)]
     Xor(dst~, src1~, src2~) => [Alu(dst~, src1~, src2~, op=Xor)]
@@ -175,15 +168,15 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
     Not2(dst~, src~) => [Alu(dst~, src1=src, src2=src, op=Nand)]
     Jmp(dst~) => [Jmp(dst~, cond=Always)]
     Jeq(dst~, src1~, src2~) => [
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+      Alu(dst=Z, src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfZero),
     ]
     Jne(dst~, src1~, src2~) => [
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+      Alu(dst=Z, src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotZero),
     ]
     Jlt(dst~, src1~, src2~) => [
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+      Alu(dst=Z, src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotCarry),
     ]
     Jgt(dst~, src1~, src2~) => {
@@ -191,7 +184,7 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
         let skip_zero_check_label = ctx.next_label()
 
         [
-            Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+            Alu(dst=Z, src1~, src2~, op=Sub),
             Jmp(dst=skip_zero_check_label, cond=IfNotCarry),
             Jmp(dst~, cond=IfNotZero),
             Label(skip_zero_check_label),
@@ -199,12 +192,12 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
     }
     Jle(dst~, src1~, src2~) => [
       // src1 <= src2 iff carry == 0 OR zero == 1
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+      Alu(dst=Z, src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfNotCarry),
       Jmp(dst~, cond=IfZero),
     ]
     Jge(dst~, src1~, src2~) => [
-      Alu(dst=Reg(Z), src1~, src2~, op=Sub),
+      Alu(dst=Z, src1~, src2~, op=Sub),
       Jmp(dst~, cond=IfCarry),
     ]
     Jc(dst~) => [Jmp(dst~, cond=IfCarry)]
@@ -212,28 +205,28 @@ pub fn PseudoInst::lower(self: PseudoInst[Loc], ctx: &LabelContext) -> Array[LIR
     Jz(dst~) => [Jmp(dst~, cond=IfZero)]
     Jnz(dst~) => [Jmp(dst~, cond=IfNotZero)]
     Push(val~) => [
-        Store(dst=Reg(SP), src=val, offset=0),
-        Dec(dst=Reg(SP)),
+        Store(dst=SP, src=val, offset=0),
+        Dec(dst=SP),
     ] |> lower_many(ctx~)
     Pop(dst~) => [
-        Inc(dst=Reg(SP)),
-        Load(dst~, addr=Reg(SP), offset=0),
+        Inc(dst=SP),
+        Load(dst~, addr=SP, offset=0),
     ] |> lower_many(ctx~)
     Call(dst~) => {
         [
             // skip next 5 instructions which are part of the call pseudo-instruction itself
-            LIR(Set(dst=Reg(TMP), val=5)),
-            Add(dst=Reg(TMP), src1=Reg(TMP), src2=Reg(PC)),
-            Push(val=Reg(TMP)), // 2 instructions
+            LIR(Set(dst=TMP, val=5)),
+            Add(dst=TMP, src1=TMP, src2=PC),
+            Push(val=TMP), // 2 instructions
             // TODO: Handle Jumps to arbitrary locations which might take more than 2 instructions
             Jmp(dst~), // 2 instructions
         ] |> lower_many(ctx~)
     }
-    Ret => [Pop(dst=Reg(PC))] |> lower_many(ctx~)
-    Nop => [Set(dst=Reg(Z), val=0)]
+    Ret => [Pop(dst=PC)] |> lower_many(ctx~)
+    Nop => [Set(dst=Z, val=0)]
   }
 }
 
-fn lower_many(insts: Array[PseudoInst[Loc]], ctx~: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
+fn lower_many(insts: Array[PseudoInst[Reg]], ctx~: &LabelContext) -> Array[LIR] raise PseudoLoweringError {
     insts.map(inst => inst.lower(ctx)).flatten()
 }

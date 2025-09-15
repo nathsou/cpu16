@@ -45,6 +45,16 @@ pub fn expect_loc(self: Parser) -> Loc raise ParserError {
     }
 }
 
+fn expect_reg(self: Parser) -> Reg raise ParserError {
+    match self.peek() {
+        Some(Token::Reg(reg)) => {
+            self.advance()
+            reg
+        }
+        _ => raise ParserError("Expected a register")
+    }
+}
+
 pub fn expect_label(self: Parser) -> LabelId raise ParserError {
     match self.peek() {
         Some(Token::Label(label)) => {
@@ -80,20 +90,20 @@ fn skip_comments(self: Parser) -> Unit {
     }
 }
 
-fn expect_ll(self: Parser) -> (Loc, Loc) raise ParserError {
-    let l1 = self.expect_loc()
-    let l2 = self.expect_loc()
-    (l1, l2)
+fn expect_rr(self: Parser) -> (Reg, Reg) raise ParserError {
+    let r1 = self.expect_reg()
+    let r2 = self.expect_reg()
+    (r1, r2)
 }
 
-fn expect_lll(self: Parser) -> (Loc, Loc, Loc) raise ParserError {
-    let dst = self.expect_loc()
-    let src1 = self.expect_loc()
-    let src2 = self.expect_loc()
+fn expect_rrr(self: Parser) -> (Reg, Reg, Reg) raise ParserError {
+    let dst = self.expect_reg()
+    let src1 = self.expect_reg()
+    let src2 = self.expect_reg()
     (dst, src1, src2)
 }
 
-pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
+pub fn parse_inst(self: Parser) -> PseudoInst[Reg]? raise ParserError {
     self.skip_comments()
 
     match self.peek() {
@@ -107,43 +117,43 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
         }
         Some(Set) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             let val = self.expect_const()
             Some(LIR(Set(dst~, val~)))
         }
         Some(Mem) => {
             self.advance()
-            let dst = self.expect_loc()
-            let addr = self.expect_loc()
+            let dst = self.expect_reg()
+            let addr = self.expect_reg()
             let load = self.expect_const() == 1
             let offset = self.expect_const()
             Some(LIR(Mem(dst~, addr~, load~, offset~)))
         }
         Some(Load) => {
             self.advance()
-            let (dst, addr) = self.expect_ll()
+            let (dst, addr) = self.expect_rr()
             Some(Load(dst~, addr~, offset=0))
         }
         Some(Store) => {
             self.advance()
-            let (dst, src) = self.expect_ll()
+            let (dst, src) = self.expect_rr()
             Some(Store(dst~, src~, offset=0))
         }
         Some(Move) => {
             self.advance()
-            let (dst, src) = self.expect_ll()
+            let (dst, src) = self.expect_rr()
             Some(Move(dst~, src~))
         }
         Some(Cmp) => {
             self.advance()
-            let (src1, src2) = self.expect_ll()
+            let (src1, src2) = self.expect_rr()
             Some(Cmp(src1~, src2~))
         }
         Some(Alu) => {
             self.advance()
-            let dst = self.expect_loc()
-            let src1 = self.expect_loc()
-            let src2 = self.expect_loc()
+            let dst = self.expect_reg()
+            let src1 = self.expect_reg()
+            let src2 = self.expect_reg()
             let op_code = self.expect_const().to_uint()
 
             match AluOp::decode(op_code) {
@@ -176,58 +186,58 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
         }
         Some(Setw) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             let val = self.expect_const()
             Some(Setw(dst~, val~))
         }
         Some(Add) => {
             self.advance()
-            let (dst, src1, src2) = self.expect_lll()
+            let (dst, src1, src2) = self.expect_rrr()
             Some(Add(dst~, src1~, src2~))
         }
         Some(Sub) => {
             self.advance()
-            let (dst, src1, src2) = self.expect_lll()
+            let (dst, src1, src2) = self.expect_rrr()
             Some(Sub(dst~, src1~, src2~))
         }
         Some(Inc) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             Some(Inc(dst~))
         }
         Some(Dec) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             Some(Dec(dst~))
         }
         Some(Inc2) => {
             self.advance()
-            let (dst, src) = self.expect_ll()
+            let (dst, src) = self.expect_rr()
             Some(Inc2(dst~, src~))
         }
         Some(Dec2) => {
             self.advance()
-            let (dst, src) = self.expect_ll()
+            let (dst, src) = self.expect_rr()
             Some(Dec2(dst~, src~))
         }
         Some(Not) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             Some(Not(dst~))
         }
         Some(Not2) => {
             self.advance()
-            let (dst, src) = self.expect_ll()
+            let (dst, src) = self.expect_rr()
             Some(Not2(dst~, src~))
         }
         Some(Shl) => {
             self.advance()
-            let (dst, src, amt) = self.expect_lll()
+            let (dst, src, amt) = self.expect_rrr()
             Some(Shl(dst~, src~, amt~))
         }
         Some(Shr) => {
             self.advance()
-            let (dst, src, amt) = self.expect_lll()
+            let (dst, src, amt) = self.expect_rrr()
             Some(Shr(dst~, src~, amt~))
         }
         Some(Halt) => {
@@ -258,7 +268,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
         Some((Jeq | Jne | Jlt | Jgt | Jle | Jge | Jc | Jnc | Jz | Jnz) as cond) => {
             self.advance()
             let dst = self.expect_label()
-            let (src1, src2) = self.expect_ll()
+            let (src1, src2) = self.expect_rr()
 
             Some(match cond {
                 Jeq => Jeq(dst~, src1~, src2~)
@@ -276,12 +286,12 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
         }
         Some(Push) => {
             self.advance()
-            let val = self.expect_loc()
+            let val = self.expect_reg()
             Some(Push(val~))
         }
         Some(Pop) => {
             self.advance()
-            let dst = self.expect_loc()
+            let dst = self.expect_reg()
             Some(Pop(dst~))
         }
         Some(Call) => {
@@ -302,7 +312,7 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Loc]? raise ParserError {
 }
 
 priv struct ParseResult {
-    pseudo: Array[PseudoInst[Loc]]
+    pseudo: Array[PseudoInst[Reg]]
     next_label_id: UInt
 }
 
@@ -328,7 +338,7 @@ fn parse(tokens: Array[Token]) -> ParseResult raise ParserError {
     }
 
     let parser = Parser::new(tokens, label_ids)
-    let pseudo_insts: Array[PseudoInst[Loc]] = []
+    let pseudo_insts: Array[PseudoInst[Reg]] = []
 
     while parser.index < parser.tokens.length() {
         match parser.parse_inst() {

@@ -1,0 +1,51 @@
+
+fn rem(a: u16, b: u16): u16 {
+    if b == 0 { return 65535; }
+
+    var quotient = 0;
+    var remainder = 0;
+    var i = 0;
+   
+    while i < 16 {
+        let shift = (15 - i);
+        remainder = (remainder << 1) | ((a >> shift) & 1);
+
+        if remainder >= b {
+            remainder = remainder - b;
+            quotient = quotient | (1 << shift);
+        }
+
+        i = i + 1;
+    }
+
+    return remainder;
+}
+
+fn is_prime(n: u16): u16 {
+    if n < 2 { return 0; }
+    if n == 2 { return 1; }
+    if (n & 1) == 0 { return 0; }
+
+    var i = 3;
+    var i_sq = 9;
+
+    while i_sq <= n {
+        if rem(n, i) == 0 { return 0; }
+        i_sq = i_sq + (i << 2) + 4;
+        i = i + 2;
+    }
+
+    return 1;
+}
+
+fn main(): u16 {
+    var count = 0;
+    var i = 2;
+
+    while i < 10000 {
+        count = count + is_prime(i);
+        i = i + 1;
+    }
+
+    return count;
+}
