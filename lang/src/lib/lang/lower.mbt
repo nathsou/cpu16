@@ -4,7 +4,7 @@ pub struct PseudoBuilder[T] {
     insts: Array[@asm.PseudoInst[T]]
 }
 
-const UNIT_VAR_ID: UInt = 0U
+const TEMP_VAR_ID: UInt = 0U
 
 pub fn[T] PseudoBuilder::new() -> PseudoBuilder[T] {
     {
@@ -400,7 +400,8 @@ fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder[@asm.Reg]) -> Array[@asm
         parameters: [],
         body: [
             Label(label=@uint.max_value),
-            Call(target=UNIT_VAR_ID, name="main", parameters=[]),
+            Call(target=TEMP_VAR_ID, name="main", parameters=[]),
+            Return(value=Some(TEMP_VAR_ID)),
         ],
     }
 

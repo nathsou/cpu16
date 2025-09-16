@@ -4,18 +4,17 @@ fn rem(a: u16, b: u16): u16 {
 
     var quotient = 0;
     var remainder = 0;
-    var i = 0;
+    var i = 15;
    
-    while i < 16 {
-        let shift = (15 - i);
-        remainder = (remainder << 1) | ((a >> shift) & 1);
+    while i != 65535 {
+        remainder = (remainder << 1) | ((a >> i) & 1);
 
         if remainder >= b {
             remainder = remainder - b;
-            quotient = quotient | (1 << shift);
+            quotient = quotient | (1 << i);
         }
 
-        i = i + 1;
+        i = i - 1;
     }
 
     return remainder;

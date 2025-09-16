@@ -2,7 +2,7 @@
 enum Command {
     Compile(source_file~: String, output_file~: String?)
     Asm(source_file~: String, output_file~: String?)
-    Run(source_file~: String)
+    Run(source_file~: String, trace~: Bool)
 }
 
 suberror CommandError String derive (Show)
@@ -31,7 +31,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
                 None => ()
             }
         }
-        Run(source_file~) => {
+        Run(source_file~, trace~) => {
             let prog = match source_file {
                 [.., ..".bin"] => @fs.read_file_to_bytes(source_file)
                 [.., ..".s"] => {
@@ -52,7 +52,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
             let mut steps = 0U
 
             while !cpu.halted {
-                if verbose {
+                if trace {
                     println(cpu)
                 }
 
@@ -60,7 +60,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
                 steps += 1
             }
 
-            if !verbose {
+            if !trace {
                 println(cpu)
                 println("steps: \{steps}")
             } else {
@@ -76,7 +76,8 @@ fn parse_command(args: Array[String]) -> Command? {
         [_, "compile", source_file, output_file] => Some(Command::Compile(source_file~, output_file=Some(output_file)))
         [_, "asm", source_file] => Some(Command::Asm(source_file~, output_file=None))
         [_, "asm", source_file, output_file] => Some(Command::Asm(source_file~, output_file=Some(output_file)))
-        [_, "run", source_file] => Some(Command::Run(source_file~))
+        [_, "run", source_file] => Some(Command::Run(source_file~, trace=false))
+        [_, "trace", source_file] => Some(Command::Run(source_file~, trace=true))
         _ => None
     }
 }

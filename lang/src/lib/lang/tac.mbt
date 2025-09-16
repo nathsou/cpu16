@@ -121,7 +121,7 @@ impl @asm.LabelContext for IdContext with next_label(self) -> @asm.LabelId {
 
 pub fn IdContext::new() -> IdContext {
     {
-        next_var_id: @asm.VarId(1U), // start from 1, reserve 0 for unit type
+        next_var_id: @asm.VarId(1U), // reserve 0 for TEMP_VAR_ID
         next_label_id: LabelId(0U),
     }
 }
@@ -423,7 +423,7 @@ pub fn TACBuilder::lower_decl(self: TACBuilder1, decl: Decl) -> Unit raise TACLo
 pub fn TACBuilder::lower_value(self: TACBuilder2, value: TACValue) -> @asm.VarId {
     match value {
         TACValue::Unit => {
-            UNIT_VAR_ID
+            TEMP_VAR_ID
         }
         TACValue::Const(c) => {
             let dst = self.ctx.next_var()
