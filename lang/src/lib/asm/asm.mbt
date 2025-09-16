@@ -18,6 +18,15 @@ pub fn assemble(insts: Array[InstOrDirective]) -> Bytes {
                     Origin(addr~) => {
                         offset = addr.to_int() * 2 // each instruction is 2 bytes
                     }
+                    Byte(value) => {
+                        bytes[offset] = value
+                        offset += 1
+                    }
+                    Word(value) => {
+                        bytes[offset] = (value >> 8).to_byte()
+                        bytes[offset + 1] = value.to_byte()
+                        offset += 2
+                    }
                 }
             }
         }

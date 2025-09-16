@@ -7,11 +7,11 @@ enum Command {
 
 suberror CommandError String derive (Show)
 
-fn run_command(command: Command, verbose~: Bool) -> Unit raise {
+fn run_command(command: Command) -> Unit raise {
     match command {
         Asm(source_file~, output_file~) => {
             let prog = @fs.read_file_to_string(source_file, encoding="utf8")
-            let compiled = @asm.assemble_source(prog, verbose~)
+            let compiled = @asm.assemble_source(prog, verbose=output_file is None)
 
             match output_file {
                 Some(file) => {
@@ -22,7 +22,7 @@ fn run_command(command: Command, verbose~: Bool) -> Unit raise {
         }
         Compile(source_file~, output_file~) => {
             let prog = @fs.read_file_to_string(source_file, encoding="utf8")
-            let compiled = @lang.compile(prog, verbose~)
+            let compiled = @lang.compile(prog, verbose=output_file is None)
 
             match output_file {
                 Some(file) => {
@@ -85,7 +85,7 @@ fn parse_command(args: Array[String]) -> Command? {
 fn main {
     try {
         match parse_command(@sys.get_cli_args()) {
-            Some(cmd) => run_command(cmd, verbose=true)
+            Some(cmd) => run_command(cmd)
             None => {
                 println("Usage: lang <command> <source_file> [output_file]")
                 println("Commands:")

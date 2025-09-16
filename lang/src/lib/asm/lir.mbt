@@ -105,6 +105,12 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                         Origin(addr~) => {
                             offset = addr.to_int()
                         }
+                        Byte(_) => {
+                            offset += 1
+                        }
+                        Word(_) => {
+                            offset += 2
+                        }
                     }
 
                     without_labels.push(inst)

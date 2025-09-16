@@ -181,6 +181,19 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Reg]? raise ParserError {
                     let addr = self.expect_const()
                     Some(Directive(Origin(addr~)))
                 }
+                "byte" => {
+                    let value = self.expect_const()
+
+                    if value > 0xff {
+                        raise ParserError("Byte value out of range: \{value}")
+                    }
+
+                    Some(Directive(Byte(value.to_byte())))
+                }
+                "word" => {
+                    let value = self.expect_const()
+                    Some(Directive(Word(value)))
+                }
                 _ => raise ParserError("Invalid directive: '.\{name}'")
             }
         }

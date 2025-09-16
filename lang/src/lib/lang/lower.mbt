@@ -396,7 +396,7 @@ pub const STACK_TOP: UInt16 = 0x7fff
 fn PseudoBuilder::with_main_fn_call(self: PseudoBuilder[@asm.Reg]) -> Array[@asm.PseudoInst[@asm.Reg]] raise IRBuilderError {
     let start: TACFunc2 = {
         name: "<start>",
-        return_type: Unit,
+        return_type: U16,
         parameters: [],
         body: [
             Label(label=@uint.max_value),
