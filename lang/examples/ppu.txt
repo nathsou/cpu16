@@ -1,0 +1,13 @@
+
+fn main(): u16 {
+    let ppu_regs = 65520;
+    @store(ppu_regs, 32768, 1);
+
+    @store(ppu_regs, 121, 2);
+    @store(ppu_regs, 111, 2);
+    @store(ppu_regs, 100, 2);
+    @store(ppu_regs, 108, 2);
+    @store(ppu_regs, 33, 2);
+
+    return 0;
+}

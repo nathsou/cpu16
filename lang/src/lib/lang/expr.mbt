@@ -102,7 +102,7 @@ pub impl Show for Expr with output(self, logger) {
             }
         }
         Expr::Call(name, params) => {
-            let params_str = params.map(fn (param) { param.to_string() }).join(", ")
+            let params_str = params.map(param => param.to_string()).join(", ")
             "\{name}(\{params_str})"
         }
     }

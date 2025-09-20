@@ -144,16 +144,16 @@ pub fn PseudoBuilder::lower(self: PseudoBuilder[@asm.Reg], func: TACFunc2) -> Ps
 
                 store(target, dst)
             }
-            TAC::Store(dst~, src~, offset=_) => {
-                let dst_reg = write_reg()
+            TAC::Store(dst~, src~, offset~) => {
+                let dst_reg = read_reg(dst)
                 let src = read_reg(src)
-                body.push(Store(dst=dst_reg, src~, offset=0))
+                body.push(Store(dst=dst_reg, src~, offset=offset.reinterpret_as_int().to_uint16()))
                 store(dst, dst_reg)
             }
-            TAC::Load(target~, addr~, offset=_) => {
+            TAC::Load(target~, addr~, offset~) => {
                 let dst = write_reg()
                 let addr = read_reg(addr)
-                body.push(Load(dst~, addr~, offset=0))
+                body.push(Load(dst~, addr~, offset=offset.reinterpret_as_int().to_uint16()))
                 store(target, dst)
             }
             TAC::Jump(label~) => {
@@ -250,11 +250,16 @@ pub fn PseudoBuilder::lower(self: PseudoBuilder[@asm.Reg], func: TACFunc2) -> Ps
                     if return_reg is Some(reg) {
                         store(target, reg)
                     }
-                } else if name == "@show" {
-                    let r = read_reg(parameters[0])
-                    body.push(LIR(Ctl(op=Show(r))))
                 } else {
-                    raise IRBuilderError("call to undeclared function '\{name}'")
+                    match name {
+                        "@show" => {
+                            let r = read_reg(parameters[0])
+                            body.push(LIR(Ctl(op=Show(r))))
+                        }
+                        _ => {
+                            raise IRBuilderError("call to undeclared function '\{name}'")
+                        }
+                    }
                 }
             }
         }

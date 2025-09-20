@@ -46,5 +46,7 @@ fn main(): u16 {
         i = i + 1;
     }
 
+    @show(count);
+
     return count;
 }

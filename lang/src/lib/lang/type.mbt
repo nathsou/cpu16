@@ -23,6 +23,8 @@ pub struct FuncInfo {
 fn lookup_builtin(name: String) -> FuncInfo? {
     match name {
         "@show" => Some({ parameters: [{ name: "value", ty: U16 }], return_type: Unit })
+        "@load" => Some({ parameters: [{ name: "addr", ty: U16 }, { name: "offset", ty: U16 }], return_type: U16 })
+        "@store" => Some({ parameters: [{ name: "addr", ty: U16 }, { name: "value", ty: U16 }, { name: "offset", ty: U16 }], return_type: Unit })
         _ => None
     }
 }

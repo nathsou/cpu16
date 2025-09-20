@@ -321,6 +321,44 @@ pub fn TACBuilder::lower_expr(self: TACBuilder1, expr: Expr) -> TACValue raise T
                 None => TACValue::Unit
             }
         }
+        Expr::Call("@load", [addr, offset]) => {
+            match offset {
+                Const(Integer(offset, _)) => {
+                    let addr = self.lower_expr(addr)
+                    let target = self.ctx.next_var()
+                    self.emit(TAC::Load(target~, addr~, offset=offset.reinterpret_as_uint()))
+                    TACValue::Variable(target)
+                }
+                _ => {
+                    raise TACLoweringError("expected integer constant as offset in @load")
+                }
+            }
+        }
+        Expr::Call("@store", [addr, value, offset]) => {
+            let value = self.lower_expr(value)
+            
+            match offset {
+                Const(Integer(offset, _)) => {
+                    let dst = match self.lower_expr(addr) {
+                        Variable(v) => v
+                        Const(c) => {
+                            let var_id = self.ctx.next_var()
+                            self.emit_assign(var_id, c)
+                            var_id
+                        }
+                        Unit => {
+                            raise TACLoweringError("expected address expression in @store")
+                        }
+                    }
+
+                    self.emit(TAC::Store(dst~, src=value, offset=offset.reinterpret_as_uint()))
+                    TACValue::Unit
+                }
+                _ => {
+                    raise TACLoweringError("expected integer constant as offset in @store")
+                }
+            }
+        }
         Expr::Call(name, parameters) => {
             let args = []
 

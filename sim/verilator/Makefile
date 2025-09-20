@@ -15,7 +15,8 @@ VTop: VTopSim.mk
 	make -C ./obj_dir -f VTopSim.mk
 
 Top.fir:
-	cp -r ../../design/src/resources/ ./
+	mkdir -p resources
+	cp -R ../../design/src/resources/. resources/
 	cd ../.. && bunx yodl@0.0.6 design/src/Sim.yodl "write_firrtl sim/verilator/Top.fir"
 
 Top.sv: Top.fir

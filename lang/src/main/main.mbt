@@ -91,7 +91,8 @@ fn main {
                 println("Commands:")
                 println("  compile - Compile a source file")
                 println("  asm - Assemble a source file")
-                println("  run - Run a compiled program")
+                println("  run - Run a program")
+                println("  trace - Run a program with tracing")
             }
         }
     } catch {
