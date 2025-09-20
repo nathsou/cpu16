@@ -1,10 +1,6 @@
 
 .org 0x1000
-; "yodl"
-.byte 0x79
-.byte 0x6f
-.byte 0x64
-.byte 0x6c
+.ascii "yodl!"
 
 .org 0x8000
 setw sp 0x7fff ; init stack pointer
@@ -21,7 +17,7 @@ setw r3 0x1000 ; address of string
 set r2 0 ; length counter
 
 char_loop:
-    set r5 4 ; length of string
+    set r5 5 ; length of string
     jeq char_loop_end r2 r5
     load r4 r3 ; load character
     store r1 r4 ; write low byte

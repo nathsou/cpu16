@@ -105,11 +105,14 @@ pub fn replace_labels(insts: Array[LIR]) -> Array[LIR] raise InstLoweringError {
                         Origin(addr~) => {
                             offset = addr.to_int()
                         }
-                        Byte(_) => {
-                            offset += 1
+                        U8(bytes) => {
+                            offset += bytes.length()
                         }
-                        Word(_) => {
+                        U16(_) => {
                             offset += 2
+                        }
+                        Ascii(text) => {
+                            offset += text.length()
                         }
                     }
 

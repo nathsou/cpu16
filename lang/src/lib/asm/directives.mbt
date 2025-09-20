@@ -13,8 +13,9 @@ pub impl Show for InstOrDirective with output(self, logger) {
 
 pub(all) enum Directive {
   Origin(addr~: UInt16)
-  Byte(Byte)
-  Word(UInt16)
+  U8(Array[Byte])
+  U16(Array[UInt16])
+  Ascii(String)
 }
 
 pub impl Show for Directive with output(self, logger) {
@@ -22,11 +23,22 @@ pub impl Show for Directive with output(self, logger) {
     Origin(addr~) => {
       logger.write_string(".org \{addr}")
     }
-    Byte(value) => {
-      logger.write_string(".byte \{value.to_uint16()}")
+    U8(values) => {
+      logger.write_string(".u8")
+
+      for v in values {
+        logger.write_string(" \{v.to_uint16()}")
+      }
     }
-    Word(value) => {
-      logger.write_string(".word \{value}")
+    U16(values) => {
+      logger.write_string(".u16")
+
+      for v in values {
+        logger.write_string(" \{v}")
+      }
+    }
+    Ascii(text) => {
+      logger.write_string(".ascii \"\{text}\"")
     }
   }
 }

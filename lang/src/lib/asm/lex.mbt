@@ -2,6 +2,7 @@
 pub enum Token {
     Reg(Reg)
     Const(value~: UInt16, base~: UInt)
+    StringLiteral(String)
     LabelDef(String)
     Label(String)
     Directive(String)
@@ -168,7 +169,7 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
                 
                 while true {
                     match lexer.peek() {
-                        Some(c) if c is 'a'..='z' || c == '_' => {
+                        Some(c) if c.is_ascii_alphabetic() || c.is_ascii_digit() || c == '_' => {
                             lexer.index += 1
                         }
                         _ => break
@@ -177,6 +178,28 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
 
                 let directive = lexer.input[start_index:lexer.index].to_string()
                 Some(Token::Directive(directive))
+            }
+            '"' => {
+                lexer.index += 1 // consume opening quote
+                let start_index = lexer.index
+                
+                while true {
+                    match lexer.peek() {
+                        Some(c) if c != '"' => {
+                            lexer.index += 1
+                        }
+                        _ => break
+                    }
+                }
+
+                if lexer.peek() != Some('"') {
+                    raise AsmLexerError("unterminated string literal starting at position \{start_index - 1}")
+                }
+
+                let string_literal = lexer.input[start_index:lexer.index].to_string()
+                lexer.index += 1 // consume closing quote
+
+                Some(Token::StringLiteral(string_literal))
             }
             _ => {
                 raise AsmLexerError("unexpected character '\{c}' at position \{lexer.index}")

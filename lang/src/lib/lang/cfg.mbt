@@ -74,7 +74,7 @@ fn TAC2s::collect_basic_block_leaders(self: TAC2s) -> Array[Int] {
     leaders
 }
 
-fn TACFunc::cfg(self: TACFunc2) -> CFG {
+fn TACFunc::_cfg(self: TACFunc2) -> CFG {
     CFG::from(self.collect_basic_blocks())
 }
 
@@ -451,7 +451,7 @@ fn LivePoints::intervals(self: LivePoints) -> Array[LivenessInterval] {
     intervals
 }
 
-fn CFG::allocate(self: CFG, regs_count~: Int = 4) -> VariableAllocation {
+fn CFG::_allocate(self: CFG, regs_count~: Int = 4) -> VariableAllocation {
     let intervals = self.liveness_intervals()
     allocate_registers(intervals, regs_count~)
 }

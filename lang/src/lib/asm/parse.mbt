@@ -181,18 +181,63 @@ pub fn parse_inst(self: Parser) -> PseudoInst[Reg]? raise ParserError {
                     let addr = self.expect_const()
                     Some(Directive(Origin(addr~)))
                 }
-                "byte" => {
-                    let value = self.expect_const()
+                "u8" => {
+                    let values: Array[Byte] = []
 
-                    if value > 0xff {
-                        raise ParserError("Byte value out of range: \{value}")
+                    while true {
+                        match self.peek() {
+                            Some(Token::Const(value~, base=_)) => {
+                                if value > 0xff {
+                                    raise ParserError("u8 value out of range: \{value}")
+                                }
+
+                                values.push(value.to_byte())
+                                self.advance()
+                            }
+                            _ => break
+                        }
                     }
 
-                    Some(Directive(Byte(value.to_byte())))
+                    if values.length() == 0 {
+                        raise ParserError("Expected at least one byte value after .byte directive")
+                    }
+
+                    Some(Directive(U8(values)))
                 }
-                "word" => {
-                    let value = self.expect_const()
-                    Some(Directive(Word(value)))
+                "u16" => {
+                    let values: Array[UInt16] = []
+
+                    while true {
+                        match self.peek() {
+                            Some(Token::Const(value~, base=_)) => {
+                                values.push(value)
+                                self.advance()
+                            }
+                            _ => break
+                        }
+                    }
+
+                    if values.length() == 0 {
+                        raise ParserError("Expected at least one u16 value after .u16 directive")
+                    }
+
+                    Some(Directive(U16(values)))
+                }
+                "ascii" => {
+                    match self.peek() {
+                        Some(Token::StringLiteral(text)) => {
+                            self.advance()
+
+                            for c in text {
+                                if !c.is_ascii() {
+                                    raise ParserError("Non-ASCII character in .ascii directive: '\{c}'")
+                                }
+                            }
+
+                            Some(Directive(Ascii(text)))
+                        }
+                        _ => raise ParserError("Expected string literal after '.ascii'")
+                    }
                 }
                 _ => raise ParserError("Invalid directive: '.\{name}'")
             }

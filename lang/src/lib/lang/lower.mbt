@@ -27,95 +27,6 @@ pub(all) struct PseudoFunc[T] {
     mut spilled_locals: UInt16
 }
 
-priv struct RegUse {
-    reg: @asm.Reg
-    mut var_id: @asm.VarId?
-    mut last_used_idx: UInt
-}
-
-fn RegUse::touch(self: RegUse, idx: UInt) -> Unit {
-    self.last_used_idx = idx
-}
-
-priv struct RegAlloc {
-    regs: Array[RegUse]
-    on_evict: (@asm.VarId, @asm.Reg) -> Unit
-    mut counter: UInt
-}
-
-fn RegAlloc::new(on_evict~: (@asm.VarId, @asm.Reg) -> Unit) -> RegAlloc {
-    {
-        regs: [
-            { reg: R1, var_id: None, last_used_idx: 0 },
-            { reg: R2, var_id: None, last_used_idx: 0 },
-            { reg: R3, var_id: None, last_used_idx: 0 },
-            { reg: R4, var_id: None, last_used_idx: 0 },
-        ],
-        on_evict,
-        counter: 0,
-    }
-}
-
-fn RegAlloc::evict_all(self: RegAlloc) -> Unit {
-    for r in self.regs {
-        if r.var_id is Some(var_id) {
-            (self.on_evict)(var_id, r.reg)
-            r.var_id = None
-        }
-    }
-}
-
-fn RegAlloc::lookup(self: RegAlloc, var_id: @asm.VarId) -> RegUse? {
-    for r in self.regs {
-        match r.var_id {
-            Some(v) if v == var_id => {
-                self.touch(r)
-                return Some(r)
-            }
-            _ => ()
-        }
-    }
-
-    None
-}
-
-fn RegAlloc::touch(self: RegAlloc, r: RegUse) -> Unit {
-    r.touch({ self.counter += 1; self.counter })
-}
-
-fn RegAlloc::assign(self: RegAlloc, var_id: @asm.VarId) -> @asm.Reg {
-    // check if already assigned
-    if self.lookup(var_id) is Some(r) {
-        self.touch(r)
-        return r.reg
-    }
-
-    // find free register
-    for r in self.regs {
-        if r.var_id is None {
-            r.var_id = Some(var_id)
-            self.touch(r)
-            return r.reg
-        }
-    }
-
-    // evict least recently used register
-    let mut lru = self.regs[0]
-    for r in self.regs {
-        if r.last_used_idx < lru.last_used_idx {
-            lru = r
-        }
-    }
-
-    if lru.var_id is Some(evicted_var_id) {
-        (self.on_evict)(evicted_var_id, lru.reg)
-    }
-
-    lru.var_id = Some(var_id)
-    self.touch(lru)
-    lru.reg
-}
-
 priv struct MemAlloc {
     offsets: Map[@asm.VarId, UInt16]
     base_offset: UInt16
@@ -179,27 +90,6 @@ pub fn PseudoBuilder::lower(self: PseudoBuilder[@asm.Reg], func: TACFunc2) -> Ps
 
         next_reg
     }
-
-    // fn read_reg(var_id: @asm.VarId) -> @asm.Reg raise IRBuilderError {
-    //     if regs.lookup(var_id) is Some(r) {
-    //         regs.touch(r)
-    //         r.reg
-    //     } else {
-    //         // The variable is not in a register, so it must be on the stack.
-    //         // Get its offset, but do not create a new one.
-    //         if mem.offsets.get(var_id) is Some(offset) {
-    //             let target = regs.assign(var_id)
-    //             body.push(Load(dst=target, addr=SP, offset=spilled_offset + offset))
-    //             target
-    //         } else {
-    //             raise IRBuilderError("Attempted to read '\{var_id}' that is not in a register and was never spilled.")
-    //         }
-    //     }
-    // }
-
-    // fn write_reg(var_id: @asm.VarId) -> @asm.Reg {
-    //     regs.assign(var_id)
-    // }
 
     for item in func.body {
         match item {

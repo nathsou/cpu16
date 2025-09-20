@@ -10,18 +10,16 @@ module RAM(
 ) {
     let mem = Memory<
         T: uint<16>,
-        Depth: 1024,
+        Depth: 65536,
         ReadPorts: 1,
         WritePorts: 1,
         ReadLatency: 1,
         WriteLatency: 1,
     >(
-        read: [{ clk: clk, en: read_enable, addr: addr[9:0] }],
-        write: [{ clk: clk, en: write_enable, addr: addr[9:0], data: write_data, mask: true }],
+        read: [{ clk: clk, en: read_enable, addr: addr }],
+        write: [{ clk: clk, en: write_enable, addr: addr, data: write_data, mask: true }],
     )
 
-    // PC starts at 0x8000 but since the depth is 1024 * 16 bits and (n + 0x8000) % 1024 = n,
-    // we can just load the program at address 0 in RAM.
     $readmemh("resources/progs/ppu.hex", mem)
 
     read_data = mem.q[0]
