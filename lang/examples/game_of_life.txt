@@ -1,0 +1,172 @@
+
+fn render_frame(): u16 {
+    let PPU_REGS = 0xfff0;
+    @store(PPU_REGS, 0x8000, 1); // PPU_ADDR = 0x8000 (start of nametable)
+    
+    // render frame
+    var counter = 4800; // 80 * 60
+
+    while counter != 0 {
+        let char = if @load(counter, 0) == 0 { 0x20 } else { 0x4f };
+        @store(PPU_REGS, char, 2); // PPU_DATA = char
+        counter = counter - 1;
+    }
+
+    return 0;
+}
+
+fn update_grid(): u16 {
+    // Step 3: Update grid
+    let COUNTS_ARRAYS_ADDR = 0x2000;
+
+    var grid_offset = 0;
+    var counts_offset = COUNTS_ARRAYS_ADDR;
+    var counter = 4800;
+
+    while counter != 0 {
+        // let prev_state = @load(grid_offset, 0);
+        // @store(grid_offset, if prev_state == 1 { 0 } else { 1 }, 0); 
+
+        let count = @load(counts_offset, 0);
+
+        if count == 3 {
+            @store(grid_offset, 1, 0);
+        } else if count != 2 {
+            @store(grid_offset, 0, 0);
+        }
+
+        grid_offset = grid_offset + 1;
+        counts_offset = counts_offset + 1;
+        counter = counter - 1;
+    }
+
+    return 0;
+}
+
+fn count_neighbors(offset: u16, x: u16, y: u16): u16 {
+    // x and y are coordinates of [e], offset = y * 80 + x
+    // a  b  c
+    // d [e] f
+    // g  h  i
+
+    var count = 0;
+
+    // previous row
+    if y != 0 {
+        let cell_idx = offset - 80;
+
+        if x != 0 {
+            count = count + @load(cell_idx - 1, 0); // a
+        }
+
+        count = count + @load(cell_idx, 0); // b
+
+        if x != 79 {
+            count = count + @load(cell_idx, 1); // c
+        }
+    }
+
+    // current row
+    if x != 0 {
+        count = count + @load(offset - 1, 0); // d
+    }
+
+    // ignore e
+
+    if x != 79 {
+        count = count + @load(offset, 1); // f
+    }
+
+    // next row
+    if y != 59 {
+        let cell_idx = offset + 80;
+
+        if x != 0 {
+            count = count + @load(cell_idx - 1, 0); // g
+        }
+
+        count = count + @load(cell_idx, 0); // h
+
+        if x != 79 {
+            count = count + @load(cell_idx, 1); // i
+        }
+    }
+
+    return count;
+}
+
+fn update_counts(): u16 {
+    let COUNTS_ARRAYS_ADDR = 0x2000;
+    var counts_offset = COUNTS_ARRAYS_ADDR;
+    var grid_offset = 0;
+    var y = 0;
+
+    while y < 60 {
+        var x = 0;
+        while x < 80 {
+            let count = count_neighbors(grid_offset, x, y);
+            @store(counts_offset, count, 0);
+            counts_offset = counts_offset + 1;
+            grid_offset = grid_offset + 1;
+            x = x + 1;
+        }
+
+        y = y + 1;
+    }
+
+    return 0;
+}
+
+fn init_grid(): u16 {
+    // store pattern starting at 0x0000
+    @store(0x84e, 1, 0);
+    @store(0x89c, 1, 0);
+    @store(0x89e, 1, 0);
+    @store(0x8e2, 1, 0);
+    @store(0x8e3, 1, 0);
+    @store(0x8ea, 1, 0);
+    @store(0x8eb, 1, 0);
+    @store(0x8f8, 1, 0);
+    @store(0x8f9, 1, 0);
+    @store(0x931, 1, 0);
+    @store(0x935, 1, 0);
+    @store(0x93a, 1, 0);
+    @store(0x93b, 1, 0);
+    @store(0x948, 1, 0);
+    @store(0x949, 1, 0);
+    @store(0x976, 1, 0);
+    @store(0x977, 1, 0);
+    @store(0x980, 1, 0);
+    @store(0x986, 1, 0);
+    @store(0x98a, 1, 0);
+    @store(0x98b, 1, 0);
+    @store(0x9c6, 1, 0);
+    @store(0x9c7, 1, 0);
+    @store(0x9d0, 1, 0);
+    @store(0x9d4, 1, 0);
+    @store(0x9d6, 1, 0);
+    @store(0x9d7, 1, 0);
+    @store(0x9dc, 1, 0);
+    @store(0x9de, 1, 0);
+    @store(0xa20, 1, 0);
+    @store(0xa26, 1, 0);
+    @store(0xa2e, 1, 0);
+    @store(0xa71, 1, 0);
+    @store(0xa75, 1, 0);
+    @store(0xac2, 1, 0);
+    @store(0xac3, 1, 0);
+
+    return 0;
+}
+
+fn main(): u16 {
+    init_grid();
+
+    while true {
+        render_frame();
+        update_counts();
+        update_grid();
+    }
+
+    return 0;
+}
