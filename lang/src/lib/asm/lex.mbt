@@ -32,50 +32,9 @@ fn next_token(lexer: @lex.Lexer) -> Token? raise {
         None => None
         Some(c) => match c {
             '0'..='9' => {
-                let base: UInt = match c {
-                    '0' => {
-                        lexer.index += 1
-                        match lexer.peek() {
-                            Some('x') => {
-                                lexer.index += 1
-                                16 // hexadecimal
-                            }
-                            Some('o') => {
-                                lexer.index += 1
-                                8 // octal
-                            }
-                            Some('b') => {
-                                lexer.index += 1
-                                2 // binary
-                            }
-                            _ => 10 // decimal
-                        }
-                    }
-                    _ => 10 // decimal
-                }
+                let (value, base) = lexer.parse_integer()
 
-                let mut value: UInt = 0
-
-                while true {
-                    match lexer.peek() {
-                        Some(d) => {
-                            if d is ('0'..='9' | 'a'..='f')  {
-                                match @lex.parse_digit(d, base~) {
-                                    None => raise AsmLexerError("invalid digit '\{d}' in base \{base} at position \{lexer.index}")
-                                    Some(digit) => {
-                                        value = value * base + digit
-                                        lexer.index += 1
-                                    }
-                                }
-                            } else {
-                                break
-                            }
-                        }
-                        _ => break
-                    }
-                }
-
-                if value > 0xFFFF || value < 0 {
+                if value > 0xFFFF {
                     raise AsmLexerError("value out of range: \{value}")
                 }
 

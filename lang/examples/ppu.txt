@@ -1,13 +1,14 @@
 
 fn main(): u16 {
-    let ppu_regs = 65520;
-    @store(ppu_regs, 32768, 1);
+    let PPU_REGS = 0xfff0;
+    @store(PPU_REGS, 0x8000, 1); // PPU_ADDR = 0x8000 (start of nametable)
 
-    @store(ppu_regs, 121, 2);
-    @store(ppu_regs, 111, 2);
-    @store(ppu_regs, 100, 2);
-    @store(ppu_regs, 108, 2);
-    @store(ppu_regs, 33, 2);
+    // write "yodl!" to PPU_DATA
+    @store(PPU_REGS, 0x79, 2);
+    @store(PPU_REGS, 0x6f, 2);
+    @store(PPU_REGS, 0x64, 2);
+    @store(PPU_REGS, 0x6c, 2);
+    @store(PPU_REGS, 0x21, 2);
 
     return 0;
 }

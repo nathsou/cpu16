@@ -115,7 +115,7 @@ pub(all) struct IdContext {
 
 impl @asm.LabelContext for IdContext with next_label(self) -> @asm.LabelId {
     let label_id = self.next_label_id
-    self.next_label_id = self.next_label_id.inner() + 1U
+    self.next_label_id = self.next_label_id.0 + 1U
     label_id
 }
 
@@ -129,7 +129,7 @@ pub fn IdContext::new() -> IdContext {
 pub fn IdContext::next_var(self: IdContext) -> @asm.VarId {
     let var_id = self.next_var_id
     // Increment without relying on Add trait for IR@asm.VarId
-    self.next_var_id = self.next_var_id.inner() + 1U
+    self.next_var_id = self.next_var_id.0 + 1U
     var_id
 }
 

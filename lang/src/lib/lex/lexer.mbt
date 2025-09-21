@@ -60,7 +60,7 @@ pub fn parse_digit(c: Char, base~: UInt) -> UInt? {
     }
 }
 
-pub fn parse_integer(self: Lexer) -> UInt {
+pub fn parse_decimal_integer(self: Lexer) -> UInt {
     let mut value = 0U
     
     for i = self.index; i < self.input.length(); i = i + 1 {
@@ -75,6 +75,53 @@ pub fn parse_integer(self: Lexer) -> UInt {
     }
 
     value
+}
+
+pub fn parse_integer(self: Lexer) -> (UInt, UInt) raise {
+    let base: UInt = match self.peek() {
+        Some('0') => {
+            self.index += 1
+            match self.peek() {
+                Some('x') => {
+                    self.index += 1
+                    16 // hexadecimal
+                }
+                Some('o') => {
+                    self.index += 1
+                    8 // octal
+                }
+                Some('b') => {
+                    self.index += 1
+                    2 // binary
+                }
+                _ => 10 // decimal
+            }
+        }
+        _ => 10 // decimal
+    }
+
+    let mut value: UInt = 0
+
+    while true {
+        match self.peek() {
+            Some(d) => {
+                if d is ('0'..='9' | 'a'..='f' | 'A'..='F') && is_digit(d, base~) {
+                    match parse_digit(d, base~) {
+                        None => raise Failure("invalid digit '\{d}' in base \{base} at position \{self.index}")
+                        Some(digit) => {
+                            value = value * base + digit
+                            self.index += 1
+                        }
+                    }
+                } else {
+                    break
+                }
+            }
+            _ => break
+        }
+    }
+
+    (value, base)
 }
 
 pub fn parse_identifier(self: Lexer) -> String {

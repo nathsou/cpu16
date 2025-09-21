@@ -72,7 +72,21 @@ pub fn next_token(lexer: @lex.Lexer) -> Token? raise {
             }
             '/' => {
                 lexer.index += 1
-                Some(Slash)
+
+                if lexer.consumes('/') {
+                    // comment
+                    while lexer.peek() is Some(c) {
+                        if c == '\n' {
+                            break
+                        }
+
+                        lexer.index += 1
+                    }
+
+                    return next_token(lexer)
+                } else {
+                    Some(Slash)
+                }
             }
             '%' => {
                 lexer.index += 1
@@ -142,7 +156,7 @@ pub fn next_token(lexer: @lex.Lexer) -> Token? raise {
             }
             _ => {
                 if @lex.is_digit(c, base=10) {
-                    let value = lexer.parse_integer()
+                    let (value, _base) = lexer.parse_integer()
                     // Optional integer kind suffix: u8 (defaults to u16)
                     let saved_index = lexer.index
                     let kind = if lexer.consumes('u') {
