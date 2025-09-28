@@ -10,7 +10,7 @@ rm -f output/$module.json output/$module.asc output/$module.bin
 
 cp -r design/src/resources/ output/resources/
 
-bunx yodl@0.0.6 design/src/$fileName.yodl "write_firrtl output/$module.fir"
+bunx yodl@0.0.8 design/src/$fileName.yodl "write_firrtl output/$module.fir"
 
 cd output
 

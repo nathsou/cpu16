@@ -17,7 +17,7 @@ VTop: VTopSim.mk
 Top.fir:
 	mkdir -p resources
 	cp -R ../../design/src/resources/. resources/
-	cd ../.. && bunx yodl@0.0.6 design/src/Sim.yodl "write_firrtl sim/verilator/Top.fir"
+	cd ../.. && bunx yodl@0.0.8 design/src/Sim.yodl "write_firrtl sim/verilator/Top.fir"
 
 Top.sv: Top.fir
 	firtool -O=release --format=fir --verilog Top.fir -o Top.sv

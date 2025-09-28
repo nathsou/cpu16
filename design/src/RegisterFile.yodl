@@ -17,32 +17,32 @@ module RegisterFile(
     program_counter: uint<16>,
     display_reg: uint<32>,
 ) {
-    let regs = [
-        Reg<uint<16>>(clk, rst: true), // R0 (Z)
-        ..(6*[Reg<uint<16>>(clk, rst)]), // R1-R6
-        Reg<uint<16>>(clk), // R7 (PC)
-    ]
-
-    for i in 0..=7 {
-        regs[i].d = regs[i].q
-    }
+    let regs = Reg<uint<16>[8]>(clk)
 
     if rst {
-        regs[7].d = PC_START_ADDR
+        regs.d[1] = 16'd0
+        regs.d[2] = 16'd0
+        regs.d[3] = 16'd0
+        regs.d[4] = 16'd0
+        regs.d[5] = 16'd0
+        regs.d[6] = 16'd0
+        regs.d[7] = PC_START_ADDR
     } else if count_enable and not(write_enable and (write_dest == 3'd7)) {
-        regs[7].d = regs[7].q + 1
+        regs.d[7] = regs.q[7] + 1
     }
 
     if write_enable {
-        regs[write_dest].d = write_data
+        regs.d[write_dest] = write_data
     }
+
+    regs.d[0] = 16'd0 // Z is always zero
 
     if DEBUG {
-        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs[1].q, regs[2].q, regs[3].q, regs[4].q, regs[5].q, regs[6].q, regs[7].q)
+        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs.q[1], regs.q[2], regs.q[3], regs.q[4], regs.q[5], regs.q[6], regs.q[7])
     }
 
-    read_data1 = regs[read_src1].q
-    read_data2 = regs[read_src2].q
-    program_counter = regs[7].q
-    display_reg = {regs[1].q, regs[2].q}
+    read_data1 = regs.q[read_src1]
+    read_data2 = regs.q[read_src2]
+    program_counter = regs.q[7]
+    display_reg = {regs.q[1], regs.q[2]}
 }
