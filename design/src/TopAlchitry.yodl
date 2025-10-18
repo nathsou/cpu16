@@ -30,7 +30,7 @@ module Top(
     cpu.ram_read_data = ram.read_data
 
     if cpu.flags.halt {
-        $stop()
+        stop!()
     }
 
     let disp = (orr io_sw) ? cpu.display_reg[15:0] : cpu.display_reg[31:16]

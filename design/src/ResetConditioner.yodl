@@ -5,7 +5,7 @@ module ResetConditioner<Cycles: uint>(
 ) -> (
     q: bool,
 ) {
-    let counter = Reg<uint<$clog2(Cycles - 1)>>(clk)
+    let counter = Reg<uint<clog2!(Cycles - 1)>>(clk)
 
     if counter.q != Cycles - 1 {
         counter.d = counter.q + 1

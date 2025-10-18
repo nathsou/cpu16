@@ -20,7 +20,7 @@ module RAM(
         write: [{ clk: clk, en: write_enable, addr: addr, data: write_data, mask: true }],
     )
 
-    $readmemh("resources/progs/gol.hex", mem)
+    readmemh!("resources/progs/gol.hex", mem)
 
     read_data = mem.q[0]
 }

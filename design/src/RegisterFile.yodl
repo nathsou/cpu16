@@ -38,7 +38,7 @@ module RegisterFile(
     regs.d[0] = 16'd0 // Z is always zero
 
     if DEBUG {
-        $printf("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs.q[1], regs.q[2], regs.q[3], regs.q[4], regs.q[5], regs.q[6], regs.q[7])
+        printf!("r1: %h, r2: %h, r3: %h, r4: %h, r5: %h, r6: %h, r7: %h\n", regs.q[1], regs.q[2], regs.q[3], regs.q[4], regs.q[5], regs.q[6], regs.q[7])
     }
 
     read_data1 = regs.q[read_src1]

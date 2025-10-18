@@ -12,7 +12,7 @@ const TILES_Y = 60
 const TILE_SIZE = 8
 const PATTERN_TABLE_SIZE = 256
 const NAMETABLE_BANKS = 1
-const NAMETABLE_ADDR_WIDTH = $clog2(TILES_X * TILES_Y * NAMETABLE_BANKS)
+const NAMETABLE_ADDR_WIDTH = clog2!(TILES_X * TILES_Y * NAMETABLE_BANKS)
 
 type VGASignals = {
     hsync: bool,
@@ -101,7 +101,7 @@ module PPU(
     )
 
     // TODO: Fill pattern table from the CPU
-    $readmemh("resources/font.hex", pattern_table)
+    readmemh!("resources/font.hex", pattern_table)
 
     if sync_pulses.is_active_area {
         if x[2:0] == 3'd7 {
